@@ -87,17 +87,16 @@ convert(::Type{String}, po::PyObject) =
 
 function show(io::IO, o::PyObject)
     if o.o == C_NULL
-        show(io, "<PyObject NULL>")
+        show(io, "PyObject NULL")
     else
         s = ccall((:PyObject_Str, libpython), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             s = ccall((:PyObject_Repr, libpython), PyPtr, (PyPtr,), o)
         end
         if (s == C_NULL)
-            show(io, "<PyObject $o.o>")
+            show(io, "PyObject $o.o")
         else
-            ss = convert(String, PyObject(s))
-            show(io, "<PyObject $ss>")
+            show(io, "PyObject $(convert(String, PyObject(s)))")
         end
     end
 end
