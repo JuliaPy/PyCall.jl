@@ -41,7 +41,6 @@ to fetch the latest version of the package and install it in your
 
 Here is a simple example to call Python's `math.sin` function:
 
-    require("PyCall")
     using PyCall
     pyinitialize() # initialize the Python interpreter
     math = pyimport("math") # import the Python math module
