@@ -10,7 +10,7 @@ PyCall is currently a proof-of-concept and work in progress.  Some
 basic functionality works, but major TODO items are:
 
 * Currently, the Python library name is hardcoded, but this should be
-  determined from the `python` executable name given when Python is,
+  determined from the `python` executable name given when Python is
   initialized.  For now, change the `libpython` variable in `PyCall.jl`
   to the name of your Python library as needed.
 
