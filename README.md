@@ -9,11 +9,6 @@ language, automatically converting types etcetera.
 PyCall is currently a proof-of-concept and work in progress.  Some
 basic functionality works, but major TODO items are:
 
-* Currently, the Python library name is hardcoded, but this should be
-  determined from the `python` executable name given when Python is
-  initialized.  For now, change the `libpython` variable in `PyCall.jl`
-  to the name of your Python library as needed.
-
 * Support for passing and returning `Array` and `Tuple` arguments, the
   former ideally using [NumPy's](http://www.numpy.org/) interface to
   pass arrays without incurring a copy.
@@ -42,7 +37,6 @@ to fetch the latest version of the package and install it in your
 Here is a simple example to call Python's `math.sin` function:
 
     using PyCall
-    pyinitialize() # initialize the Python interpreter
     math = pyimport("math") # import the Python math module
     pycall(math["sin"], Float64, 3.0) - sin(3.0) # returns 0.0
 
@@ -75,16 +69,10 @@ returns the numeric value of &pi; from Python's `math.pi`.
 
 ## Reference
 
-The following functions are provided by the `PyCall` module:
+The PyCall module supplies several subroutines, types, and conversion routines
+to simplify calling Python code.
 
-* `pyinitialize()`: Initialize the Python interpreter.  This `must` be
-  called before any of the other functions below, or a crash will occur.
-  It is safe to call this function more than once; subsequent calls will
-  do nothing.
-
-* `pyfinalize()`: End the Python interpreter and free all associated memory.
-  After this function is called, none of the other functions below may
-  be called until Python is re-started by calling `pyinitialize()` again.
+### Calling Python
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).   Functions or other symbols
@@ -100,14 +88,61 @@ The following functions are provided by the `PyCall` module:
 * `pyglobal(s)`: Look up `s` (a string or symbol) in the global Python
   namespace.
 
-The `PyCall` module also provides a new type `PyObject` (a wrapper around
+### Types
+
+The PyCall module also provides a new type `PyObject` (a wrapper around
 `PyObject*` in Python's C API) representing a reference to a Python object.
 
 Constructors `PyObject(o)` are provided for a number of Julia types,
-and `PyCall` also supplies `convert(T, o::PyObject)` to convert
+and PyCall also supplies `convert(T, o::PyObject)` to convert
 PyObjects back into Julia types `T`.  *Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
 strings, but more are planned.*
+
+### Initialization
+
+By default, whenever you call `pyimport`, `pycall`, or `pyglobal`, the
+Python interpreter (corresponding to the `python` executable name) is
+initialized and remains in memory until Julia exits.  However, you may
+want to modify this behavior to change the default Python version, to
+call low-level Python functions or create `PyObject`s before calling
+`pyimport` etcetera, or to free the memory consumed by Python.  This
+can be accomplished using:
+
+* `pyinitialize(s::String)`: Initialize the Python interpreter using
+  the Python libraries corresponding to the `python` executable given
+  by the argument `s`.  Calling `pyinitialize()` defaults to
+  `pyinitialize("python")`, but you may need to change this to use a
+  different Python version.   The `pyinitialize` function *must* be
+  called before you can call any Python functions, but it is called
+  automatically if necessary by `pyimport`, `pycall`, and `pyglobal`.
+  It is safe to call this function more than once; subsequent calls will
+  do nothing (until `pyfinalize` is called).
+
+* `pyfinalize()`: End the Python interpreter and free all associated memory.
+  After this function is called, you may restart the Python interpreter
+  by calling `pyinitialize` again.  It is safe to call `pyfinalize` more
+  than once (subsequent calls do nothing).
+
+### Low-level Python API access
+
+If you want to call low-level functions in the Python C API, you can
+do so using `ccall`.  Just remember to call `pyinitialize` first, and:
+
+* Use `pyfunc(func::Symbol)` to get a function pointer to pass to `ccall`
+  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(pyfunc(:Py_IsInitialized), Int32, ())`.
+
+* PyCall defines the typealias `PyPtr` for `PythonObject*` argument types,
+  and `PythonObject` (see above) arguments are correctly converted to this
+  type.
+
+* Use `PythonObject` and the `convert` routines mentioned above to convert
+  Julia types to/from `PythonObject*` references.
+
+* If a new reference is returned by a Python function, immediately
+  convert the `PyPtr` return values to `PythonObject` objects in order to
+  have their Python reference counts decremented when the object is
+  garbage collected in Julia.  i.e. `PythonObject(ccall(func, PyPtr, ...))`.
 
 ## Author
 

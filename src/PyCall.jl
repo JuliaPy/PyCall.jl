@@ -1,25 +1,53 @@
 module PyCall
 
-export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject
+export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject, pyfunc, PyPtr
 
 import Base.convert
 import Base.ref
 import Base.show
 
-const libpython = "libpython2.6" # fixme: don't hard-code this
-
 typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 
 #########################################################################
 
+# Global configuration variables.  Note that, since Julia does not allow us
+# to attach type annotations to globals, we need to annotate these explicitly
+# as initialized::Bool and libpython::String when we use them.
+initialized = false # whether Python is initialized
+libpython = C_NULL # Python shared library (from dlopen)
+
+libpython_name(python::String) =
+  replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
+          r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
+
+pyfunc(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
+
 # initialize the Python interpreter (no-op on subsequent calls)
-function pyinitialize()
-    ccall((:Py_Initialize, libpython), Void, ())
+function pyinitialize(python::String)
+    global initialized
+    global libpython
+    if (!initialized::Bool)
+        libpython::Ptr{Void} = dlopen(libpython_name(python))
+        ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
+        initialized::Bool = true
+    end
+    nothing
 end
+
+pyinitialize() = pyinitialize("python") # default Python executable name
+libpython_name() = libpython_name("python") # ditto
 
 # end the Python interpreter and free associated memory
 function pyfinalize()
-    ccall((:Py_Finalize, libpython), Void, ())
+    global initialized
+    global libpython
+    if (initialized::Bool)
+        ccall(pyfunc(:Py_Finalize), Void, ())
+        dlclose(libpython::Ptr{Void})
+        libpython::Ptr{Void} = C_NULL
+        initialized::Bool = false
+    end
+    nothing
 end
 
 #########################################################################
@@ -30,7 +58,7 @@ type PyObject
     o::PyPtr
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(po, po -> ccall((:Py_DecRef, libpython), 
+        finalizer(po, po -> ccall(pyfunc(:Py_DecRef), 
                                   Void, (PyPtr,), po.o))
         return po
     end
@@ -41,46 +69,46 @@ convert(::Type{PyPtr}, po::PyObject) = po.o
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(ccall((:PyInt_FromSize_t, libpython),
+PyObject(i::Unsigned) = PyObject(ccall(pyfunc(:PyInt_FromSize_t),
                                        PyPtr, (Uint,), i))
-PyObject(i::Integer) = PyObject(ccall((:PyInt_FromSsize_t, libpython),
+PyObject(i::Integer) = PyObject(ccall(pyfunc(:PyInt_FromSsize_t),
                                       PyPtr, (Int,), i))
 
 PyObject(b::Bool) = 
-  PyObject(ccall((:PyBool_FromLong, libpython),
+  PyObject(ccall(pyfunc(:PyBool_FromLong),
                  PyPtr, (OS_NAME == :Windows ? Int32 : Int,), b))
 
-PyObject(r::Real) = PyObject(ccall((:PyFloat_FromDouble, libpython),
+PyObject(r::Real) = PyObject(ccall(pyfunc(:PyFloat_FromDouble),
                                    PyPtr, (Float64,), r))
 
-PyObject(c::Complex) = PyObject(ccall((:PyComplex_FromDoubles, libpython),
+PyObject(c::Complex) = PyObject(ccall(pyfunc(:PyComplex_FromDoubles),
                                       PyPtr, (Float64,Float64), 
                                       real(c), imag(c)))
 
 # fixme: PyString_* was renamed to PyBytes_* in Python 3.x?
-PyObject(s::String) = PyObject(ccall((:PyString_FromString, libpython),
+PyObject(s::String) = PyObject(ccall(pyfunc(:PyString_FromString),
                                      PyPtr, (Ptr{Uint8},), bytestring(s)))
 
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
-  convert(T, ccall((:PyInt_AsSsize_t, libpython), Int, (PyPtr,), po))
+  convert(T, ccall(pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 convert(::Type{Bool}, po::PyObject) = 
-  convert(Bool, ccall((:PyInt_AsSsize_t, libpython), Int, (PyPtr,), po))
+  convert(Bool, ccall(pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) = 
-  convert(T, ccall((:PyFloat_AsDouble, libpython), Float64, (PyPtr,), po))
+  convert(T, ccall(pyfunc(:PyFloat_AsDouble), Float64, (PyPtr,), po))
 
 convert{T<:Complex}(::Type{T}, po::PyObject) = 
   convert(T, 
-          complex128(ccall((:PyComplex_RealAsDouble, libpython), 
+          complex128(ccall(pyfunc(:PyComplex_RealAsDouble), 
                            Float64, (PyPtr,), po),
-                     ccall((:PyComplex_ImagAsDouble, libpython), 
+                     ccall(pyfunc(:PyComplex_ImagAsDouble), 
                            Float64, (PyPtr,), po)))
 
 convert(::Type{String}, po::PyObject) =
-  bytestring(ccall((:PyString_AsString, libpython), 
+  bytestring(ccall(pyfunc(:PyString_AsString), 
                    Ptr{Uint8}, (PyPtr,), po))
 
 #########################################################################
@@ -89,9 +117,9 @@ function show(io::IO, o::PyObject)
     if o.o == C_NULL
         show(io, "PyObject NULL")
     else
-        s = ccall((:PyObject_Str, libpython), PyPtr, (PyPtr,), o)
+        s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
-            s = ccall((:PyObject_Repr, libpython), PyPtr, (PyPtr,), o)
+            s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
         end
         if (s == C_NULL)
             show(io, "PyObject $o.o")
@@ -105,7 +133,7 @@ end
 # For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python
 
 function ref(o::PyObject, s::String)
-    p = ccall((:PyObject_GetAttrString, libpython), PyPtr,
+    p = ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
               (PyPtr, Ptr{Uint8}), o, bytestring(s))
     if p == C_NULL
         throw(KeyError(s))
@@ -118,7 +146,8 @@ ref(o::PyObject, s::Symbol) = ref(o, string(s))
 #########################################################################
 
 function pyimport(name::String)
-    mod = PyObject(ccall((:PyImport_ImportModule, libpython), PyPtr,
+    pyinitialize()
+    mod = PyObject(ccall(pyfunc(:PyImport_ImportModule), PyPtr,
                          (Ptr{Uint8},), bytestring(name)))
     # fixme: check for errors
     return mod
@@ -128,10 +157,11 @@ pyimport(name::Symbol) = pyimport(string(name))
 
 # look up a global variable (in module __main__)
 function pyglobal(name::String)
+    pyinitialize()
     # fixme: check for errors
-    return PyObject(ccall((:PyObject_GetAttrString, libpython), PyPtr,
+    return PyObject(ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
                           (PyPtr, Ptr{Uint8}), 
-                          ccall((:PyImport_AddModule, libpython), PyPtr,
+                          ccall(pyfunc(:PyImport_AddModule), PyPtr,
                                 (Ptr{Uint8},), bytestring("__main__")),
                           bytestring(name)))
 end
@@ -141,23 +171,24 @@ pyglobal(name::Symbol) = pyglobal(string(name))
 #########################################################################
 
 function pycall(o::PyObject, returntype::Type, args...)
+    pyinitialize()
     oargs = map(PyObject, args)
     # would rather call PyTuple_Pack, but calling varargs functions
     # with ccall and argument splicing seems problematic right now.
-    arg = PyObject(ccall((:PyTuple_New, libpython), PyPtr, (Int,), 
+    arg = PyObject(ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
                          length(args)))
     if arg.o == C_NULL
         error("failure creating Python argument tuple")
     end
     for i = 1:length(args)
-        if 0 != ccall((:PyTuple_SetItem, libpython), Int32, (PyPtr,Int,PyPtr),
+        if 0 != ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
                       arg, i-1, oargs[i])
             error("error setting Python argument tuple")
         end
-        # must incref since PyTuple_SetItem steals a reference
-        ccall((:Py_IncRef, libpython), Void, (PyPtr,), oargs[i])
+        oargs[i].o = C_NULL # PyTuple_SetItem steals the reference
+        ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), oargs[i])
     end
-    ret = PyObject(ccall((:PyObject_CallObject, libpython), PyPtr,
+    ret = PyObject(ccall(pyfunc(:PyObject_CallObject), PyPtr,
                          (PyPtr,PyPtr), o, arg))
     if ret.o == C_NULL
         error("failure calling Python function")
