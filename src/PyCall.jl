@@ -4,6 +4,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject
 
 import Base.convert
 import Base.ref
+import Base.show
 
 const libpython = "libpython2.6" # fixme: don't hard-code this
 
@@ -81,6 +82,25 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
 convert(::Type{String}, po::PyObject) =
   bytestring(ccall((:PyString_AsString, libpython), 
                    Ptr{Uint8}, (PyPtr,), po))
+
+#########################################################################
+
+function show(io::IO, o::PyObject)
+    if o.o == C_NULL
+        show(io, "<PyObject NULL>")
+    else
+        s = ccall((:PyObject_Str, libpython), PyPtr, (PyPtr,), o)
+        if (s == C_NULL)
+            s = ccall((:PyObject_Repr, libpython), PyPtr, (PyPtr,), o)
+        end
+        if (s == C_NULL)
+            show(io, "<PyObject $o.o>")
+        else
+            ss = convert(String, PyObject(s))
+            show(io, "<PyObject $ss>")
+        end
+    end
+end
 
 #########################################################################
 # For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python
