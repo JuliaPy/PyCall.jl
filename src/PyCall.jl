@@ -27,7 +27,7 @@ function pyinitialize(python::String)
     global initialized
     global libpython
     if (!initialized::Bool)
-        libpython::Ptr{Void} = dlopen(libpython_name(python))
+        libpython::Ptr{Void} = dlopen_global(libpython_name(python))
         ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
     end
@@ -66,6 +66,13 @@ end
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o
+
+# use constructor for generic conversions to PyObject
+convert(::Type{PyObject}, o) = PyObject(o)
+PyObject(o::PyObject) = o
+
+#########################################################################
+# Conversions of simple types (numbers and strings)
 
 # conversions from Julia types to PyObject:
 
@@ -112,6 +119,34 @@ convert(::Type{String}, po::PyObject) =
                    Ptr{Uint8}, (PyPtr,), po))
 
 #########################################################################
+# Tuple conversion
+
+function PyObject(t::(Any...)) 
+    o = ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), length(t))
+    if o == C_NULL
+        error("failure creating Python tuple")
+    end
+    for i = 1:length(t)
+        oi = PyObject(t[i])
+        if 0 != ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
+                      o, i-1, oi)
+            error("error setting Python tuple")
+        end
+        oi.o = C_NULL # PyTuple_SetItem steals the reference
+    end
+    return PyObject(o)
+end
+
+convert(tt::(Type...), o::PyObject) = 
+  ntuple(ccall(pyfunc(:PyTuple_Size), Int, (PyPtr,), o), i -> begin
+      oi = PyObject(ccall(pyfunc(:PyTuple_GetItem), PyPtr, (PyPtr,Int), o,i-1))
+      ti = convert(tt[i], oi)
+      oi.o = C_NULL # GetItem returns borrowed reference
+      ti
+  end)
+
+#########################################################################
+# Pretty-printing PyObject
 
 function show(io::IO, o::PyObject)
     if o.o == C_NULL
@@ -120,12 +155,11 @@ function show(io::IO, o::PyObject)
         s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
+            if (s == C_NULL)
+                return show(io, "PyObject $o.o")
+            end
         end
-        if (s == C_NULL)
-            show(io, "PyObject $o.o")
-        else
-            show(io, "PyObject $(convert(String, PyObject(s)))")
-        end
+        show(io, "PyObject $(convert(String, PyObject(s)))")
     end
 end
 
@@ -170,7 +204,7 @@ pyglobal(name::Symbol) = pyglobal(string(name))
 
 #########################################################################
 
-function pycall(o::PyObject, returntype::Type, args...)
+function pycall(o::PyObject, returntype::Union(Type,(Type...)), args...)
     pyinitialize()
     oargs = map(PyObject, args)
     # would rather call PyTuple_Pack, but calling varargs functions
@@ -185,7 +219,10 @@ function pycall(o::PyObject, returntype::Type, args...)
                       arg, i-1, oargs[i])
             error("error setting Python argument tuple")
         end
-        oargs[i].o = C_NULL # PyTuple_SetItem steals the reference
+        # PyTuple_SetItem steals the reference.  (Note: Don't
+        # set oargs[i].o to C_NULL here, since the original arg
+        # might itself have been a PyObject and we don't want
+        # it to "lose" its object.  IncRef instead.)
         ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), oargs[i])
     end
     ret = PyObject(ccall(pyfunc(:PyObject_CallObject), PyPtr,
@@ -197,9 +234,6 @@ function pycall(o::PyObject, returntype::Type, args...)
     # TODO: check for errors
     return jret
 end
-
-pycall(s::Union(String,Symbol), returntype::Type, args...) =
-  pycall(pyglobal(s), returntype, args...)
 
 #########################################################################
 
