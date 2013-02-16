@@ -60,8 +60,8 @@ converted into the corresponding Python types.  For example:
 also works and also returns `0.0` since Python's `math.sin` function accepts
 integer arguments as well as floating-point arguments.
 
-*Currently, only numeric, boolean, and string types are supported, with
-more planned.*
+Currently, numeric, boolean, and string types, along with tuples and
+1d arrays/lists thereof, are supported, with more planned.
 
 You can also look up other names in a module, and use `convert` to
 convert them to Julia types, e.g.
@@ -98,9 +98,9 @@ The PyCall module also provides a new type `PyObject` (a wrapper around
 
 Constructors `PyObject(o)` are provided for a number of Julia types,
 and PyCall also supplies `convert(T, o::PyObject)` to convert
-PyObjects back into Julia types `T`.  *Currently, the only types
+PyObjects back into Julia types `T`.  Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
-strings, but more are planned.*
+strings, along with tuples and 1d arrays/lists thereof, but more are planned.
 
 ### Initialization
 
