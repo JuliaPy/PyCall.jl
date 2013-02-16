@@ -137,13 +137,15 @@ function PyObject(t::(Any...))
     return PyObject(o)
 end
 
-convert(tt::(Type...), o::PyObject) = 
-  ntuple(ccall(pyfunc(:PyTuple_Size), Int, (PyPtr,), o), i -> begin
-      oi = PyObject(ccall(pyfunc(:PyTuple_GetItem), PyPtr, (PyPtr,Int), o,i-1))
-      ti = convert(tt[i], oi)
-      oi.o = C_NULL # GetItem returns borrowed reference
-      ti
-  end)
+function convert(tt::(Type...), o::PyObject)
+    len = ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+    if len != length(tt)
+        throw(BoundsError())
+    end
+    ntuple(len, i ->
+           convert(tt[i], PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+                                         (PyPtr, Int), o, i-1))))
+end
 
 #########################################################################
 # Pretty-printing PyObject
