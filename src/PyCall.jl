@@ -156,7 +156,7 @@ function show(io::IO, o::PyObject)
         if (s == C_NULL)
             s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
-                return print(io, "PyObject $o.o")
+                return print(io, "PyObject $(o.o)")
             end
         end
         print(io, "PyObject $(convert(String, PyObject(s)))")
