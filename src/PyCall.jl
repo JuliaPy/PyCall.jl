@@ -12,7 +12,7 @@ typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 
 # Global configuration variables.  Note that, since Julia does not allow us
 # to attach type annotations to globals, we need to annotate these explicitly
-# as initialized::Bool and libpython::String when we use them.
+# as initialized::Bool and libpython::Ptr{Void} when we use them.
 initialized = false # whether Python is initialized
 libpython = C_NULL # Python shared library (from dlopen)
 
