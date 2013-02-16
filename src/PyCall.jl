@@ -1,6 +1,6 @@
 module PyCall
 
-export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject, pyfunc, PyPtr
+export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject, pyfunc, PyPtr, pyincref
 
 import Base.convert
 import Base.ref
@@ -67,6 +67,8 @@ type PyObject
         return po
     end
 end
+
+pyincref(o::PyObject) = ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o
@@ -136,7 +138,7 @@ function PyObject(t::(Any...))
                       o, i-1, oi)
             error("error setting Python tuple")
         end
-        oi.o = C_NULL # PyTuple_SetItem steals the reference
+        pyincref(oi) # PyTuple_SetItem steals the reference
     end
     return PyObject(o)
 end
@@ -165,7 +167,7 @@ function PyObject(v::AbstractVector)
                       o, i-1, oi)
             error("error setting Python tuple")
         end
-        oi.o = C_NULL # PyList_SetItem steals the reference
+        pyincref(oi) # PyList_SetItem steals the reference
     end
     return PyObject(o)
 end
@@ -254,7 +256,7 @@ function pycall(o::PyObject, returntype::Union(Type,(Type...)), args...)
         # set oargs[i].o to C_NULL here, since the original arg
         # might itself have been a PyObject and we don't want
         # it to "lose" its object.  IncRef instead.)
-        ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), oargs[i])
+        pyincref(oargs[i])
     end
     ret = PyObject(ccall(pyfunc(:PyObject_CallObject), PyPtr,
                          (PyPtr,PyPtr), o, arg))
