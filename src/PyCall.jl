@@ -150,16 +150,16 @@ convert(tt::(Type...), o::PyObject) =
 
 function show(io::IO, o::PyObject)
     if o.o == C_NULL
-        show(io, "PyObject NULL")
+        print(io, "PyObject NULL")
     else
         s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
-                return show(io, "PyObject $o.o")
+                return print(io, "PyObject $o.o")
             end
         end
-        show(io, "PyObject $(convert(String, PyObject(s)))")
+        print(io, "PyObject $(convert(String, PyObject(s)))")
     end
 end
 
