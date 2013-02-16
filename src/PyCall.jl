@@ -35,7 +35,7 @@ function pyinitialize(python::String)
         ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
     end
-    nothing
+    return
 end
 
 pyinitialize() = pyinitialize("python") # default Python executable name
@@ -51,7 +51,7 @@ function pyfinalize()
         libpython::Ptr{Void} = C_NULL
         initialized::Bool = false
     end
-    nothing
+    return
 end
 
 #########################################################################

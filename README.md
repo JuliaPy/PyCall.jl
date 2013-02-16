@@ -79,7 +79,7 @@ to simplify calling Python code.
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).   Functions or other symbols
-  in the module may then be looked up by `s[name]` where `name is a string
+  in the module may then be looked up by `s[name]` where `name` is a string
   or symbol (`s[name]` also returns a `PyObject`).
 
 * `pycall(function::PyObject, returntype::Type, args...)`.   Call the given 
