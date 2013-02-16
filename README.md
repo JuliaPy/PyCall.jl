@@ -6,19 +6,22 @@ language, automatically converting types etcetera.
 
 ## Work in Progress
 
-PyCall is currently a proof-of-concept and work in progress.  Some
+PyCall is currently a proof-of-concept and work in progress.  Much
 basic functionality works, but major TODO items are:
 
-* Support for passing and returning `Array` and `Tuple` arguments, the
-  former ideally using [NumPy's](http://www.numpy.org/) interface to
-  pass arrays without incurring a copy.
+* Conversion between Julia types and NumPy arrays (which in many cases
+  should require no data copying).  This is required to support
+  multidimensional arrays.  (Currently, only 1d arrays can be converted.)
 
-* Currently, Julia needs to be patched to include the `RTLD_GLOBAL` flag
-  in `dlopen` (in `dlload.c:jl_uv_dlopen`) in order for it to be possible to
-  import modules like [SciPy](http://www.scipy.org) that load their own
-  shared libraries.  A more permanent solution needs to be found.
+* Automatic type inference of Python return values (currently, you
+  must specify this manually, which leads to better compiled code
+  but is inconvenient).
 
 * More error checking and conversion of Python exceptions to Julia exceptions.
+
+* Conversions for many more types (Dict, range, xrange, etc.).
+
+* Syntactic sugar.
 
 ## Installation
 

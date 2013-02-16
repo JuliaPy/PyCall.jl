@@ -148,6 +148,31 @@ function convert(tt::(Type...), o::PyObject)
 end
 
 #########################################################################
+# Lists and 1d arrays.  TODO: Use NumPy arrays to share data where possible.
+
+function PyObject(v::AbstractVector)
+    o = ccall(pyfunc(:PyList_New), PyPtr, (Int,), length(v))
+    if o == C_NULL
+        error("failure creating Python list")
+    end
+    for i = 1:length(v)
+        oi = PyObject(v[i])
+        if 0 != ccall(pyfunc(:PyList_SetItem), Int32, (PyPtr,Int,PyPtr),
+                      o, i-1, oi)
+            error("error setting Python tuple")
+        end
+        oi.o = C_NULL # PyList_SetItem steals the reference
+    end
+    return PyObject(o)
+end
+
+function convert{T}(::Type{Vector{T}}, o::PyObject)
+    len = ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+    [ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+                                (PyPtr, Int), o, i-1))) for i in 1:len ]
+end
+
+#########################################################################
 # Pretty-printing PyObject
 
 function show(io::IO, o::PyObject)
