@@ -27,7 +27,11 @@ function pyinitialize(python::String)
     global initialized
     global libpython
     if (!initialized::Bool)
-        libpython::Ptr{Void} = dlopen_global(libpython_name(python))
+        if isdefined(:dlopen_global) # see Julia issue #2317
+            libpython::Ptr{Void} = dlopen_global(libpython_name(python))
+        else # Julia 0.1 - can't support inter-library dependencies
+            libpython::Ptr{Void} = dlopen(libpython_name(python))
+        end
         ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
     end
