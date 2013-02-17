@@ -18,7 +18,8 @@ basic functionality works, but major TODO items are:
 
 * More error checking and conversion of Python exceptions to Julia exceptions.
 
-* Conversions for many more types (Dict, range, xrange, etc.).
+* Conversions for many more types (set, range, xrange, etc.).  Callback
+  functions.
 
 * Syntactic sugar.
 

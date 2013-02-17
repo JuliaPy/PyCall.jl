@@ -148,8 +148,8 @@ convert(::Type{String}, po::PyObject) =
 # Tuple conversion
 
 function PyObject(t::(Any...)) 
-    o = ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), length(t))
-    if o == C_NULL
+    o = PyObject(ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), length(t)))
+    if o.o == C_NULL
         error("failure creating Python tuple")
     end
     for i = 1:length(t)
@@ -160,7 +160,7 @@ function PyObject(t::(Any...))
         end
         pyincref(oi) # PyTuple_SetItem steals the reference
     end
-    return PyObject(o)
+    return o
 end
 
 function convert(tt::(Type...), o::PyObject)
@@ -177,8 +177,8 @@ end
 # Lists and 1d arrays.  TODO: Use NumPy arrays to share data where possible.
 
 function PyObject(v::AbstractVector)
-    o = ccall(pyfunc(:PyList_New), PyPtr, (Int,), length(v))
-    if o == C_NULL
+    o = PyObject(ccall(pyfunc(:PyList_New), PyPtr, (Int,), length(v)))
+    if o.o == C_NULL
         error("failure creating Python list")
     end
     for i = 1:length(v)
@@ -189,13 +189,48 @@ function PyObject(v::AbstractVector)
         end
         pyincref(oi) # PyList_SetItem steals the reference
     end
-    return PyObject(o)
+    return o
 end
 
 function convert{T}(::Type{Vector{T}}, o::PyObject)
     len = ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
     [ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
                                 (PyPtr, Int), o, i-1))) for i in 1:len ]
+end
+
+#########################################################################
+# Dictionaries (TODO: no-copy conversion?)
+
+function PyObject(d::Associative)
+    o = PyObject(ccall(pyfunc(:PyDict_New), PyPtr, ()))
+    if o == C_NULL
+        error("failure creating Python dictionary")
+    end
+    for k in keys(d)
+        if 0 != ccall(pyfunc(:PyDict_SetItem), Int32, (PyPtr,PyPtr,PyPtr),
+                      o, PyObject(k), PyObject(d[k]))
+            error("error setting Python dictionary item")
+        end
+    end
+    return o
+end
+
+function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
+    d = Dict{K,V}()
+    # arrays to pass key, value, and pos pointers to PyDict_Next
+    ka = Array(PyPtr, 1)
+    va = Array(PyPtr, 1)
+    pa = zeros(Int, 1) # must be initialized to zero
+    while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
+                     (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
+                     o, pa, ka, va)
+        ko = PyObject(ka[1])
+        vo = PyObject(va[1])
+        merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
+        ko.o = C_NULL # borrowed reference, don't decref
+        vo.o = C_NULL # borrowed reference, don't decref
+    end
+    return d
 end
 
 #########################################################################
