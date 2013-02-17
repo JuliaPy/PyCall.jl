@@ -9,9 +9,8 @@ language, automatically converting types etcetera.
 PyCall is currently a proof-of-concept and work in progress.  Much
 basic functionality works, but major TODO items are:
 
-* Conversion between Julia types and NumPy arrays (which in many cases
-  should require no data copying).  This is required to support
-  multidimensional arrays.  (Currently, only 1d arrays can be converted.)
+* Conversion of NumPy ndarrays to Julia arrays, possibly with no copying.
+  (The converse, Julia to NumPy, is already implemented in a copy-free manner).
 
 * Automatic type inference of Python return values (currently, you
   must specify this manually, which leads to better compiled code
@@ -61,7 +60,7 @@ also works and also returns `0.0` since Python's `math.sin` function accepts
 integer arguments as well as floating-point arguments.
 
 Currently, numeric, boolean, and string types, along with tuples and
-1d arrays/lists thereof, are supported, with more planned.
+arrays/lists thereof, are supported, with more planned.
 
 You can also look up other names in a module, and use `convert` to
 convert them to Julia types, e.g.
@@ -100,7 +99,7 @@ Constructors `PyObject(o)` are provided for a number of Julia types,
 and PyCall also supplies `convert(T, o::PyObject)` to convert
 PyObjects back into Julia types `T`.  Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
-strings, along with tuples and 1d arrays/lists thereof, but more are planned.
+strings, along with tuples and arrays/lists thereof, but more are planned.
 
 ### Initialization
 
@@ -125,7 +124,8 @@ can be accomplished using:
 * `pyfinalize()`: End the Python interpreter and free all associated memory.
   After this function is called, you may restart the Python interpreter
   by calling `pyinitialize` again.  It is safe to call `pyfinalize` more
-  than once (subsequent calls do nothing).
+  than once (subsequent calls do nothing).   You must *not* have any
+  remaining variables referencing `PyObject` types when `pyfinalize` runs.
 
 ### Low-level Python API access
 

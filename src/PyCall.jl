@@ -1,12 +1,54 @@
 module PyCall
 
-export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject, pyfunc, PyPtr, pyincref
+export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject,
+       pyfunc, PyPtr, pyincref, pydecref, pyversion
 
 import Base.convert
 import Base.ref
 import Base.show
 
 typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
+
+#########################################################################
+# Wrapper around Python's C PyObject* type, with hooks to Python reference
+# counting and conversion routines to/from C and Julia types.
+
+type PyObject
+    o::PyPtr # the actual PyObject*
+
+    # For copy-free wrapping of arrays, the PyObject may reference a
+    # pointer to Julia array data.  In this case, we must keep a
+    # reference to the Julia object inside the PyObject so that the
+    # former is not garbage collected before the latter.
+    keep::Any
+
+    function PyObject(o::PyPtr, keep::Any)
+        po = new(o, keep)
+        finalizer(po, pydecref)
+        return po
+    end
+end
+
+PyObject(o::PyPtr) = PyObject(o, nothing) # no Julia object to keep
+
+function pydecref(o::PyObject)
+    ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
+    o.o = C_NULL
+end
+
+pyincref(o::PyObject) = ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
+
+# conversion to pass PyObject as ccall arguments:
+convert(::Type{PyPtr}, po::PyObject) = po.o
+
+# use constructor for generic conversions to PyObject
+convert(::Type{PyObject}, o) = PyObject(o)
+PyObject(o::PyObject) = o
+
+#########################################################################
+# Auxiliary files
+
+include("numpy.jl")
 
 #########################################################################
 
@@ -46,6 +88,8 @@ function pyfinalize()
     global initialized
     global libpython
     if (initialized::Bool)
+        npyfinalize()
+        gc() # collect/decref any remaining PyObjects
         ccall(pyfunc(:Py_Finalize), Void, ())
         dlclose(libpython::Ptr{Void})
         libpython::Ptr{Void} = C_NULL
@@ -54,28 +98,9 @@ function pyfinalize()
     return
 end
 
-#########################################################################
-# Wrapper around Python's C PyObject* type, with hooks to Python reference
-# counting and conversion routines to/from C and Julia types.
-
-type PyObject
-    o::PyPtr
-    function PyObject(o::PyPtr)
-        po = new(o)
-        finalizer(po, po -> ccall(pyfunc(:Py_DecRef), 
-                                  Void, (PyPtr,), po.o))
-        return po
-    end
-end
-
-pyincref(o::PyObject) = ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
-
-# conversion to pass PyObject as ccall arguments:
-convert(::Type{PyPtr}, po::PyObject) = po.o
-
-# use constructor for generic conversions to PyObject
-convert(::Type{PyObject}, o) = PyObject(o)
-PyObject(o::PyObject) = o
+# Return the Python version as a Julia VersionNumber<
+pyversion() = VersionNumber(convert((Int,Int,Int,String,Int), 
+                                    pyimport("sys")["version_info"])[1:3]...)
 
 #########################################################################
 # Conversions of simple types (numbers and strings)
