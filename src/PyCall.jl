@@ -228,7 +228,11 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
         vo = PyObject(va[1])
         merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
         ko.o = C_NULL # borrowed reference, don't decref
-        vo.o = C_NULL # borrowed reference, don't decref
+        if V == PyObject
+            pyincref(vo) # need to hold a reference
+        else
+            vo.o = C_NULL # borrowed reference, don't decref
+        end
     end
     return d
 end
