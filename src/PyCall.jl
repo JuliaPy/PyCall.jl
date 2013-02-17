@@ -46,11 +46,6 @@ convert(::Type{PyObject}, o) = PyObject(o)
 PyObject(o::PyObject) = o
 
 #########################################################################
-# Auxiliary files
-
-include("numpy.jl")
-
-#########################################################################
 
 # Global configuration variables.  Note that, since Julia does not allow us
 # to attach type annotations to globals, we need to annotate these explicitly
@@ -202,6 +197,11 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
     [ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
                                 (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
+
+#########################################################################
+# NumPy conversions (multidimensional arrays)
+
+include("numpy.jl")
 
 #########################################################################
 # Pretty-printing PyObject
