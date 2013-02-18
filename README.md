@@ -9,9 +9,6 @@ language, automatically converting types etcetera.
 PyCall is currently a proof-of-concept and work in progress.  Much
 basic functionality works, but major TODO items are:
 
-* Conversion of NumPy ndarrays to Julia arrays, possibly with no copying.
-  (The converse, Julia to NumPy, is already implemented in a copy-free manner).
-
 * Automatic type inference of Python return values (currently, you
   must specify this manually, which leads to better compiled code
   but is inconvenient).

@@ -159,8 +159,17 @@ npy_type(::Type{PyObject}) = NPY_OBJECT
 
 typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128,PyObject)
 
+# conversions from __array_interface__ type strings to supported Julia types
+const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
+                                     "i2"=>Int16, "u2"=>Uint16,
+                                     "i4"=>Int32, "u4"=>Uint32,
+                                     "i8"=>Int64, "u8"=>Uint64,
+                                     "f4"=>Float32, "f8"=>Float64,
+                                     "c8"=>Complex64, "c16"=>Complex128,
+                                     "O$(div(WORD_SIZE,8))"=>PyPtr ]
+
 #########################################################################
-# copy-less conversion of Julia arrays to NumPy arrays.
+# no-copy conversion of Julia arrays to NumPy arrays.
 
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     npyinitialize()
@@ -173,5 +182,204 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
               C_NULL)
     return PyObject(p, a)
 end
+
+#########################################################################
+# Extract shape and other information about a NumPy array.  We need
+# to call the Python interface to do this, since the equivalent information
+# in NumPy's C API is only available via macros (or parsing structs).
+# [ Hopefully, this will be improved in a future NumPy version. ]
+
+type PyArray_Info
+    T::Type
+    native::Bool # native byte order?
+    sz::Vector{Int}
+    st::Vector{Int} # strides, in multiples of bytes!
+    data::Ptr{Void}
+    readonly::Bool
+
+    function PyArray_Info(a::PyObject)
+        ai = convert(Dict{String,PyObject}, a["__array_interface__"])
+        typestr = convert(String, ai["typestr"])
+        T = npy_typestrs[typestr[2:end]]
+        datatuple = convert((Int,Bool), ai["data"])
+        sz = convert(Vector{Int}, ai["shape"])
+        st = convert(Vector{Int}, ai["strides"])
+        if isempty(st) && !isempty(sz) # default is C-order contiguous
+            st = similar(sz)
+            st[end] = sizeof(T)
+            for i = length(sz)-1:-1:1
+                st[i] = st[i+1]*sz[i+1]
+            end
+        end
+        return new(T,
+                   (ENDIAN_BOM == 0x04030201 && typestr[1] == '<')
+                   || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>') 
+                   || typestr[1] == '|',
+                   sz, st,
+                   convert(Ptr{Void}, datatuple[1]),
+                   datatuple[2])
+    end
+end
+
+aligned(i::PyArray_Info) = #  FIXME: also check pointer alignment?
+  all(m -> m == 0, mod(i.st, sizeof(i.T))) # strides divisible by elsize
+
+# whether a contiguous array in column-major (Fortran, Julia) order
+function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
+    if prod(sz) == 1
+        return true
+    end
+    if st[1] != sizeof(T)
+        return false
+    end
+    for j = 2:length(st)
+        if st[j] != st[j-1] * sz[j-1]
+            return false
+        end
+    end
+    return true
+end
+
+f_contiguous(i::PyArray_Info) = f_contiguous(i.T, i.sz, i.st)
+c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipud(i.sz), flipud(i.st))
+
+#########################################################################
+# PyArray: no-copy wrapper around NumPy ndarray
+#
+# Hopefully, in the future this can be a subclass of StridedArray (see
+# Julia issue #2345), which will allow it to be used with most Julia
+# functions, but that is not possible at the moment.  So, to use this
+# with Julia linalg functions etcetera a copy is still required.
+
+type PyArray{T,N} <: AbstractArray{T,N}
+    o::PyObject
+    info::PyArray_Info
+    dims::Dims
+    st::Vector{Int}
+    f_contig::Bool
+    c_contig::Bool
+    data::Ptr{T}
+
+    function PyArray(o::PyObject, info::PyArray_Info)
+        if !aligned(info)
+            throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
+        end
+        if info.T != T
+            throw(ArgumentError("inconsistent type in PyArray constructor"))
+        end
+        if length(info.sz) != N || length(info.st) != N
+            throw(ArgumentError("inconsistent ndims in PyArray constructor"))
+        end
+        return new(o, info, tuple(info.sz...), div(info.st, sizeof(T)),
+                   f_contiguous(info), c_contiguous(info),
+                   convert(Ptr{T}, info.data))
+    end
+end
+
+function PyArray(o::PyObject)
+    info = PyArray_Info(o)
+    return PyArray{info.T, length(info.sz)}(o, info)
+end
+
+import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
+       Base.stride, Base.convert, Base.pointer, Base.summary
+
+size(a::PyArray) = a.dims
+ndims{T,N}(a::PyArray{T,N}) = N
+
+similar(a::PyArray, T, dims::Dims) = Array(T, dims)
+
+function copy{T,N}(a::PyArray{T,N}) 
+    if a.c_contig # equivalent to f_contig with reversed dimensions
+        B = pointer_to_array(a.data, ntuple(N, n -> a.dims[N - n + 1]))
+        return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
+    end
+    A = Array(T, a.dims)
+    if a.f_contig
+        ccall(:memcpy, Void, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
+        return A
+    else
+        return copy!(A, a)
+    end
+end
+
+ref{T}(a::PyArray{T,0}) = unsafe_ref(a.data)
+ref{T}(a::PyArray{T,1}, i::Integer) = unsafe_ref(a.data, 1 + (i-1)*a.st[1])
+
+ref{T}(a::PyArray{T,2}, i::Integer, j::Integer) = 
+  unsafe_ref(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
+
+function ref(a::PyArray, i::Integer) 
+    if a.f_contig
+        return unsafe_ref(a.data, i)
+    else
+        return a[ind2sub(a.dims, i)...]
+    end
+end
+
+function ref(a::PyArray, is::Integer...)
+    index = 1
+    for i = 1:length(is)
+        index += (is[i]-1)*a.st[i]
+    end
+    unsafe_ref(a.data, index)
+end
+
+function writeok_assign(a::PyArray, v, i::Integer)
+    if a.info.readonly
+        throw(ArgumentError("read-only PyArray"))
+    else
+        unsafe_assign(a.data, v, i)
+    end
+    return a
+end
+
+assign{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
+assign{T}(a::PyArray{T,1}, v, i::Integer) = writeok_assign(a, v, 1 + (i-1)*a.st[1])
+
+assign{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) = 
+  writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
+
+function assign(a::PyArray, v, i::Integer) 
+    if a.f_contig
+        return writeok_assign(a, v, i)
+    else
+        return assign(a, v, ind2sub(a.dims, i)...)
+    end
+end
+
+function assign(a::PyArray, v, is::Integer...)
+    index = 1
+    for i = 1:length(is)
+        index += (is[i]-1)*a.st[i]
+    end
+    writeok_assign(a, v, index)
+end
+
+stride(a::PyArray, i::Integer) = a.st[i]
+
+convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+
+pointer(a::PyArray, i::Int) = pointer(a, ind2sub(a.dims, i))
+
+function pointer{T}(a::PyArray{T}, is::(Int...))
+    offset = 0
+    for i = 1:length(is)
+        offset += (is[i]-1)*a.st[i]
+    end
+    return a.data + offset*sizeof(T)
+end
+
+summary{T}(a::PyArray{T}) = string(Base.dims2string(size(a)), " ",
+                                   string(T), " PyArray")
+
+#########################################################################
+# PyArray <-> PyObject conversions
+
+PyObject(a::PyArray) = a.o
+
+convert(::Type{PyArray}, o::PyObject) = PyArray(o)
+
+convert(::Type{Array}, o::PyObject) = copy(PyArray(o))
 
 #########################################################################

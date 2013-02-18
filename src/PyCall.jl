@@ -1,7 +1,7 @@
 module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pyglobal, PyObject,
-       pyfunc, PyPtr, pyincref, pydecref, pyversion
+       pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info
 
 import Base.convert
 import Base.ref
@@ -174,7 +174,7 @@ function convert(tt::(Type...), o::PyObject)
 end
 
 #########################################################################
-# Lists and 1d arrays.  TODO: Use NumPy arrays to share data where possible.
+# Lists and 1d arrays.
 
 function PyObject(v::AbstractVector)
     o = PyObject(ccall(pyfunc(:PyList_New), PyPtr, (Int,), length(v)))
