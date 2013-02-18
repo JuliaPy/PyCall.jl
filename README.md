@@ -13,8 +13,6 @@ basic functionality works, but major TODO items are:
   must specify this manually, which leads to better compiled code
   but is inconvenient).
 
-* More error checking and conversion of Python exceptions to Julia exceptions.
-
 * Conversions for many more types (set, range, xrange, etc.).  Callback
   functions.
 
@@ -83,12 +81,15 @@ to simplify calling Python code.
   Python `function` (typically looked up from a module) with the given
   `args...` (of standard Julia types which are converted automatically to
   the corresponding Python types if possible), converting the return value
-  to `returntype`.
+  to `returntype` (use `returntype = PyObject` to return the unconverted
+  Python object reference).
 
-* `pyglobal(s)`: Look up `s` (a string or symbol) in the global Python
-  namespace.
+* `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
+  builtins.
 
 ### Types
+
+#### PyObject
 
 The PyCall module also provides a new type `PyObject` (a wrapper around
 `PyObject*` in Python's C API) representing a reference to a Python object.
@@ -99,31 +100,56 @@ PyObjects back into Julia types `T`.  Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
 strings, along with tuples and arrays/lists thereof, but more are planned.
 
+#### PyArray
+
+Multidimensional NumPy arrays (`ndarray`) are supported and can be
+converted to the native Julia `Array` type, which makes a copy of the data.
+
+Alternatively, the PyCall module also provides a new type `PyArray` (a
+subclass of `AbstractArray`) which implements a no-copy wrapper around
+a NumPy array (currently of numeric types or objects only).  Just use
+`PyArray` as the return type of a `pycall` returning an `ndarray`, or
+call `PyArray(o::PyObject)` on an `ndarray` object `o`.  (Technically,
+a `PyArray` works for any Python object that uses the NumPy array
+interface to provide a data pointer and shape information.)
+
+Conversely, when passing arrays *to* Python, Julia `Array` types are
+converted to `PyObject` types *without* making a copy via NumPy,
+e.g. when passed as `pycall` arguments. **Warning:** If Python creates
+a new reference to an `Array` object and returns it from `pycall`, you
+*must* ensure that the original `Array` object still exists (i.e., is not
+garbage collected) as long as any such "hidden" Python references
+exist.
+
 ### Initialization
 
-By default, whenever you call `pyimport`, `pycall`, or `pyglobal`, the
-Python interpreter (corresponding to the `python` executable name) is
-initialized and remains in memory until Julia exits.  However, you may
-want to modify this behavior to change the default Python version, to
-call low-level Python functions or create `PyObject`s before calling
-`pyimport` etcetera, or to free the memory consumed by Python.  This
-can be accomplished using:
+By default, whenever you call any of the high-level PyCall routines
+above, the Python interpreter (corresponding to the `python`
+executable name) is initialized and remains in memory until Julia
+exits.  However, you may want to modify this behavior to change the
+default Python version, to call low-level Python functions directly
+via `ccall`, or to free the memory consumed by Python.  This can be
+accomplished using:
 
 * `pyinitialize(s::String)`: Initialize the Python interpreter using
   the Python libraries corresponding to the `python` executable given
   by the argument `s`.  Calling `pyinitialize()` defaults to
   `pyinitialize("python")`, but you may need to change this to use a
-  different Python version.   The `pyinitialize` function *must* be
-  called before you can call any Python functions, but it is called
-  automatically if necessary by `pyimport`, `pycall`, and `pyglobal`.
-  It is safe to call this function more than once; subsequent calls will
-  do nothing (until `pyfinalize` is called).
+  different Python version.  The `pyinitialize` function *must* be
+  called before you can call any low-level Python functions (via
+  `ccall`), but it is called automatically as needed when you use the
+  higher-level functions above.  It is safe to call this function more
+  than once; subsequent calls will do nothing (until `pyfinalize` is
+  called).
 
 * `pyfinalize()`: End the Python interpreter and free all associated memory.
   After this function is called, you may restart the Python interpreter
   by calling `pyinitialize` again.  It is safe to call `pyfinalize` more
   than once (subsequent calls do nothing).   You must *not* have any
-  remaining variables referencing `PyObject` types when `pyfinalize` runs.
+  remaining variables referencing `PyObject` types when `pyfinalize` runs!
+
+* The Python version number is returned by `pyversion()`, which returns
+  Julia's native `VersionNumber` type.
 
 ### Low-level Python API access
 
@@ -144,6 +170,15 @@ do so using `ccall`.  Just remember to call `pyinitialize` first, and:
   convert the `PyPtr` return values to `PythonObject` objects in order to
   have their Python reference counts decremented when the object is
   garbage collected in Julia.  i.e. `PythonObject(ccall(func, PyPtr, ...))`.
+
+* You can call `pyincref(o::PyObject)` and `pydecref(o::PyObject)` to
+  manually increment/decrement the reference count.  This is sometimes
+  needed when low-level functions steal a reference or return a borrowed one.
+
+* The function `pyerr_check(msg::String)` can be used to check if a
+  Python exception was thrown, and throw a Julia exception (which includes
+  both `msg` and the Python exception object) if so.  The Python 
+  exception status may be cleared by calling `pyerr_clear()`.
 
 ## Author
 

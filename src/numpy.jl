@@ -29,6 +29,11 @@ npy_multiarray = PyObject(C_NULL)
 
 npy_initialized = false # global to prevent multiple initializations
 
+# Macro version of npyinitialize() to inline npy_initialized? check
+macro npyinitialize()
+    :(npy_initialized::Bool ? nothing : npyinitialize())
+end
+
 function npyinitialize()
     global npy_api
     global npy_initialized
@@ -37,13 +42,18 @@ function npyinitialize()
     if npy_initialized::Bool
         return
     end
-    npy_multiarray::PyObject = pyimport("numpy.core.multiarray")
+    try
+        npy_multiarray::PyObject = pyimport("numpy.core.multiarray")
+    catch e
+        error("numpy.core.multiarray required for multidimensional Array conversions - ", e)
+    end
     if pyversion() < VersionNumber(2,7)
-        PyArray_API = ccall(pyfunc(:PyCObject_AsVoidPtr), Ptr{Ptr{Void}}, 
-                            (PyPtr,), (npy_multiarray::PyObject)["_ARRAY_API"])
+        PyArray_API = @pychecki ccall(pyfunc(:PyCObject_AsVoidPtr), 
+                                      Ptr{Ptr{Void}}, (PyPtr,), 
+                                      (npy_multiarray::PyObject)["_ARRAY_API"])
     else
-        PyArray_API = ccall(pyfunc(:PyCapsule_GetPointer), Ptr{Ptr{Void}}, 
-                            (PyPtr,Ptr{Void}), 
+        PyArray_API = @pychecki ccall(pyfunc(:PyCapsule_GetPointer),
+                                      Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}), 
                             (npy_multiarray::PyObject)["_ARRAY_API"], C_NULL)
     end
 
@@ -51,9 +61,13 @@ function npyinitialize()
     inc = pycall(pyimport("numpy")["get_include"], String)
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
-    hdrfile = open(joinpath(inc, "numpy", "__multiarray_api.h"))
-    hdr = readall(hdrfile);
-    close(hdrfile)
+    try
+        hdrfile = open(joinpath(inc, "numpy", "__multiarray_api.h"))
+        hdr = readall(hdrfile);
+        close(hdrfile)
+    catch e
+        error("could not read __multiarray_api.h to parse PyArray_API ", e)
+    end
     hdr = replace(hdr, r"\\\s*\n", " "); # rm backslashed newlines
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
@@ -155,9 +169,9 @@ npy_type(::Type{Float32}) = NPY_FLOAT
 npy_type(::Type{Float64}) = NPY_DOUBLE
 npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
-npy_type(::Type{PyObject}) = NPY_OBJECT
+# npy_type(::Type{PyPtr}) = NPY_OBJECT # problem: not all Ptr{Void} are PyPtr
 
-typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128,PyObject)
+typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128)
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
@@ -172,8 +186,8 @@ const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
 # no-copy conversion of Julia arrays to NumPy arrays.
 
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
-    npyinitialize()
-    p = ccall(npy_api[:PyArray_New], PyPtr,
+    @npyinitialize
+    p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Int32,Ptr{Int},Int32, Ptr{Int},Ptr{T}, Int32,Int32,PyPtr),
               npy_api[:PyArray_Type], 
               ndims(a), [size(a)...], npy_type(T),
@@ -203,8 +217,11 @@ type PyArray_Info
         T = npy_typestrs[typestr[2:end]]
         datatuple = convert((Int,Bool), ai["data"])
         sz = convert(Vector{Int}, ai["shape"])
-        st = convert(Vector{Int}, ai["strides"])
-        if isempty(st) && !isempty(sz) # default is C-order contiguous
+        local st
+        try
+            st = convert(Vector{Int}, ai["strides"])
+        catch
+            # default is C-order contiguous 
             st = similar(sz)
             st[end] = sizeof(T)
             for i = length(sz)-1:-1:1
@@ -263,11 +280,11 @@ type PyArray{T,N} <: AbstractArray{T,N}
     function PyArray(o::PyObject, info::PyArray_Info)
         if !aligned(info)
             throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
-        end
-        if info.T != T
+        elseif !info.native
+            throw(ArgumentError("only native byte-order arrays are supported"))
+        elseif info.T != T
             throw(ArgumentError("inconsistent type in PyArray constructor"))
-        end
-        if length(info.sz) != N || length(info.st) != N
+        elseif length(info.sz) != N || length(info.st) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
         end
         return new(o, info, tuple(info.sz...), div(info.st, sizeof(T)),
@@ -380,6 +397,15 @@ PyObject(a::PyArray) = a.o
 
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
-convert(::Type{Array}, o::PyObject) = copy(PyArray(o))
+function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
+    info = PyArray_Info(o)
+    copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+end
+
+# seems to conflict with the previous definition:
+#function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
+#    info = PyArray_Info(o)
+#    copy(PyArray{T, N}(o, info)) # will check T == info.T && N == length(info.sz)
+#end
 
 #########################################################################
