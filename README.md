@@ -88,6 +88,17 @@ to simplify calling Python code.
 * `pyglobal(s)`: Look up `s` (a string or symbol) in the global Python
   namespace.
 
+* Note that \_\_builtin\_\_ module gives access to all top-level python functions:
+  ```julia 
+  julia> using PyCall
+
+  julia> pybuiltin = pyimport("__builtin__")
+  PyObject <module '__builtin__' (built-in)>
+
+  julia> pyfile = pybuiltin["file"]
+  PyObject <type 'file'>
+  ```
+
 ### Types
 
 The PyCall module also provides a new type `PyObject` (a wrapper around
