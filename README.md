@@ -18,6 +18,10 @@ basic functionality works, but major TODO items are:
 
 * Syntactic sugar.
 
+**Note**: In order to load Python modules such as NumPy that are partly
+implemented in shared libraries (i.e., which are not purely written in Python),
+you must patch Julia with the fix in [Julia issue #2317](https://github.com/JuliaLang/julia/pull/2317).  This is required for multidimensional array conversions, which rely on NumPy.
+
 ## Installation
 
 Until this package stabilizes and is added to Julia's global
