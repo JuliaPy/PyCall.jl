@@ -9,12 +9,10 @@ language, automatically converting types etcetera.
 PyCall is currently a proof-of-concept and work in progress.  Much
 basic functionality works, but major TODO items are:
 
-* Automatic type inference of Python return values (currently, you
-  must specify this manually, which leads to better compiled code
-  but is inconvenient).
-
 * Conversions for many more types (set, range, xrange, etc.).  Callback
   functions.
+
+* Support for keyword arguments.
 
 * Syntactic sugar.
 
@@ -124,6 +122,16 @@ a new reference to an `Array` object and returns it from `pycall`, you
 *must* ensure that the original `Array` object still exists (i.e., is not
 garbage collected) as long as any such "hidden" Python references
 exist.
+
+#### PyAny
+
+The `PyAny` type is used in conversions to tell PyCall to detect the
+Python type at runtime and convert to the corresponding native Julia
+type.  That is, `pycall(func, PyAny, ...)` and `convert(PyAny,
+o::PyObject)` both automatically convert their result to a native
+Julia type (if possible).   This is convenient, but will lead
+to slightly worse performance (due to the overhead of runtime type-checking
+and the fact that the Julia JIT compiler can no longer infer the type).
 
 ### Initialization
 

@@ -2,7 +2,7 @@ module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
-       pyerr_check, pyerr_clear
+       pyerr_check, pyerr_clear, pytype_query, PyAny
 
 import Base.convert
 import Base.ref
@@ -57,6 +57,12 @@ function pyincref(o::PyObject)
     ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
     o
 end
+
+pyisinstance(o::PyObject, t::Symbol) = 
+  ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, pyfunc(t)) == 1
+
+pyquery(q::Symbol, o::PyObject) =
+  ccall(pyfunc(q), Int32, (PyPtr,), o) == 1
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o
@@ -197,9 +203,9 @@ PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSize_t),
 PyObject(i::Integer) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSsize_t),
                                                 PyPtr, (Int,), i))
 
-PyObject(b::Bool) = 
-  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong),
-                           PyPtr, (OS_NAME == :Windows ? Int32 : Int,), b))
+PyObject(b::Bool) = OS_NAME == :Windows ?
+  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int32,), b)) :
+  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int,), b))
 
 PyObject(r::Real) = PyObject(@pycheckn ccall(pyfunc(:PyFloat_FromDouble),
                                              PyPtr, (Float64,), r))
@@ -240,7 +246,7 @@ convert(::Type{String}, po::PyObject) =
 #########################################################################
 # Tuple conversion
 
-function PyObject(t::(Any...)) 
+function PyObject(t::Tuple) 
     o = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
                                  length(t)))
     for i = 1:length(t)
@@ -252,7 +258,7 @@ function PyObject(t::(Any...))
     return o
 end
 
-function convert(tt::(Type...), o::PyObject)
+function convert(tt::NTuple{Type}, o::PyObject)
     len = @pycheckz ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
     if len != length(tt)
         throw(BoundsError())
@@ -278,8 +284,8 @@ end
 
 function convert{T}(::Type{Vector{T}}, o::PyObject)
     len = @pycheckz ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
-    [ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
-                                (PyPtr, Int), o, i-1))) for i in 1:len ]
+    T[ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+                                 (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
 
 #########################################################################
@@ -301,18 +307,30 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
     va = Array(PyPtr, 1)
     pa = zeros(Int, 1) # must be initialized to zero
     @pyinitialize
-    while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
-                     (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
-                     o, pa, ka, va)
-        ko = PyObject(ka[1])
-        vo = PyObject(va[1])
-        merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
-        ko.o = C_NULL # borrowed reference, don't decref
-        if V == PyObject
-            pyincref(vo) # need to hold a reference
-        else
-            vo.o = C_NULL # borrowed reference, don't decref
+    if pyisinstance(o, :PyDict_Type)
+        # Dict loop is more efficient than items copy needed for Mapping below
+        while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
+                         (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
+                         o, pa, ka, va)
+            ko = PyObject(ka[1])
+            vo = PyObject(va[1])
+            merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
+            ko.o = C_NULL # borrowed reference, don't decref
+            if V == PyObject
+                pyincref(vo) # need to hold a reference
+            else
+                vo.o = C_NULL # borrowed reference, don't decref
+            end
         end
+    elseif pyquery(:PyMapping_Check, o)
+        # use generic Python mapping protocol
+        items = convert(Vector{(PyObject,PyObject)},
+                        pycall(o["items"], PyObject))
+        for (ko,vo) in items
+            merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
+        end
+    else
+        throw(ArgumentError("only Mapping objects can be converted to Dict"))
     end
     return d
 end
@@ -321,6 +339,79 @@ end
 # NumPy conversions (multidimensional arrays)
 
 include("numpy.jl")
+
+#########################################################################
+# Inferring Julia types at runtime from Python objects.  The set of
+# Julia types that we can convert to is given by PyAny
+#
+# Note that we sometimes use the PyFoo_Check API and sometimes we use
+# PyObject_IsInstance(o, PyFoo_Type), since sometimes the former API
+# is a macro (hence inaccessible in Julia).
+
+# A type-query function f(o::PyObject) returns the Julia type
+# for use with the convert function, or None if there isn't one.
+
+typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, String, Dict, Tuple, Array)
+
+pyint_query(o::PyObject) = pyisinstance(o, :PyInt_Type) ? 
+  (pyisinstance(o, :PyBool_Type) ? Bool : Int) : None
+
+pyfloat_query(o::PyObject) = pyisinstance(o, :PyFloat_Type) ? Float64 : None
+
+pycomplex_query(o::PyObject) = 
+  pyisinstance(o, :PyComplex_Type) ? Complex128 : None
+
+pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
+
+pydict_query(o::PyObject) = pyquery(:PyMapping_Check, o) ? Dict{PyAny,PyAny} : None
+
+function pysequence_query(o::PyObject)
+    if pyquery(:PySequence_Check, o)
+        if pyisinstance(o, :PyTuple_Type)
+            len = @pycheckzi ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+            ntuple(len, i ->
+                   ptype_query(PyObject(ccall(pyfunc(:PySequence_GetItem), 
+                                              PyPtr, (PyPtr,Int), o,i-1)),
+                               PyAny))
+        else
+            try
+                otypestr = PyObject(@pycheckni ccall(pyfunc(:PyDict_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
+                typestr = convert(String, otypestr)
+                otypestr.o = C_NULL # PyDict_GetItem gives borrowed reference
+                T = npy_typestrs[typestr[2:end]]
+                Array{T}
+            catch
+                Vector{PyAny}
+            end
+        end
+    else
+        None
+    end
+end
+
+macro return_not_None(ex)
+    quote
+        T = $ex
+        if T != None
+            return T
+        end
+    end
+end
+
+function pytype_query(o::PyObject, default::Type)
+    @pyinitialize
+    @return_not_None pyint_query(o)
+    @return_not_None pyfloat_query(o)
+    @return_not_None pycomplex_query(o)
+    @return_not_None pystring_query(o)
+    @return_not_None pydict_query(o)
+    @return_not_None pysequence_query(o)
+    return default
+end
+
+pytype_query(o::PyObject) = pytype_query(o, PyObject)
+
+convert(::Type{PyAny}, o::PyObject) = convert(pytype_query(o), o)
 
 #########################################################################
 # Pretty-printing PyObject
@@ -381,7 +472,7 @@ pybuiltin(name::Symbol) = pybuiltin(string(name))
 
 #########################################################################
 
-function pycall(o::PyObject, returntype::Union(Type,(Type...)), args...)
+function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     oargs = map(PyObject, args)
     # would rather call PyTuple_Pack, but calling varargs functions
     # with ccall and argument splicing seems problematic right now.
