@@ -18,7 +18,20 @@ typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 initialized = false # whether Python is initialized
 libpython = C_NULL # Python shared library (from dlopen)
 
-pyfunc(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
+#@pyfunc(func)::Symbol = dlsym(libpython::Ptr{Void}, func)
+macro pyfunc(func)
+    z = gensym(string(func))
+    @eval global $z = C_NULL
+    quote begin
+        global $z::Ptr{Void}
+        if $z == C_NULL
+            $z = dlsym(libpython::Ptr{Void}, $(esc(func)))
+        end
+        #println($(string(func))*" = "*string($z))
+        $z
+    end end
+end
+
 
 # Macro version of pyinitialize() to inline initialized? check
 macro pyinitialize()
@@ -48,21 +61,23 @@ end
 PyObject(o::PyPtr) = PyObject(o, nothing) # no Julia object to keep
 
 function pydecref(o::PyObject)
-    ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
+    ccall(@pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
     o.o = C_NULL
     o
 end
 
 function pyincref(o::PyObject)
-    ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
+    ccall(@pyfunc(:Py_IncRef), Void, (PyPtr,), o)
     o
 end
 
-pyisinstance(o::PyObject, t::Symbol) = 
-  ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, pyfunc(t)) == 1
+macro pyisinstance(o, t) #::PyObject, ::Symbol
+  :(ccall(@pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), $(esc(o)), @pyfunc($(esc(t)))) == 1)
+end
 
-pyquery(q::Symbol, o::PyObject) =
-  ccall(pyfunc(q), Int32, (PyPtr,), o) == 1
+macro pyquery(q, o) #::Symbol, ::PyObject
+  :(ccall(@pyfunc($(esc(q))), Int32, (PyPtr,), $(esc(o))) == 1)
+end
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o
@@ -73,9 +88,12 @@ PyObject(o::PyObject) = o
 
 #########################################################################
 
-libpython_name(python::String) =
-  replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
-          r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
+function libpython_name(python::String)
+    lib = replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
+            r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
+    @osx_only if lib[1] != '/'; lib = "/System/Library/Frameworks/"*chomp(lib) end
+    lib
+end
 
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::String)
@@ -87,9 +105,9 @@ function pyinitialize(python::String)
         else # Julia 0.1 - can't support inter-library dependencies
             libpython::Ptr{Void} = dlopen(libpython_name(python))
         end
-        ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
+        ccall(@pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
               bytestring(python))
-        ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
+        ccall(@pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
     end
     return
@@ -105,7 +123,7 @@ function pyfinalize()
     if (initialized::Bool)
         npyfinalize()
         gc() # collect/decref any remaining PyObjects
-        ccall(pyfunc(:Py_Finalize), Void, ())
+        ccall(@pyfunc(:Py_Finalize), Void, ())
         dlclose(libpython::Ptr{Void})
         libpython::Ptr{Void} = C_NULL
         initialized::Bool = false
@@ -121,7 +139,7 @@ pyversion() = VersionNumber(convert((Int,Int,Int,String,Int),
 # Conversion of Python exceptions into Julia exceptions
 
 # call when we are throwing our own exception
-pyerr_clear() = ccall(pyfunc(:PyErr_Clear), Void, ())
+pyerr_clear() = ccall(@pyfunc(:PyErr_Clear), Void, ())
 
 type PyError <: Exception
     msg::String
@@ -131,7 +149,7 @@ end
 function pyerr_check(msg::String, val::Any)
     # note: don't call pyinitialize here since we will
     # only use this in contexts where initialization was already done
-    e = ccall(pyfunc(:PyErr_Occurred), PyPtr, ())
+    e = ccall(@pyfunc(:PyErr_Occurred), PyPtr, ())
     if e != C_NULL
         o = pyincref(PyObject(e)) # PyErr_Occurred returns borrowed ref
         pyerr_clear()
@@ -143,7 +161,7 @@ end
 pyerr_check(msg::String) = pyerr_check(msg, nothing)
 pyerr_check() = pyerr_check("")
 
-# Macros for common pyerr_check("Foo", ccall(pyfunc(:Foo), ...)) pattern.
+# Macros for common pyerr_check("Foo", ccall(@pyfunc(:Foo), ...)) pattern.
 # (The "i" variant assumes Python is initialized.)
 macro pychecki(ex)
     :(pyerr_check($(string(ex.args[1].args[2])), $ex))
@@ -155,7 +173,7 @@ macro pycheck(ex)
     end
 end
 
-# Macros to check that ccall(pyfunc(:Foo), ...) returns value != bad
+# Macros to check that ccall(@pyfunc(:Foo), ...) returns value != bad
 # (The "i" variants assume Python is initialized.)
 macro pycheckvi(ex, bad)
     quote
@@ -198,60 +216,60 @@ end
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSize_t),
+PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pyfunc(:PyInt_FromSize_t),
                                                  PyPtr, (Uint,), i))
-PyObject(i::Integer) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSsize_t),
+PyObject(i::Integer) = PyObject(@pycheckn ccall(@pyfunc(:PyInt_FromSsize_t),
                                                 PyPtr, (Int,), i))
 
 PyObject(b::Bool) = OS_NAME == :Windows ?
-  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int32,), b)) :
-  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int,), b))
+  PyObject(@pycheckn ccall(@pyfunc(:PyBool_FromLong), PyPtr, (Int32,), b)) :
+  PyObject(@pycheckn ccall(@pyfunc(:PyBool_FromLong), PyPtr, (Int,), b))
 
-PyObject(r::Real) = PyObject(@pycheckn ccall(pyfunc(:PyFloat_FromDouble),
+PyObject(r::Real) = PyObject(@pycheckn ccall(@pyfunc(:PyFloat_FromDouble),
                                              PyPtr, (Float64,), r))
 
-PyObject(c::Complex) = PyObject(@pycheckn ccall(pyfunc(:PyComplex_FromDoubles),
+PyObject(c::Complex) = PyObject(@pycheckn ccall(@pyfunc(:PyComplex_FromDoubles),
                                                 PyPtr, (Float64,Float64), 
                                                 real(c), imag(c)))
 
 # fixme: PyString_* was renamed to PyBytes_* in Python 3.x?
-PyObject(s::String) = PyObject(@pycheckn ccall(pyfunc(:PyString_FromString),
+PyObject(s::String) = PyObject(@pycheckn ccall(@pyfunc(:PyString_FromString),
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
 
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
-  convert(T, @pycheck ccall(pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
+  convert(T, @pycheck ccall(@pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 convert(::Type{Bool}, po::PyObject) = 
-  convert(Bool, @pycheck ccall(pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
+  convert(Bool, @pycheck ccall(@pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) = 
-  convert(T, @pycheck ccall(pyfunc(:PyFloat_AsDouble), Float64, (PyPtr,), po))
+  convert(T, @pycheck ccall(@pyfunc(:PyFloat_AsDouble), Float64, (PyPtr,), po))
 
 convert{T<:Complex}(::Type{T}, po::PyObject) = 
   convert(T,
     begin
-        re = @pycheck ccall(pyfunc(:PyComplex_RealAsDouble),
+        re = @pycheck ccall(@pyfunc(:PyComplex_RealAsDouble),
                             Float64, (PyPtr,), po)
-        complex128(re, ccall(pyfunc(:PyComplex_ImagAsDouble), 
+        complex128(re, ccall(@pyfunc(:PyComplex_ImagAsDouble), 
                              Float64, (PyPtr,), po))
     end)
 
 convert(::Type{String}, po::PyObject) =
-  bytestring(@pycheck ccall(pyfunc(:PyString_AsString),
+  bytestring(@pycheck ccall(@pyfunc(:PyString_AsString),
                              Ptr{Uint8}, (PyPtr,), po))
 
 #########################################################################
 # Tuple conversion
 
 function PyObject(t::Tuple) 
-    o = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
+    o = PyObject(@pycheckn ccall(@pyfunc(:PyTuple_New), PyPtr, (Int,), 
                                  length(t)))
     for i = 1:length(t)
         oi = PyObject(t[i])
-        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(@pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
         pyincref(oi) # PyTuple_SetItem steals the reference
     end
@@ -259,12 +277,12 @@ function PyObject(t::Tuple)
 end
 
 function convert(tt::NTuple{Type}, o::PyObject)
-    len = @pycheckz ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+    len = @pycheckz ccall(@pyfunc(:PySequence_Size), Int, (PyPtr,), o)
     if len != length(tt)
         throw(BoundsError())
     end
     ntuple(len, i ->
-           convert(tt[i], PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+           convert(tt[i], PyObject(ccall(@pyfunc(:PySequence_GetItem), PyPtr, 
                                          (PyPtr, Int), o, i-1))))
 end
 
@@ -272,10 +290,10 @@ end
 # Lists and 1d arrays.
 
 function PyObject(v::AbstractVector)
-    o = PyObject(@pycheckn ccall(pyfunc(:PyList_New), PyPtr,(Int,), length(v)))
+    o = PyObject(@pycheckn ccall(@pyfunc(:PyList_New), PyPtr,(Int,), length(v)))
     for i = 1:length(v)
         oi = PyObject(v[i])
-        @pycheckzi ccall(pyfunc(:PyList_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(@pyfunc(:PyList_SetItem), Int32, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
         pyincref(oi) # PyList_SetItem steals the reference
     end
@@ -283,8 +301,8 @@ function PyObject(v::AbstractVector)
 end
 
 function convert{T}(::Type{Vector{T}}, o::PyObject)
-    len = @pycheckz ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
-    T[ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+    len = @pycheckz ccall(@pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+    T[ convert(T, PyObject(ccall(@pyfunc(:PySequence_GetItem), PyPtr, 
                                  (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
 
@@ -292,9 +310,9 @@ end
 # Dictionaries (TODO: no-copy conversion?)
 
 function PyObject(d::Associative)
-    o = PyObject(@pycheckn ccall(pyfunc(:PyDict_New), PyPtr, ()))
+    o = PyObject(@pycheckn ccall(@pyfunc(:PyDict_New), PyPtr, ()))
     for k in keys(d)
-        @pycheckzi ccall(pyfunc(:PyDict_SetItem), Int32, (PyPtr,PyPtr,PyPtr),
+        @pycheckzi ccall(@pyfunc(:PyDict_SetItem), Int32, (PyPtr,PyPtr,PyPtr),
                          o, PyObject(k), PyObject(d[k]))
     end
     return o
@@ -307,9 +325,9 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
     va = Array(PyPtr, 1)
     pa = zeros(Int, 1) # must be initialized to zero
     @pyinitialize
-    if pyisinstance(o, :PyDict_Type)
+    if @pyisinstance(o, :PyDict_Type)
         # Dict loop is more efficient than items copy needed for Mapping below
-        while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
+        while 0 != ccall(@pyfunc(:PyDict_Next), Int32, 
                          (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
                          o, pa, ka, va)
             ko = PyObject(ka[1])
@@ -322,7 +340,7 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
                 vo.o = C_NULL # borrowed reference, don't decref
             end
         end
-    elseif pyquery(:PyMapping_Check, o)
+    elseif @pyquery(:PyMapping_Check, o)
         # use generic Python mapping protocol
         items = convert(Vector{(PyObject,PyObject)},
                         pycall(o["items"], PyObject))
@@ -353,29 +371,29 @@ include("numpy.jl")
 
 typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, String, Dict, Tuple, Array)
 
-pyint_query(o::PyObject) = pyisinstance(o, :PyInt_Type) ? 
-  (pyisinstance(o, :PyBool_Type) ? Bool : Int) : None
+pyint_query(o::PyObject) = @pyisinstance(o, :PyInt_Type) ? 
+  (@pyisinstance(o, :PyBool_Type) ? Bool : Int) : None
 
-pyfloat_query(o::PyObject) = pyisinstance(o, :PyFloat_Type) ? Float64 : None
+pyfloat_query(o::PyObject) = @pyisinstance(o, :PyFloat_Type) ? Float64 : None
 
 pycomplex_query(o::PyObject) = 
-  pyisinstance(o, :PyComplex_Type) ? Complex128 : None
+  @pyisinstance(o, :PyComplex_Type) ? Complex128 : None
 
-pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
+pystring_query(o::PyObject) = @pyisinstance(o, :PyString_Type) ? String : None
 
-pydict_query(o::PyObject) = pyquery(:PyMapping_Check, o) ? Dict{PyAny,PyAny} : None
+pydict_query(o::PyObject) = @pyquery(:PyMapping_Check, o) ? Dict{PyAny,PyAny} : None
 
 function pysequence_query(o::PyObject)
-    if pyquery(:PySequence_Check, o)
-        if pyisinstance(o, :PyTuple_Type)
-            len = @pycheckzi ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+    if @pyquery(:PySequence_Check, o)
+        if @pyisinstance(o, :PyTuple_Type)
+            len = @pycheckzi ccall(@pyfunc(:PySequence_Size), Int, (PyPtr,), o)
             ntuple(len, i ->
-                   ptype_query(PyObject(ccall(pyfunc(:PySequence_GetItem), 
+                   ptype_query(PyObject(ccall(@pyfunc(:PySequence_GetItem), 
                                               PyPtr, (PyPtr,Int), o,i-1)),
                                PyAny))
         else
             try
-                otypestr = PyObject(@pycheckni ccall(pyfunc(:PyDict_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
+                otypestr = PyObject(@pycheckni ccall(@pyfunc(:PyDict_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
                 typestr = convert(String, otypestr)
                 otypestr.o = C_NULL # PyDict_GetItem gives borrowed reference
                 T = npy_typestrs[typestr[2:end]]
@@ -420,9 +438,9 @@ function show(io::IO, o::PyObject)
     if o.o == C_NULL
         print(io, "PyObject NULL")
     else
-        s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
+        s = ccall(@pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
-            s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
+            s = ccall(@pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 return print(io, "PyObject $(o.o)")
             end
@@ -438,7 +456,7 @@ function ref(o::PyObject, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
+    p = ccall(@pyfunc(:PyObject_GetAttrString), PyPtr,
               (PyPtr, Ptr{Uint8}), o, bytestring(s))
     if p == C_NULL
         throw(KeyError(s))
@@ -451,7 +469,7 @@ ref(o::PyObject, s::Symbol) = ref(o, string(s))
 #########################################################################
 
 function pyimport(name::String)
-    mod = PyObject(@pycheckn ccall(pyfunc(:PyImport_ImportModule), PyPtr,
+    mod = PyObject(@pycheckn ccall(@pyfunc(:PyImport_ImportModule), PyPtr,
                                    (Ptr{Uint8},), bytestring(name)))
     return mod
 end
@@ -460,10 +478,10 @@ pyimport(name::Symbol) = pyimport(string(name))
 
 # look up a global variable (in module __main__)
 function pybuiltin(name::String)
-    main = @pycheckn ccall(pyfunc(:PyImport_AddModule), 
+    main = @pycheckn ccall(@pyfunc(:PyImport_AddModule), 
                            PyPtr, (Ptr{Uint8},),
                            bytestring("__main__"))
-    PyObject(@pycheckni ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
+    PyObject(@pycheckni ccall(@pyfunc(:PyObject_GetAttrString), PyPtr,
                               (PyPtr, Ptr{Uint8}), main,
                               bytestring("__builtins__")))[bytestring(name)]
 end
@@ -476,14 +494,14 @@ function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     oargs = map(PyObject, args)
     # would rather call PyTuple_Pack, but calling varargs functions
     # with ccall and argument splicing seems problematic right now.
-    arg = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
+    arg = PyObject(@pycheckn ccall(@pyfunc(:PyTuple_New), PyPtr, (Int,), 
                                    length(args)))
     for i = 1:length(args)
-        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(@pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
                          arg, i-1, oargs[i])
         pyincref(oargs[i]) # PyTuple_SetItem steals the reference
     end
-    ret = PyObject(@pycheckni ccall(pyfunc(:PyObject_CallObject), PyPtr,
+    ret = PyObject(@pycheckni ccall(@pyfunc(:PyObject_CallObject), PyPtr,
                                     (PyPtr,PyPtr), o, arg))
     jret = convert(returntype, ret)
     return jret
