@@ -4,18 +4,6 @@ This package provides a `pycall` function (similar in spirit to
 Julia's `ccall` function) to call Python functions from the Julia
 language, automatically converting types etcetera.
 
-## Work in Progress
-
-PyCall is currently a proof-of-concept and work in progress.  Much
-basic functionality works, but major TODO items are:
-
-* Conversions for many more types (set, range, xrange, etc.).  Callback
-  functions.
-
-* Support for keyword arguments.
-
-* Syntactic sugar.
-
 **Note**: In order to load Python modules such as NumPy that are partly
 implemented in shared libraries (i.e., which are not purely written in Python),
 you must patch Julia with the fix in [Julia issue #2317](https://github.com/JuliaLang/julia/pull/2317).  This is required for multidimensional array conversions, which rely on NumPy.
@@ -34,60 +22,39 @@ to fetch the latest version of the package and install it in your
 
 ## Usage
 
-Here is a simple example to call Python's `math.sin` function:
+Here is a simple example to call Python's `math.sin` function and
+compare it to the built-in Julia `sin`:
 
     using PyCall
-    math = pyimport("math") # import the Python math module
-    pycall(math["sin"], Float64, 3.0) - sin(3.0) # returns 0.0
+    pyinitialize() # required until Julia issue #2378 is fixed
+    @pyimport math
+    math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
-Note that `math["sin"]` looks up the `sin` function in the Python
-`math` module, and is the equivalent of `math.sin` in Python.
+Type conversions are automatically performed for numeric, boolean, and
+string types, along with tuples, arrays/lists, and dictionaries of
+these types.  Python functions can be converted to Julia functions but
+not vice-versa.  Other types are supported via the generic PyObject type, below.
 
-Like `ccall`, we must tell `pycall` the return type we wish in Julia.
-In principle, this could be determined dynamically at runtime but that
-is not currently implemented, in part because that would defeat
-efficient compilation in Julia (since the Julia compiler would be
-unable to determine the return type at compile-time).  On the other
-hand, the argument types need not be specified explicitly; they will
-be determined from the types of the Julia arguments, which will be
-converted into the corresponding Python types.  For example:
+Python submodules must be imported by a separate `@pyimport` call, and
+in this case you must supply an identifier to to use in Julia.  For example
 
-    pycall(math["sin"], Float64, 3) - sin(3.0)
+    @pyimport numpy.random as nr
+    nr.rand(3,4)
 
-also works and also returns `0.0` since Python's `math.sin` function accepts
-integer arguments as well as floating-point arguments.
+Multidimensional arrays rely on the NumPy array interface for
+conversions between Python and Julia.  By default, they are passed
+from Julia to Python without making a copy, but from Python to Julia a
+copy is made; no-copy conversion of Python to Julia arrays can be achieved
+with the `PyArray` type below.
 
-Currently, numeric, boolean, and string types, along with tuples and
-arrays/lists thereof, are supported, with more planned.
+## Python object interfaces
 
-You can also look up other names in a module, and use `convert` to
-convert them to Julia types, e.g.
-
-    convert(Float64, math["pi"])
-
-returns the numeric value of &pi; from Python's `math.pi`.
-
-## Reference
-
-The PyCall module supplies several subroutines, types, and conversion routines
-to simplify calling Python code.
-
-### Calling Python
-
-* `pyimport(s)`: Import the Python module `s` (a string or symbol) and
-  return a pointer to it (a `PyObject`).   Functions or other symbols
-  in the module may then be looked up by `s[name]` where `name` is a string
-  or symbol (`s[name]` also returns a `PyObject`).
-
-* `pycall(function::PyObject, returntype::Type, args...)`.   Call the given 
-  Python `function` (typically looked up from a module) with the given
-  `args...` (of standard Julia types which are converted automatically to
-  the corresponding Python types if possible), converting the return value
-  to `returntype` (use `returntype = PyObject` to return the unconverted
-  Python object reference).
-
-* `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
-  builtins.
+The `@pyimport` macro is built on top of several routines for
+manipulating Python objects in Julia, via a type `PyObject` described
+below.  These can be used to have greater control over the types and
+data passed between Julia and Python, as well as to access additional
+Python functionality (especially in conjunction with the low-level interfaces
+described later).
 
 ### Types
 
@@ -133,14 +100,39 @@ Julia type (if possible).   This is convenient, but will lead
 to slightly worse performance (due to the overhead of runtime type-checking
 and the fact that the Julia JIT compiler can no longer infer the type).
 
+### Calling Python
+
+In cases where the 
+
+* `pycall(function::PyObject, returntype::Type, args...)`.   Call the given 
+  Python `function` (typically looked up from a module) with the given
+  `args...` (of standard Julia types which are converted automatically to
+  the corresponding Python types if possible), converting the return value
+  to `returntype` (use a `returntype` of `PyObject` to return the unconverted
+  Python object reference, or of `PyAny` to request an automated conversion).
+
+* `pyimport(s)`: Import the Python module `s` (a string or symbol) and
+  return a pointer to it (a `PyObject`).   Functions or other symbols
+  in the module may then be looked up by `s[name]` where `name` is a string
+  or symbol (`s[name]` also returns a `PyObject`).  Unlike the `@pyimport`
+  macro, this does not define a structure type and module members cannot
+  be accessed with `s.name` (the `s[name]` syntax can also be used
+  with `@pyimport` modules in order to obtain the raw `PyObject` members).
+
+* `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
+  builtins.
+
 ### Initialization
 
 By default, whenever you call any of the high-level PyCall routines
 above, the Python interpreter (corresponding to the `python`
 executable name) is initialized and remains in memory until Julia
-exits.  However, you may want to modify this behavior to change the
-default Python version, to call low-level Python functions directly
-via `ccall`, or to free the memory consumed by Python.  This can be
+exits.  (**Bug**: because of Julia [issue #2378](https://github.com/JuliaLang/julia/issues/2378), the `@pyimport` macro hangs when trying to initialiaze
+Python, so you need to call `pyinitialize()` manually first.)
+
+However, you may want to modify this behavior to change the default
+Python version, to call low-level Python functions directly via
+`ccall`, or to free the memory consumed by Python.  This can be
 accomplished using:
 
 * `pyinitialize(s::String)`: Initialize the Python interpreter using
@@ -166,7 +158,7 @@ accomplished using:
 ### Low-level Python API access
 
 If you want to call low-level functions in the Python C API, you can
-do so using `ccall`.  Just remember to call `pyinitialize` first, and:
+do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 * Use `pyfunc(func::Symbol)` to get a function pointer to pass to `ccall`
   given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(pyfunc(:Py_IsInitialized), Int32, ())`.
@@ -182,6 +174,9 @@ do so using `ccall`.  Just remember to call `pyinitialize` first, and:
   convert the `PyPtr` return values to `PythonObject` objects in order to
   have their Python reference counts decremented when the object is
   garbage collected in Julia.  i.e. `PythonObject(ccall(func, PyPtr, ...))`.
+  **Important**: for Python routines that return a borrowed reference
+  you should instead do `pyincref(PyObject(...))` to obtain a new
+  reference.
 
 * You can call `pyincref(o::PyObject)` and `pydecref(o::PyObject)` to
   manually increment/decrement the reference count.  This is sometimes
@@ -191,6 +186,16 @@ do so using `ccall`.  Just remember to call `pyinitialize` first, and:
   Python exception was thrown, and throw a Julia exception (which includes
   both `msg` and the Python exception object) if so.  The Python 
   exception status may be cleared by calling `pyerr_clear()`.
+
+* The function `pytype_query(o::PyObject)` returns a native Julia
+  type that `o` can be converted into, if possible, or `PyObject` if not.
+
+## Work in Progress
+
+* Conversions for many more types (set, range, xrange, etc.).  Callback
+  functions.  No-copy dictionary conversions.
+
+* Support for keyword arguments.
 
 ## Author
 

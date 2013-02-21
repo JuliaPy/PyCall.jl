@@ -2,7 +2,7 @@ module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
-       pyerr_check, pyerr_clear, pytype_query, PyAny
+       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyModule_Type
 
 import Base.convert
 import Base.ref
@@ -58,6 +58,9 @@ function pyincref(o::PyObject)
     o
 end
 
+pyisinstance(o::PyObject, t::PyObject) = 
+  ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, t.o) == 1
+
 pyisinstance(o::PyObject, t::Symbol) = 
   ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, pyfunc(t)) == 1
 
@@ -73,6 +76,11 @@ PyObject(o::PyObject) = o
 
 #########################################################################
 
+inspect = PyObject(C_NULL) # inspect module, needed for module introspection
+
+# the C API doesn't seem to provide this, so we get it from Python & cache it:
+BuiltinFunctionType = PyObject(C_NULL)
+
 libpython_name(python::String) =
   replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
           r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
@@ -81,6 +89,8 @@ libpython_name(python::String) =
 function pyinitialize(python::String)
     global initialized
     global libpython
+    global inspect
+    global BuiltinFunctionType
     if (!initialized::Bool)
         if isdefined(:dlopen_global) # see Julia issue #2317
             libpython::Ptr{Void} = dlopen_global(libpython_name(python))
@@ -91,6 +101,8 @@ function pyinitialize(python::String)
               bytestring(python))
         ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
+        inspect::PyObject = pyimport("inspect")
+        BuiltinFunctionType::PyObject = pyimport("types")["BuiltinFunctionType"]
     end
     return
 end
@@ -102,8 +114,12 @@ libpython_name() = libpython_name("python") # ditto
 function pyfinalize()
     global initialized
     global libpython
+    global inspect
+    global BuiltinFunctionType
     if (initialized::Bool)
         npyfinalize()
+        pydecref(BuiltinFunctionType::PyObject)
+        pydecref(inspect::PyObject)
         gc() # collect/decref any remaining PyObjects
         ccall(pyfunc(:Py_Finalize), Void, ())
         dlclose(libpython::Ptr{Void})
@@ -244,6 +260,34 @@ convert(::Type{String}, po::PyObject) =
                              Ptr{Uint8}, (PyPtr,), po))
 
 #########################################################################
+# for automatic conversions, I pass Vector{PyAny}, NTuple{PyAny}, etc.,
+# but since PyAny is an abstract type I need to convert this to Any
+# before actually creating the Julia object
+
+# I want to use a union, but this seems to confuse Julia's method
+# dispatch for the convert function in some circumstances
+# typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, String, Function, Dict, Tuple, Array)
+abstract PyAny
+
+# I originally implemented this via multiple dispatch, with
+#   pyany_toany(::Type{PyAny}), pyany_toany(x::Tuple), and pyany_toany(x),
+# but Julia seemed to get easily confused about which one to call.
+pyany_toany(x) = isa(x, Type{PyAny}) ? Any : (isa(x, Tuple) ? 
+                                              map(pyany_toany, x) : x)
+
+# no-op conversions
+for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :String, 
+          :Function, :Dict, :Tuple, :Array)
+    @eval convert(::Type{PyAny}, x::$T) = x
+end
+
+#########################################################################
+# Function conversion (TODO: Julia to Python conversion for callbacks)
+
+convert(::Type{Function}, po::PyObject) =
+    (args...) -> pycall(po, PyAny, args...)
+
+#########################################################################
 # Tuple conversion
 
 function PyObject(t::Tuple) 
@@ -284,8 +328,14 @@ end
 
 function convert{T}(::Type{Vector{T}}, o::PyObject)
     len = @pycheckz ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
-    T[ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
-                                 (PyPtr, Int), o, i-1))) for i in 1:len ]
+    if len < 0 || len+1 < 0 
+        # scipy IndexExpression instances pretend to be sequences
+        # with infinite (intmax) length, so we need to catch this, grr
+        throw(ArgumentError("invalid PySequence length $len"))
+    end
+    TA = pyany_toany(T)
+    TA[ convert(T, PyObject(ccall(pyfunc(:PySequence_GetItem), PyPtr, 
+                                  (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
 
 #########################################################################
@@ -301,7 +351,9 @@ function PyObject(d::Associative)
 end
 
 function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
-    d = Dict{K,V}()
+    KA = pyany_toany(K)
+    VA = pyany_toany(V)
+    d = Dict{KA,VA}()
     # arrays to pass key, value, and pos pointers to PyDict_Next
     ka = Array(PyPtr, 1)
     va = Array(PyPtr, 1)
@@ -312,22 +364,16 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
         while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
                          (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
                          o, pa, ka, va)
-            ko = PyObject(ka[1])
-            vo = PyObject(va[1])
-            merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
-            ko.o = C_NULL # borrowed reference, don't decref
-            if V == PyObject
-                pyincref(vo) # need to hold a reference
-            else
-                vo.o = C_NULL # borrowed reference, don't decref
-            end
+            ko = pyincref(PyObject(ka[1])) # PyDict_Next returns
+            vo = pyincref(PyObject(va[1])) #   borrowed ref, so incref
+            merge!(d, (KA=>VA)[convert(K,ko) => convert(V,vo)])
         end
     elseif pyquery(:PyMapping_Check, o)
         # use generic Python mapping protocol
         items = convert(Vector{(PyObject,PyObject)},
                         pycall(o["items"], PyObject))
         for (ko,vo) in items
-            merge!(d, (K=>V)[convert(K, ko) => convert(V, vo)])
+            merge!(d, (KA=>VA)[convert(K, ko) => convert(V, vo)])
         end
     else
         throw(ArgumentError("only Mapping objects can be converted to Dict"))
@@ -341,8 +387,7 @@ end
 include("numpy.jl")
 
 #########################################################################
-# Inferring Julia types at runtime from Python objects.  The set of
-# Julia types that we can convert to is given by PyAny
+# Inferring Julia types at runtime from Python objects.
 #
 # Note that we sometimes use the PyFoo_Check API and sometimes we use
 # PyObject_IsInstance(o, PyFoo_Type), since sometimes the former API
@@ -350,8 +395,6 @@ include("numpy.jl")
 
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or None if there isn't one.
-
-typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, String, Dict, Tuple, Array)
 
 pyint_query(o::PyObject) = pyisinstance(o, :PyInt_Type) ? 
   (pyisinstance(o, :PyBool_Type) ? Bool : Int) : None
@@ -363,29 +406,34 @@ pycomplex_query(o::PyObject) =
 
 pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
 
-pydict_query(o::PyObject) = pyquery(:PyMapping_Check, o) ? Dict{PyAny,PyAny} : None
+pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) ? Function : None
+
+# we check for "items" attr since PyMapping_Check doesn't do this (it only
+# checks for __getitem__) and PyMapping_Check returns true for some 
+# scipy scalar array members, grrr.
+pydict_query(o::PyObject) = pyisinstance(o, :PyDict_Type) || (pyquery(:PyMapping_Check, o) && ccall(pyfunc(:PyObject_HasAttrString), Int32, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
 
 function pysequence_query(o::PyObject)
-    if pyquery(:PySequence_Check, o)
-        if pyisinstance(o, :PyTuple_Type)
-            len = @pycheckzi ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
-            ntuple(len, i ->
-                   ptype_query(PyObject(ccall(pyfunc(:PySequence_GetItem), 
-                                              PyPtr, (PyPtr,Int), o,i-1)),
-                               PyAny))
-        else
-            try
-                otypestr = PyObject(@pycheckni ccall(pyfunc(:PyDict_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
-                typestr = convert(String, otypestr)
-                otypestr.o = C_NULL # PyDict_GetItem gives borrowed reference
-                T = npy_typestrs[typestr[2:end]]
-                Array{T}
-            catch
-                Vector{PyAny}
-            end
-        end
+    # pyquery(:PySequence_Check, o) always succeeds according to the docs,
+    # but it seems we need to be careful; I've noticed that things like
+    # scipy define "fake" sequence types with intmax lengths and other
+    # problems
+    if pyisinstance(o, :PyTuple_Type)
+        len = @pycheckzi ccall(pyfunc(:PySequence_Size), Int, (PyPtr,), o)
+        return ntuple(len, i ->
+                      pytype_query(PyObject(ccall(pyfunc(:PySequence_GetItem), 
+                                                  PyPtr, (PyPtr,Int), o,i-1)),
+                                   PyAny))
     else
-        None
+        try
+            otypestr = PyObject(@pycheckni ccall(pyfunc(:PyObject_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
+            typestr = convert(String, otypestr)
+            T = npy_typestrs[typestr[2:end]]
+            return Array{T}
+        catch
+            # only handle PyList for now
+            return pyisinstance(o, :PyList_Type) ? Vector{PyAny} : None
+        end
     end
 end
 
@@ -404,6 +452,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)
     @return_not_None pystring_query(o)
+    @return_not_None pyfunction_query(o)
     @return_not_None pydict_query(o)
     @return_not_None pysequence_query(o)
     return default
@@ -411,7 +460,14 @@ end
 
 pytype_query(o::PyObject) = pytype_query(o, PyObject)
 
-convert(::Type{PyAny}, o::PyObject) = convert(pytype_query(o), o)
+function convert(::Type{PyAny}, o::PyObject)
+    try 
+        convert(pytype_query(o), o)
+    catch
+        pyerr_clear() # just in case
+        o
+    end
+end
 
 #########################################################################
 # Pretty-printing PyObject
@@ -422,8 +478,10 @@ function show(io::IO, o::PyObject)
     else
         s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
+            pyerr_clear()
             s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
+                pyerr_clear()
                 return print(io, "PyObject $(o.o)")
             end
         end
@@ -441,6 +499,7 @@ function ref(o::PyObject, s::String)
     p = ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
               (PyPtr, Ptr{Uint8}), o, bytestring(s))
     if p == C_NULL
+        pyerr_clear()
         throw(KeyError(s))
     end
     return PyObject(p)
@@ -450,13 +509,62 @@ ref(o::PyObject, s::Symbol) = ref(o, string(s))
 
 #########################################################################
 
-function pyimport(name::String)
-    mod = PyObject(@pycheckn ccall(pyfunc(:PyImport_ImportModule), PyPtr,
-                                   (Ptr{Uint8},), bytestring(name)))
-    return mod
-end
+pyimport(name::String) =
+    PyObject(@pycheckn ccall(pyfunc(:PyImport_ImportModule), PyPtr,
+                             (Ptr{Uint8},), bytestring(name)))
 
 pyimport(name::Symbol) = pyimport(string(name))
+
+abstract PyModule_Type
+ref(m::PyModule_Type, s) = ref(m.___jl_PyCall_mod___, s)
+
+# convert expressions like :math or :(scipy.special) into module name strings
+modulename(s::Symbol) = string(s)
+function modulename(e::Expr)
+    if e.head == :.
+        string(modulename(e.args[1]), :., modulename(e.args[2]))
+    elseif e.head == :quote
+        modulename(e.args...)
+    else
+        throw(ArgumentError("invalid module"))
+    end
+end
+
+typesymbol(T::AbstractKind) = T.name.name
+typesymbol(T::BitsKind) = T.name.name
+typesymbol(T::CompositeKind) = T.name.name
+typesymbol(T) = :Any # punt
+
+pyimport_counter = 0 # to assign unique names to types
+
+macro pyimport(name, optional_varname...)
+    global pyimport_counter
+    mname = modulename(name)
+    len = length(optional_varname)
+    Name = len > 0 && (len != 2 || optional_varname[1] != :as) ? 
+      throw(ArgumentError("usage @pyimport module [as name]")) :
+      (len == 2 ? optional_varname[2] :
+       typeof(name) == Symbol ? name :
+       throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>")))
+    m0 = pyimport(mname)
+    members0 = convert(Vector{(String,PyObject)}, 
+                       pycall(inspect["getmembers"], PyObject, m0))
+    tname = symbol(string("PyCall_Module_",pyimport_counter::Int+=1,"_",Name))
+    quote
+        local m = pyimport($mname)
+        local members = convert(Vector{(String,PyAny)}, 
+                                pycall(inspect["getmembers"], PyObject, m))
+        $(expr(:type, expr(:<:, tname, :PyModule_Type),
+               expr(:block, :(___jl_PyCall_mod___::PyObject),
+                    map(m -> expr(:(::), symbol(m[1]),
+                                  typesymbol(pytype_query(m[2]))), 
+                        members0)...)))
+        $(esc(Name)) = $(expr(:call, esc(tname), :m,
+                              [ :(members[$i][2]) 
+                               for i = 1:length(members0) ]...))
+        $(esc(Name)).___jl_PyCall_mod___
+    end
+end
 
 # look up a global variable (in module __main__)
 function pybuiltin(name::String)
