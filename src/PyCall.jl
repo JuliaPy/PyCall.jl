@@ -552,6 +552,10 @@ pyimport_counter = 0 # to assign unique names to types
 
 macro pyimport(name, optional_varname...)
     global pyimport_counter
+    global initialized
+    if (!initialized::Bool)
+        error("pyinitialize() must be called before @pyimport")
+    end
     mname = modulename(name)
     len = length(optional_varname)
     Name = len > 0 && (len != 2 || optional_varname[1] != :as) ? 
