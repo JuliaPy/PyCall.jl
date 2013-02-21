@@ -84,9 +84,12 @@ BuiltinFunctionType = PyObject(C_NULL)
 # special function type used in NumPy and SciPy (if available)
 ufuncType = PyObject(C_NULL)
 
-libpython_name(python::String) =
-  replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
-          r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
+function libpython_name(python::String)
+    lib = replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
+            r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
+    @osx_only if lib[1] != '/'; lib = "/System/Library/Frameworks/"*chomp(lib) end
+    lib
+end
 
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::String)
