@@ -548,10 +548,7 @@ typesymbol(T::BitsKind) = T.name.name
 typesymbol(T::CompositeKind) = T.name.name
 typesymbol(T) = :Any # punt
 
-pyimport_counter = 0 # to assign unique names to types
-
 macro pyimport(name, optional_varname...)
-    global pyimport_counter
     global initialized
     if (!initialized::Bool)
         error("pyinitialize() must be called before @pyimport")
@@ -566,7 +563,7 @@ macro pyimport(name, optional_varname...)
     m0 = pyimport(mname)
     members0 = convert(Vector{(String,PyObject)}, 
                        pycall(inspect["getmembers"], PyObject, m0))
-    tname = symbol(string("PyCall_Module_",pyimport_counter::Int+=1,"_",Name))
+    tname = gensym("PyCall_$mname")
     quote
         local m = pyimport($mname)
         local members = convert(Vector{(String,PyAny)}, 
