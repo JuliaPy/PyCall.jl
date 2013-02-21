@@ -59,7 +59,7 @@ function pyincref(o::PyObject)
 end
 
 pyisinstance(o::PyObject, t::PyObject) = 
-  ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, t.o) == 1
+  t.o != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, t.o) == 1
 
 pyisinstance(o::PyObject, t::Symbol) = 
   ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, pyfunc(t)) == 1
@@ -81,6 +81,9 @@ inspect = PyObject(C_NULL) # inspect module, needed for module introspection
 # the C API doesn't seem to provide this, so we get it from Python & cache it:
 BuiltinFunctionType = PyObject(C_NULL)
 
+# special function type used in NumPy and SciPy (if available)
+ufuncType = PyObject(C_NULL)
+
 libpython_name(python::String) =
   replace(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('LDLIBRARY')"`),
           r"\.so(\.[0-9\.]+)?\s*$|\.dll\s*$", "", 1)
@@ -91,6 +94,7 @@ function pyinitialize(python::String)
     global libpython
     global inspect
     global BuiltinFunctionType
+    global ufuncType
     if (!initialized::Bool)
         if isdefined(:dlopen_global) # see Julia issue #2317
             libpython::Ptr{Void} = dlopen_global(libpython_name(python))
@@ -103,6 +107,11 @@ function pyinitialize(python::String)
         initialized::Bool = true
         inspect::PyObject = pyimport("inspect")
         BuiltinFunctionType::PyObject = pyimport("types")["BuiltinFunctionType"]
+        try
+            ufuncType = pyimport("numpy")["ufunc"]
+        catch
+            ufuncType = PyObject(C_NULL) # NumPy not available
+        end
     end
     return
 end
@@ -118,6 +127,7 @@ function pyfinalize()
     global BuiltinFunctionType
     if (initialized::Bool)
         npyfinalize()
+        pydecref(ufuncType)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(inspect::PyObject)
         gc() # collect/decref any remaining PyObjects
@@ -406,7 +416,7 @@ pycomplex_query(o::PyObject) =
 
 pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
 
-pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) ? Function : None
+pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) ? Function : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
