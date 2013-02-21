@@ -6,7 +6,7 @@ language, automatically converting types etcetera.
 
 **Note**: In order to load Python modules such as NumPy that are partly
 implemented in shared libraries (i.e., which are not purely written in Python),
-you must patch Julia with the fix in [Julia issue #2317](https://github.com/JuliaLang/julia/pull/2317).  This is required for multidimensional array conversions, which rely on NumPy.
+you must patch Julia with the fix in [Julia issue #2380](https://github.com/JuliaLang/julia/pull/2380).  This is required for multidimensional array conversions, which rely on NumPy.
 
 ## Installation
 

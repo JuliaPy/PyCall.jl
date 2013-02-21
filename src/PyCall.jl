@@ -98,6 +98,9 @@ function pyinitialize(python::String)
     if (!initialized::Bool)
         if isdefined(:dlopen_global) # see Julia issue #2317
             libpython::Ptr{Void} = dlopen_global(libpython_name(python))
+        elseif method_exists(dlopen,(String,Integer))
+            libpython::Ptr{Void} = dlopen(libpython_name(python),
+                                          RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
         else # Julia 0.1 - can't support inter-library dependencies
             libpython::Ptr{Void} = dlopen(libpython_name(python))
         end
