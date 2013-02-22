@@ -176,14 +176,16 @@ accomplished using:
   called before you can call any low-level Python functions (via
   `ccall`), but it is called automatically as needed when you use the
   higher-level functions above.  It is safe to call this function more
-  than once; subsequent calls will do nothing (until `pyfinalize` is
-  called).
+  than once; subsequent calls will do nothing.
 
-* `pyfinalize()`: End the Python interpreter and free all associated memory.
-  After this function is called, you may restart the Python interpreter
-  by calling `pyinitialize` again.  It is safe to call `pyfinalize` more
-  than once (subsequent calls do nothing).   You must *not* have any
-  remaining variables referencing `PyObject` types when `pyfinalize` runs!
+* `pyfinalize()`: End the Python interpreter and free all associated
+  memory.  After this function is called, you *may no longer restart
+  Python* by calling `pyinitialize` again (an exception will be
+  thrown).  The reason is that some Python modules (e.g. numpy) crash
+  if their initialization routine is called more than once.
+  Subsequent calls to `pyfinalize` do nothing.  You must *not* have
+  any remaining variables referencing `PyObject` types when
+  `pyfinalize` runs!
 
 * The Python version number is returned by `pyversion()`, which returns
   Julia's native `VersionNumber` type.

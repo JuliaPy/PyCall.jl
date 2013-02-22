@@ -19,6 +19,7 @@ typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 # to attach type annotations to globals, we need to annotate these explicitly
 # as initialized::Bool and libpython::Ptr{Void} when we use them.
 initialized = false # whether Python is initialized
+finalized = false # whether Python has been finalized
 libpython = C_NULL # Python shared library (from dlopen)
 
 pyfunc(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
@@ -94,11 +95,21 @@ libpython_name(python::String) =
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::String)
     global initialized
+    global finalized
     global libpython
     global inspect
     global BuiltinFunctionType
     global ufuncType
-    if (!initialized::Bool)
+    if !initialized::Bool
+        if finalized::Bool
+            # From the Py_Finalize documentation:
+            #    "Some extensions may not work properly if their
+            #     initialization routine is called more than once; this
+            #     can happen if an application calls Py_Initialize()
+            #     and Py_Finalize() more than once."
+            # For example, numpy and scipy seem to crash if this is done.
+            error("Calling pyinitialize after pyfinalize is not supported")
+        end
         if isdefined(:dlopen_global) # see Julia issue #2317
             libpython::Ptr{Void} = dlopen_global(libpython_name(python))
         elseif method_exists(dlopen,(String,Integer))
@@ -129,10 +140,11 @@ libpython_name() = libpython_name("python") # ditto
 # end the Python interpreter and free associated memory
 function pyfinalize()
     global initialized
+    global finalized
     global libpython
     global inspect
     global BuiltinFunctionType
-    if (initialized::Bool)
+    if initialized::Bool
         npyfinalize()
         pydecref(ufuncType)
         pydecref(BuiltinFunctionType::PyObject)
@@ -142,6 +154,7 @@ function pyfinalize()
         dlclose(libpython::Ptr{Void})
         libpython::Ptr{Void} = C_NULL
         initialized::Bool = false
+        finalized::Bool = true
     end
     return
 end
@@ -284,7 +297,7 @@ typesymbol(T) = :Any # punt
 
 # hack: because of Julia issue #2386, we need to cache pywrap's
 #       local variables in globals
-pywrap_members = PyObject(C_NULL)
+pywrap_members = Array((String,PyObject),0)
 pywrap_o = PyObject(C_NULL)
 function pywrap(o::PyObject)
     @pyinitialize
@@ -293,9 +306,9 @@ function pywrap(o::PyObject)
     tname = gensym("PyCall_PyWrapper")
     global pywrap_members
     global pywrap_o
-    pywrap_members::PyObject = members
+    pywrap_members::Vector{(String,PyObject)} = members
     pywrap_o::PyObject = o
-    @eval begin
+    w = @eval begin
         $(expr(:type, expr(:<:, tname, :PyWrapper),
                expr(:block, :(___jl_PyCall_PyObject___::PyObject),
                     map(m -> expr(:(::), symbol(m[1]),
@@ -305,6 +318,9 @@ function pywrap(o::PyObject)
                [ :(convert(PyAny, pywrap_members[$i][2]))
                 for i = 1:length(members) ]...))
     end
+    pywrap_members::Vector{(String,PyObject)} = Array((String,PyObject),0)
+    pywrap_o::PyObject = PyObject(C_NULL)
+    return w
 end
 
 #########################################################################
