@@ -183,9 +183,9 @@ accomplished using:
   Python* by calling `pyinitialize` again (an exception will be
   thrown).  The reason is that some Python modules (e.g. numpy) crash
   if their initialization routine is called more than once.
-  Subsequent calls to `pyfinalize` do nothing.  You must *not* have
-  any remaining variables referencing `PyObject` types when
-  `pyfinalize` runs!
+  Subsequent calls to `pyfinalize` do nothing.  You must *not* try
+  to access any Python functions or data (that has not been converted
+  to native Julia types) after `pyfinalize` runs!
 
 * The Python version number is returned by `pyversion()`, which returns
   Julia's native `VersionNumber` type.

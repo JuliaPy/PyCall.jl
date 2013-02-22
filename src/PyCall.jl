@@ -52,8 +52,11 @@ end
 PyObject(o::PyPtr) = PyObject(o, nothing) # no Julia object to keep
 
 function pydecref(o::PyObject)
-    ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
+    if initialized::Bool # don't decref after pyfinalize!
+        ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
+    end
     o.o = C_NULL
+    o.keep = nothing
     o
 end
 
