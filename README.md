@@ -194,7 +194,8 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 * PyCall defines the typealias `PyPtr` for `PythonObject*` argument types,
   and `PythonObject` (see above) arguments are correctly converted to this
-  type.
+  type.  `PythonObject(p::PyPtr)` creates a Julia wrapper around a
+  `PyPtr` return value.
 
 * Use `PythonObject` and the `convert` routines mentioned above to convert
   Julia types to/from `PythonObject*` references.
@@ -203,7 +204,7 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
   convert the `PyPtr` return values to `PythonObject` objects in order to
   have their Python reference counts decremented when the object is
   garbage collected in Julia.  i.e. `PythonObject(ccall(func, PyPtr, ...))`.
-  **Important**: for Python routines that return a borrowed reference
+  **Important**: for Python routines that return a borrowed reference,
   you should instead do `pyincref(PyObject(...))` to obtain a new
   reference.
 
@@ -218,6 +219,13 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 * The function `pytype_query(o::PyObject)` returns a native Julia
   type that `o` can be converted into, if possible, or `PyObject` if not.
+
+* `pyisinstance(o::PyObject, t::Symbol)` can be used to query whether
+  `o` is of a given Python type (where `t` is the identifier of a global
+  `PyTypeObject` in the Python C API), e.g. `pyisinstance(o, :PyDict_Type)`
+  checks whether `o` is a Python dictionary.  Alternatively,
+  `pyisinstance(o::PyObject, t::PyObject)` performs the same check
+  given a Python type object `t`.
 
 ## Work in Progress
 
