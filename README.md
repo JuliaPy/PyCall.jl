@@ -32,7 +32,6 @@ Here is a simple example to call Python's `math.sin` function and
 compare it to the built-in Julia `sin`:
 
     using PyCall
-    pyinitialize() # required until Julia issue #2378 is fixed
     @pyimport math
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
@@ -151,13 +150,18 @@ and also by providing more type information to the Julia compiler.
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins, returning a `PyObject`
 
+* `pywrap(o::PyObject)` returns a wrapper `w` that is an anonymous
+  composite type (a subclass of `PyWrapper`) which provides (read)
+  access to converted versions of `o`'s members as `w.member`.  (For
+  example, `@pyimport module as name` is equivalent to `name =
+  pywrap(pyimport("module"))`.)
+
 ### Initialization
 
 By default, whenever you call any of the high-level PyCall routines
 above, the Python interpreter (corresponding to the `python`
 executable name) is initialized and remains in memory until Julia
-exits.  (**Bug**: because of Julia [issue #2378](https://github.com/JuliaLang/julia/issues/2378), the `@pyimport` macro hangs when trying to initialiaze
-Python, so you need to call `pyinitialize()` manually first.)
+exits.
 
 However, you may want to modify this behavior to change the default
 Python version, to call low-level Python functions directly via

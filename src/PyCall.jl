@@ -2,8 +2,8 @@ module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
-       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyModule_Type,
-       PyDict, pyisinstance
+       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
+       PyDict, pyisinstance, pywrap
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -268,15 +268,51 @@ end
 ref(o::PyObject, s::Symbol) = ref(o, string(s))
 
 #########################################################################
+# Create anonymous composite w = pywrap(o) wrapping the object o
+# and providing access to o's members (converted to PyAny) as w.member.
+
+abstract PyWrapper
+
+# still provide w[:foo] low-level access to unconverted members:
+ref(w::PyWrapper, s) = ref(w.___jl_PyCall_PyObject___, s)
+
+typesymbol(T::AbstractKind) = T.name.name
+typesymbol(T::BitsKind) = T.name.name
+typesymbol(T::CompositeKind) = T.name.name
+typesymbol(T) = :Any # punt
+
+# hack: because of Julia issue #2386, we need to cache pywrap's
+#       local variables in globals
+pywrap_members = PyObject(C_NULL)
+pywrap_o = PyObject(C_NULL)
+function pywrap(o::PyObject)
+    @pyinitialize
+    members = convert(Vector{(String,PyObject)}, 
+                      pycall(inspect["getmembers"], PyObject, o))
+    tname = gensym("PyCall_PyWrapper")
+    global pywrap_members
+    global pywrap_o
+    pywrap_members::PyObject = members
+    pywrap_o::PyObject = o
+    @eval begin
+        $(expr(:type, expr(:<:, tname, :PyWrapper),
+               expr(:block, :(___jl_PyCall_PyObject___::PyObject),
+                    map(m -> expr(:(::), symbol(m[1]),
+                                  typesymbol(pytype_query(m[2]))), 
+                        members)...)))
+        $(expr(:call, tname, :pywrap_o,
+               [ :(convert(PyAny, pywrap_members[$i][2]))
+                for i = 1:length(members) ]...))
+    end
+end
+
+#########################################################################
 
 pyimport(name::String) =
     PyObject(@pycheckn ccall(pyfunc(:PyImport_ImportModule), PyPtr,
                              (Ptr{Uint8},), bytestring(name)))
 
 pyimport(name::Symbol) = pyimport(string(name))
-
-abstract PyModule_Type
-ref(m::PyModule_Type, s) = ref(m.___jl_PyCall_mod___, s)
 
 # convert expressions like :math or :(scipy.special) into module name strings
 modulename(s::Symbol) = string(s)
@@ -290,16 +326,7 @@ function modulename(e::Expr)
     end
 end
 
-typesymbol(T::AbstractKind) = T.name.name
-typesymbol(T::BitsKind) = T.name.name
-typesymbol(T::CompositeKind) = T.name.name
-typesymbol(T) = :Any # punt
-
 macro pyimport(name, optional_varname...)
-    global initialized
-    if (!initialized::Bool)
-        error("pyinitialize() must be called before @pyimport")
-    end
     mname = modulename(name)
     len = length(optional_varname)
     Name = len > 0 && (len != 2 || optional_varname[1] != :as) ? 
@@ -307,25 +334,13 @@ macro pyimport(name, optional_varname...)
       (len == 2 ? optional_varname[2] :
        typeof(name) == Symbol ? name :
        throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>")))
-    m0 = pyimport(mname)
-    members0 = convert(Vector{(String,PyObject)}, 
-                       pycall(inspect["getmembers"], PyObject, m0))
-    tname = gensym("PyCall_$mname")
     quote
-        local m = pyimport($mname)
-        local members = convert(Vector{(String,PyAny)}, 
-                                pycall(inspect["getmembers"], PyObject, m))
-        $(expr(:type, expr(:<:, tname, :PyModule_Type),
-               expr(:block, :(___jl_PyCall_mod___::PyObject),
-                    map(m -> expr(:(::), symbol(m[1]),
-                                  typesymbol(pytype_query(m[2]))), 
-                        members0)...)))
-        $(esc(Name)) = $(expr(:call, esc(tname), :m,
-                              [ :(members[$i][2]) 
-                               for i = 1:length(members0) ]...))
-        $(esc(Name)).___jl_PyCall_mod___
+        $(esc(Name)) = pywrap(pyimport($mname))
+        nothing
     end
 end
+
+#########################################################################
 
 # look up a global variable (in module __main__)
 function pybuiltin(name::String)
