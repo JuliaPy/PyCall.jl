@@ -102,7 +102,7 @@ default, a `PyDict` is an `Any => Any` dictionary (or actually `PyAny
 dictionary has known, fixed types you can insteady use `PyDict{K,V}` given
 the key and value types `K` and `V` respectively.
 
-Currently passing Julia dictionaries to Python makes a copy of the Julia
+Currently, passing Julia dictionaries to Python makes a copy of the Julia
 dictionary.
 
 #### PyAny
