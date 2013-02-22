@@ -301,32 +301,21 @@ typesymbol(T::BitsKind) = T.name.name
 typesymbol(T::CompositeKind) = T.name.name
 typesymbol(T) = :Any # punt
 
-# hack: because of Julia issue #2386, we need to cache pywrap's
-#       local variables in globals
-pywrap_members = Array((String,PyObject),0)
-pywrap_o = PyObject(C_NULL)
 function pywrap(o::PyObject)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
     tname = gensym("PyCall_PyWrapper")
-    global pywrap_members
-    global pywrap_o
-    pywrap_members::Vector{(String,PyObject)} = members
-    pywrap_o::PyObject = o
-    w = @eval begin
+    @eval begin
         $(expr(:type, expr(:<:, tname, :PyWrapper),
                expr(:block, :(___jl_PyCall_PyObject___::PyObject),
                     map(m -> expr(:(::), symbol(m[1]),
                                   typesymbol(pytype_query(m[2]))), 
                         members)...)))
-        $(expr(:call, tname, :pywrap_o,
-               [ :(convert(PyAny, pywrap_members[$i][2]))
+        $(expr(:call, tname, o,
+               [ :(convert(PyAny, $(members[i][2])))
                 for i = 1:length(members) ]...))
     end
-    pywrap_members::Vector{(String,PyObject)} = Array((String,PyObject),0)
-    pywrap_o::PyObject = PyObject(C_NULL)
-    return w
 end
 
 #########################################################################
