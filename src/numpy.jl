@@ -76,8 +76,7 @@ function npyinitialize()
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
     for m in each_match(r, hdr) # build npy_api table
-        merge!(npy_api::Tnpy_api,
-               [ symbol(m.captures[1]) => API[int(m.captures[2])+1] ])
+        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[int(m.captures[2])+1]
     end
     if !has(npy_api::Tnpy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
@@ -204,7 +203,7 @@ type PyArray_Info
     readonly::Bool
 
     function PyArray_Info(a::PyObject)
-        ai = convert(Dict{String,PyObject}, a["__array_interface__"])
+        ai = PyDict{String,PyObject}(a["__array_interface__"])
         typestr = convert(String, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
         datatuple = convert((Int,Bool), ai["data"])
@@ -289,9 +288,6 @@ function PyArray(o::PyObject)
     info = PyArray_Info(o)
     return PyArray{info.T, length(info.sz)}(o, info)
 end
-
-import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
-       Base.stride, Base.convert, Base.pointer, Base.summary
 
 size(a::PyArray) = a.dims
 ndims{T,N}(a::PyArray{T,N}) = N

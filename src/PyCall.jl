@@ -2,11 +2,14 @@ module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
-       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyModule_Type
+       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyModule_Type,
+       PyDict
 
-import Base.convert
-import Base.ref
-import Base.show
+import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
+       Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
+       Base.show, Base.has, Base.keys, Base.values, Base.eltype, Base.get,
+       Base.delete!, Base.empty!, Base.length, Base.isempty, Base.start,
+       Base.done, Base.next, Base.filter!
 
 typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 

@@ -129,8 +129,153 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
                                   (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
 
+# NumPy conversions (multidimensional arrays)
+include("numpy.jl")
+
 #########################################################################
-# Dictionaries (TODO: no-copy conversion?)
+# PyDict: no-copy wrapping of a Julia object around a Python dictionary
+
+type PyDict{K,V} <: Associative{K,V}
+    o::PyObject
+    isdict::Bool # whether this is a Python Dict (vs. generic Mapping object)
+
+    function PyDict(o::PyObject) 
+        if o.o == C_NULL
+            throw(ArgumentError("cannot make PyDict from NULL PyObject"))
+        elseif pydict_query(o) == None
+            throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
+        end
+        new(o, pyisinstance(o, :PyDict_Type))
+    end
+end
+
+PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
+convert(::Type{PyDict}, o::PyObject) = PyDict(o)
+convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
+convert(::Type{PyPtr}, d::PyDict) = d.o.o
+
+has(d::PyDict, key) = 1 == ccall(pyfunc(d.isdict ? :PyDict_Contains :
+                                                   :PyMapping_HasKey),
+                                  Int32, (PyPtr, PyPtr), d, PyObject(key))
+
+pyobject_call(d::PyDict, vec::String) = PyObject(@pycheckni ccall(pyfunc(:PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
+
+keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckni ccall(pyfunc(:PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
+
+values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckni ccall(pyfunc(:PyDict_Values), PyPtr, (PyPtr,), d)) : pyobject_call(d, "values"))
+
+similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
+eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
+
+function assign(d::PyDict, k, v)
+    @pycheckzi ccall(pyfunc(:PyObject_SetItem), Int32, (PyPtr, PyPtr, PyPtr),
+                     d, PyObject(k), PyObject(v))
+    d
+end
+
+function get{K,V}(d::PyDict{K,V}, k, default)
+    vo = ccall(pyfunc(:PyObject_GetItem), PyPtr, (PyPtr,PyPtr), d, PyObject(k))
+    if vo == C_NULL
+        pyerr_clear()
+        return default
+    else
+        return convert(V, PyObject(vo))
+    end
+end
+
+function delete!(d::PyDict, k)
+    v = d[k]
+    @pycheckzi ccall(pyfunc(d.isdict ? :PyDict_DelItem : :PyObject_DelItem),
+                     Int32, (PyPtr, PyPtr), d, PyObject(k))
+    return v
+end
+
+function delete!(d::PyDict, k, default)
+    try
+        return delete!(d, k)
+    catch
+        return default
+    end
+end
+
+function empty!(d::PyDict)
+    if d.isdict
+        @pychecki ccall(pyfunc(:PyDict_Clear), Void, (PyPtr,), d)
+    else
+        # for generic Mapping items we must delete keys one by one
+        for k in keys(d)
+            delete!(d, k)
+        end
+    end
+    return d
+end
+
+length(d::PyDict) = @pycheckz ccall(pyfunc(d.isdict ? :PyDict_Size
+                                           :PyObject_Size), Int, (PyPtr,), d)
+isempty(d::PyDict) = length(d) == 0
+
+type PyDict_Iterator
+    # arrays to pass key, value, and pos pointers to PyDict_Next
+    ka::Array{PyPtr}
+    va::Array{PyPtr}
+    pa::Vector{Int}
+
+    items::PyObject # items list, for generic Mapping objects
+
+    i::Int # current position in items list (0-based)
+    len::Int # length of items list
+end
+
+function start(d::PyDict)
+    if d.isdict
+        PyDict_Iterator(Array(PyPtr,1), Array(PyPtr,1), zeros(Int,1),
+                        PyObject(C_NULL), 0, length(d))
+    else
+        items = convert(Vector{PyObject}, pyobject_call(d, PyObject, "items"))
+        PyDict_Iterator(Array(PyPtr,0), Array(PyPtr,0), zeros(Int,0),
+                        items, 0,
+                        @pycheckz ccall(pyfunc(:PySequence_Size),
+                                        Int, (PyPtr,), items))
+    end
+end
+
+done(d::PyDict, itr::PyDict_Iterator) = itr.i >= itr.len
+
+function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
+    if itr.items.o == C_NULL
+        # Dict object, use PyDict_Next
+        if 0 == ccall(pyfunc(:PyDict_Next), Int32,
+                      (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
+                      d, itr.pa, itr.ka, itr.va)
+            error("unexpected end of PyDict_Next")
+        end
+        ko = pyincref(PyObject(itr.ka[1])) # PyDict_Next returns
+        vo = pyincref(PyObject(itr.va[1])) #   borrowed ref, so incref
+        ((convert(K,ko), convert(V,vo)),
+         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
+    else
+        # generic Mapping object, use items list
+        (convert((K,V), PyObject(@pycheckni ccall(pyfunc(:PySequence_GetItem),
+                                                  PyPtr, (PyPtr,Int), 
+                                                  itr.items, itr.i))),
+         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
+    end
+end
+
+function filter!(f::Function, d::PyDict)
+    # We must use items(d) here rather than (k,v) in d,
+    # because PyDict_Next does not permit changing the set of keys
+    # during iteration.
+    for (k,v) in items(d)
+        if !f(k,v)
+            delete!(d,k)
+        end
+    end
+    return d
+end
+
+#########################################################################
+# Dictionary conversions (copies)
 
 function PyObject(d::Associative)
     o = PyObject(@pycheckn ccall(pyfunc(:PyDict_New), PyPtr, ()))
@@ -142,47 +287,16 @@ function PyObject(d::Associative)
 end
 
 function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
-    KA = pyany_toany(K)
-    VA = pyany_toany(V)
-    d = Dict{KA,VA}()
-    # arrays to pass key, value, and pos pointers to PyDict_Next
-    ka = Array(PyPtr, 1)
-    va = Array(PyPtr, 1)
-    pa = zeros(Int, 1) # must be initialized to zero
     @pyinitialize
-    if pyisinstance(o, :PyDict_Type)
-        # Dict loop is more efficient than items copy needed for Mapping below
-        while 0 != ccall(pyfunc(:PyDict_Next), Int32, 
-                         (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
-                         o, pa, ka, va)
-            ko = pyincref(PyObject(ka[1])) # PyDict_Next returns
-            vo = pyincref(PyObject(va[1])) #   borrowed ref, so incref
-            merge!(d, (KA=>VA)[convert(K,ko) => convert(V,vo)])
-        end
-    elseif pyquery(:PyMapping_Check, o)
-        # use generic Python mapping protocol
-        items = convert(Vector{(PyObject,PyObject)},
-                        pycall(o["items"], PyObject))
-        for (ko,vo) in items
-            merge!(d, (KA=>VA)[convert(K, ko) => convert(V, vo)])
-        end
-    else
-        throw(ArgumentError("only Mapping objects can be converted to Dict"))
-    end
-    return d
+    copy(PyDict{K,V}(o))
 end
 
 #########################################################################
-# NumPy conversions (multidimensional arrays)
-
-include("numpy.jl")
-
-#########################################################################
-# Inferring Julia types at runtime from Python objects.
+# Inferring Julia types at runtime from Python objects:
 #
-# Note that we sometimes use the PyFoo_Check API and sometimes we use
-# PyObject_IsInstance(o, PyFoo_Type), since sometimes the former API
-# is a macro (hence inaccessible in Julia).
+# [Note that we sometimes use the PyFoo_Check API and sometimes we use
+#  PyObject_IsInstance(o, PyFoo_Type), since sometimes the former API
+#  is a macro (hence inaccessible in Julia).]
 
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or None if there isn't one.

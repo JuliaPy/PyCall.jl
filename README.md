@@ -80,7 +80,7 @@ a NumPy array (currently of numeric types or objects only).  Just use
 `PyArray` as the return type of a `pycall` returning an `ndarray`, or
 call `PyArray(o::PyObject)` on an `ndarray` object `o`.  (Technically,
 a `PyArray` works for any Python object that uses the NumPy array
-interface to provide a data pointer and shape information.)
+interface to provide a data pointer and shape information.)  
 
 Conversely, when passing arrays *to* Python, Julia `Array` types are
 converted to `PyObject` types *without* making a copy via NumPy,
@@ -89,6 +89,21 @@ a new reference to an `Array` object and returns it from `pycall`, you
 *must* ensure that the original `Array` object still exists (i.e., is not
 garbage collected) as long as any such "hidden" Python references
 exist.
+
+#### PyDict
+
+Similar to `PyArray`, PyCall also provides a type `PyDict` (a subclass
+of `Association`) that implements a no-copy wrapper around a Python
+dictionary (or any object implementing the mapping protocol).  Just
+use `PyDict` as the return type of a `pycall` returning a dictionary,
+or call `PyDict(o::PyObject)` on a dictionary` object `o`.  By
+default, a `PyDict` is an `Any => Any` dictionary (or actually `PyAny
+=> PyAny`) that performs runtime type inference, but if your Python
+dictionary has known, fixed types you can insteady use `PyDict{K,V}` given
+the key and value types `K` and `V` respectively.
+
+Currently passing Julia dictionaries to Python makes a copy of the Julia
+dictionary.
 
 #### PyAny
 
@@ -102,7 +117,15 @@ and the fact that the Julia JIT compiler can no longer infer the type).
 
 ### Calling Python
 
-In cases where the 
+In most cases, the `@pyimport` macro automatically makes the
+appropriate type conversions to Julia types based on runtime
+inspection of the Python objects.  However greater control over these
+type conversions (e.g. to use a no-copy `PyArray` for a Python
+multidimensional array rather than copying to an `Array`) can be
+achieved by using the lower-level functions below.  Using `pycall` in
+cases where the Python return type is known can also improve
+performance, both by eliminating the overhead of runtime type inference
+and also by providing more type information to the Julia compiler.
 
 * `pycall(function::PyObject, returntype::Type, args...)`.   Call the given 
   Python `function` (typically looked up from a module) with the given
@@ -120,7 +143,7 @@ In cases where the
   with `@pyimport` modules in order to obtain the raw `PyObject` members).
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
-  builtins.
+  builtins, returning a `PyObject`
 
 ### Initialization
 
@@ -192,8 +215,9 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 ## Work in Progress
 
-* Conversions for many more types (set, range, xrange, etc.).  Callback
-  functions.  No-copy dictionary conversions.
+* Conversions for many more types (set, range, xrange, etc.). 
+
+* Support for Julia callback functions passed to Python.
 
 * Support for keyword arguments.
 
