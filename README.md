@@ -1,8 +1,14 @@
 # Calling Python functions from the Julia language
 
-This package provides a `pycall` function (similar in spirit to
-Julia's `ccall` function) to call Python functions from the Julia
-language, automatically converting types etcetera.
+This package provides a `@pyimport` macro that mimics a Python
+`import` statement: it imports a Python module and provides Julia
+wrappers for all of the functions and constants therein, including
+automatic conversion of types between Julia and Python.
+
+It also provides facilities for lower-level manipulation of Python
+objects, including a `PyObject` type for opaque Python objects and a
+`pycall` function (similar in spirit to Julia's `ccall` function) to
+call Python functions from the Julia language with type conversions.
 
 **Note**: In order to load Python modules such as NumPy that are partly
 implemented in shared libraries (i.e., which are not purely written in Python),
