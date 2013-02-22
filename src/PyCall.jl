@@ -105,6 +105,7 @@ function pyinitialize(python::String)
             libpython::Ptr{Void} = dlopen(libpython_name(python),
                                           RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
         else # Julia 0.1 - can't support inter-library dependencies
+            warn("your Julia version is out of date - PyCall will be broken")
             libpython::Ptr{Void} = dlopen(libpython_name(python))
         end
         ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
