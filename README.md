@@ -184,7 +184,7 @@ accomplished using:
   thrown).  The reason is that some Python modules (e.g. numpy) crash
   if their initialization routine is called more than once.
   Subsequent calls to `pyfinalize` do nothing.  You must *not* try
-  to access any Python functions or data (that has not been converted
+  to access any Python functions or data (that has not been *copied*
   to native Julia types) after `pyfinalize` runs!
 
 * The Python version number is returned by `pyversion()`, which returns
