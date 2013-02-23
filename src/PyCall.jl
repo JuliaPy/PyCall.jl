@@ -400,8 +400,6 @@ end
 
 function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     oargs = map(PyObject, args)
-    # would rather call PyTuple_Pack, but calling varargs functions
-    # with ccall and argument splicing seems problematic right now.
     nargs = length(args)
     if nargs > 0 && isa(args[end], PyKW)
         kw = PyObject(args[end])
