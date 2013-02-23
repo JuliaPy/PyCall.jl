@@ -54,7 +54,7 @@ with the `PyArray` type below.
 
 Keyword arguments can be passed as the *last* argument of a function,
 prefixed by the `@pykw` macro, and separated by *spaces*.  For example,
-[PyLab](http://www.scipy.org/PyLab) uses keyword arguments to specify
+matplotlib's [pylab](http://matplotlib.org/) uses keyword arguments to specify
 plot options, and this functionality is accessed from Julia by:
 
     @pyimport pylab
