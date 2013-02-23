@@ -3,7 +3,7 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap
+       PyDict, pyisinstance, pywrap, @pykw
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -367,20 +367,57 @@ end
 pybuiltin(name::Symbol) = pybuiltin(string(name))
 
 #########################################################################
+# Keyword arguments are just passed to pycall as @pykw kw1=val1 kw2=val2...
+# in the last pycall argument.  The @pykw macro converts this into a special
+# dictionary object for passing to pycall.
+#
+# Note that I don't use the Options package because a lot of the things
+# like typechecking and defaults don't make sense the pycall context,
+# so this can be a lot simpler.  All Python needs is a dictionary.
+
+# In order for PyCall to differentiate between the keyword dictionary
+# and an ordinary dictionary parameter, we wrap it in a special type.
+type PyKW
+    d::Dict{String,Any} # dictionary of (keyword => value) pairs.
+end
+PyObject(kw::PyKW) = isempty(kw.d) ? PyObject(C_NULL) : PyObject(kw.d)
+
+# from a single :(x = y) expression make a single :(x => y) expression
+function pykw1(ex::Expr)
+    if ex.head == :(=) && length(ex.args) == 2 && typeof(ex.args[1]) == Symbol
+        expr(:(=>), string(ex.args[1]), ex.args[2])
+    else
+        throw(ArgumentError("invalid keyword expression $ex"))
+    end
+end
+
+macro pykw(args...)
+    :(PyKW($(expr(symbol("typed-dict"), :(String=>Any), 
+                  map(pykw1, args)...))))
+end
+
+#########################################################################
 
 function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     oargs = map(PyObject, args)
     # would rather call PyTuple_Pack, but calling varargs functions
     # with ccall and argument splicing seems problematic right now.
+    nargs = length(args)
+    if nargs > 0 && isa(args[end], PyKW)
+        kw = PyObject(args[end])
+        nargs -= 1
+    else
+        kw = PyObject(C_NULL)
+    end
     arg = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
-                                   length(args)))
-    for i = 1:length(args)
+                                   nargs))
+    for i = 1:nargs
         @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
                          arg, i-1, oargs[i])
         pyincref(oargs[i]) # PyTuple_SetItem steals the reference
     end
-    ret = PyObject(@pycheckni ccall(pyfunc(:PyObject_CallObject), PyPtr,
-                                    (PyPtr,PyPtr), o, arg))
+    ret = PyObject(@pycheckni ccall(pyfunc(:PyObject_Call), PyPtr,
+                                    (PyPtr,PyPtr,PyPtr), o, arg, kw))
     jret = convert(returntype, ret)
     return jret
 end

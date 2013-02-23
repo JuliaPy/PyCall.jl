@@ -52,6 +52,16 @@ from Julia to Python without making a copy, but from Python to Julia a
 copy is made; no-copy conversion of Python to Julia arrays can be achieved
 with the `PyArray` type below.
 
+Keyword arguments can be passed as the *last* argument of a function,
+prefixed by the `@pykw` macro, and separated by *spaces*.  For example,
+[PyLab](http://www.scipy.org/PyLab) uses keyword arguments to specify
+plot options, and this functionality is accessed from Julia by:
+
+    @pyimport pylab
+    x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
+    pylab.plot(x, y, @pykw color="red" linewidth=2.0 linestyle="--")
+    pylab.show() 
+
 ## Python object interfaces
 
 The `@pyimport` macro is built on top of several routines for
@@ -239,7 +249,11 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 * Support for Julia callback functions passed to Python.
 
-* Support for keyword arguments.
+* A PyList type for no-copy sharing of Python sequence objects.
+
+* Assignment functions for write access to object members.
+
+* Caching of `pyfunc` results, following [this suggestion](https://github.com/stevengj/PyCall.jl/pull/2).
 
 ## Author
 
