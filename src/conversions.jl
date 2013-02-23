@@ -46,7 +46,7 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
                              Float64, (PyPtr,), po))
     end)
 
-convert(::Type{String}, po::PyObject) =
+convert{T<:String}(::Type{T}, po::PyObject) =
   bytestring(@pycheck ccall(pyfunc(:PyString_AsString),
                              Ptr{Uint8}, (PyPtr,), po))
 
@@ -147,9 +147,15 @@ type PyDict{K,V} <: Associative{K,V}
         end
         new(o, pyisinstance(o, :PyDict_Type))
     end
+    function PyDict() 
+        @pyinitialize
+        new(PyObject(@pycheckni ccall(pyfunc(:PyDict_New), PyPtr, ())), true)
+    end
 end
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
+PyDict() = PyDict{PyAny,PyAny}()
+PyDict{K,V}(d::Dict{K,V}) = PyDict{K,V}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 convert(::Type{PyPtr}, d::PyDict) = d.o.o
@@ -167,7 +173,7 @@ values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pychec
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
 
-function assign(d::PyDict, k, v)
+function assign(d::PyDict, v, k)
     @pycheckzi ccall(pyfunc(:PyObject_SetItem), Int32, (PyPtr, PyPtr, PyPtr),
                      d, PyObject(k), PyObject(v))
     d
