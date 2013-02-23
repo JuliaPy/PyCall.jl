@@ -392,8 +392,7 @@ function pykw1(ex::Expr)
 end
 
 macro pykw(args...)
-    :(PyKW($(expr(symbol("typed-dict"), :(String=>Any), 
-                  map(pykw1, args)...))))
+    :(PyKW($(expr(:typed_dict, :(String=>Any), map(pykw1, args)...))))
 end
 
 #########################################################################
