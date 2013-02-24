@@ -10,21 +10,15 @@ objects, including a `PyObject` type for opaque Python objects and a
 `pycall` function (similar in spirit to Julia's `ccall` function) to
 call Python functions from the Julia language with type conversions.
 
-**Note**: In order to load Python modules such as NumPy that are partly
-implemented in shared libraries (i.e., which are not purely written in Python),
-you must patch Julia with the fix in [Julia issue #2380](https://github.com/JuliaLang/julia/pull/2380).  This is required for multidimensional array conversions, which rely on NumPy.
-
 ## Installation
 
-Until this package stabilizes and is added to Julia's global
-[METADATA.jl](https://github.com/JuliaLang/METADATA.jl) database, you should
-do
+Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
+install the files.
 
-    cd ~/.julia
-    git clone https://github.com/stevengj/PyCall.jl PyCall
-
-to fetch the latest version of the package and install it in your
-`.julia` directory (or somewhere else if you prefer).
+The latest development version of PyCall is avalable from
+<https://github.com/stevengj/PyCall.jl>.  If you want to switch to
+this after installing the package, `cd ~/.julia/PyCall` and `git pull
+git://github.com/stevengj/PyCall.jl master`.
 
 ## Usage
 

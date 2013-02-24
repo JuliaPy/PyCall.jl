@@ -116,9 +116,7 @@ function pyinitialize(python::String)
             # For example, numpy and scipy seem to crash if this is done.
             error("Calling pyinitialize after pyfinalize is not supported")
         end
-        if isdefined(:dlopen_global) # see Julia issue #2317
-            libpython::Ptr{Void} = dlopen_global(libpython_name(python))
-        elseif method_exists(dlopen,(String,Integer))
+        if method_exists(dlopen,(String,Integer))
             libpython::Ptr{Void} = dlopen(libpython_name(python),
                                           RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
         else # Julia 0.1 - can't support inter-library dependencies
