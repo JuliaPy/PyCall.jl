@@ -3,7 +3,7 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, @pykw
+       PyDict, pyisinstance, pywrap, @pykw, pytypeof
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -73,6 +73,8 @@ pyisinstance(o::PyObject, t::Symbol) =
 
 pyquery(q::Symbol, o::PyObject) =
   ccall(pyfunc(q), Int32, (PyPtr,), o) == 1
+
+pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(PyCall.TypeType, PyObject, o)
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o

@@ -253,7 +253,8 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
   `PyTypeObject` in the Python C API), e.g. `pyisinstance(o, :PyDict_Type)`
   checks whether `o` is a Python dictionary.  Alternatively,
   `pyisinstance(o::PyObject, t::PyObject)` performs the same check
-  given a Python type object `t`.
+  given a Python type object `t`.  `pytypeof(o::PyObject)` returns the
+  Python type of `o`, equivalent to `type(o)` in Python.
 
 ## Work in Progress
 
