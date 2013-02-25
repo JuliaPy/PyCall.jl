@@ -85,8 +85,14 @@ PyObject(o::PyObject) = o
 
 inspect = PyObject(C_NULL) # inspect module, needed for module introspection
 
-# the C API doesn't seem to provide this, so we get it from Python & cache it:
+# Python has zillions of types that a function be, in addition to the FunctionType
+# in the C API.  We have to obtain these at runtime and cache them in globals
 BuiltinFunctionType = PyObject(C_NULL)
+TypeType = PyObject(C_NULL) # type constructor
+MethodType = PyObject(C_NULL)
+MethodWrapperType = PyObject(C_NULL)
+# also WrapperDescriptorType = type(list.__add__) and
+#      MethodDescriptorType = type(list.append) ... is it worth detecting these?
 
 # special function type used in NumPy and SciPy (if available)
 ufuncType = PyObject(C_NULL)
@@ -106,6 +112,9 @@ function pyinitialize(python::String)
     global libpython
     global inspect
     global BuiltinFunctionType
+    global TypeType
+    global MethodType
+    global MethodWrapperType
     global ufuncType
     if !initialized::Bool
         if finalized::Bool
@@ -129,7 +138,12 @@ function pyinitialize(python::String)
         ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
         inspect::PyObject = pyimport("inspect")
-        BuiltinFunctionType::PyObject = pyimport("types")["BuiltinFunctionType"]
+        types = pyimport("types")
+        BuiltinFunctionType::PyObject = types["BuiltinFunctionType"]
+        TypeType::PyObject = types["TypeType"]
+        MethodType::PyObject = types["MethodType"]
+        MethodWrapperType::PyObject = pycall(TypeType::PyObject, PyObject, 
+                                             PyObject(PyObject[])["__add__"])
         try
             ufuncType = pyimport("numpy")["ufunc"]
         catch
@@ -149,10 +163,16 @@ function pyfinalize()
     global libpython
     global inspect
     global BuiltinFunctionType
+    global TypeType
+    global MethodType
+    global MethodWrapperType
     if initialized::Bool
         npyfinalize()
         pydecref(ufuncType)
         pydecref(BuiltinFunctionType::PyObject)
+        pydecref(TypeType::PyObject)
+        pydecref(MethodType::PyObject)
+        pydecref(MethodWrapperType::PyObject)
         pydecref(inspect::PyObject)
         gc() # collect/decref any remaining PyObjects
         ccall(pyfunc(:Py_Finalize), Void, ())
@@ -269,7 +289,9 @@ function show(io::IO, o::PyObject)
 end
 
 #########################################################################
-# For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python
+# For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python,
+# with the former returning an raw PyObject and the latter giving the PyAny
+# conversion.
 
 function ref(o::PyObject, s::String)
     if (o.o == C_NULL)
@@ -284,7 +306,21 @@ function ref(o::PyObject, s::String)
     return PyObject(p)
 end
 
-ref(o::PyObject, s::Symbol) = ref(o, string(s))
+ref(o::PyObject, s::Symbol) = convert(PyAny, ref(o, string(s)))
+
+function assign(o::PyObject, v, s::String)
+    if (o.o == C_NULL)
+        throw(ArgumentError("assign of NULL PyObject"))
+    end
+    if -1 == ccall(pyfunc(:PyObject_SetAttrString), Int32,
+                   (PyPtr, Ptr{Uint8}, PyPtr), o, bytestring(s), PyObject(v))
+        pyerr_clear()
+        throw(KeyError(s))
+    end
+    o
+end
+
+assign(o::PyObject, v, s::Symbol) = assign(o, v, string(s))
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
@@ -292,7 +328,7 @@ ref(o::PyObject, s::Symbol) = ref(o, string(s))
 
 abstract PyWrapper
 
-# still provide w[:foo] low-level access to unconverted members:
+# still provide w["foo"] low-level access to unconverted members:
 ref(w::PyWrapper, s) = ref(w.___jl_PyCall_PyObject___, s)
 
 typesymbol(T::AbstractKind) = T.name.name

@@ -56,6 +56,20 @@ plot options, and this functionality is accessed from Julia by:
     pylab.plot(x, y, @pykw color="red" linewidth=2.0 linestyle="--")
     pylab.show() 
 
+The biggest diffence from Python is that object attributes/members are
+accessed with `o[:attribute]` rather than `o.attribute`.  (This is because Julia
+does not permit overloading the `.` operator yet.)  See also the section on
+`PyObject` below, as well as the `pywrap` function to create anonymous
+composite types that simulate `.` access (this is what `@pyimport` does).
+For example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
+
+    @pyimport Bio.seq as s
+    @pyimport Bio.Alphabet as a
+    my_dna = s.Seq("AGTACACTGGT", a.generic_dna)
+    my_dna[:find]("ACT")
+
+whereas in Python the last step would have been `mydna.find("ACT")`.
+
 ## Python object interfaces
 
 The `@pyimport` macro is built on top of several routines for
@@ -77,6 +91,10 @@ and PyCall also supplies `convert(T, o::PyObject)` to convert
 PyObjects back into Julia types `T`.  Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
 strings, along with tuples and arrays/lists thereof, but more are planned.
+
+Given a `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
+in Python, with automatic type conversion.  To get an attribute as a
+`PyObject` without type conversion, do `o["attribute"]` instead.
 
 #### PyArray
 
@@ -244,8 +262,6 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 * Support for Julia callback functions passed to Python.
 
 * A PyList type for no-copy sharing of Python sequence objects.
-
-* Assignment functions for write access to object members.
 
 * Caching of `pyfunc` results, following [this suggestion](https://github.com/stevengj/PyCall.jl/pull/2).
 

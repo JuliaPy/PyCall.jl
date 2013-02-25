@@ -317,7 +317,7 @@ pycomplex_query(o::PyObject) =
 
 pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
 
-pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) ? Function : None
+pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) || pyisinstance(o, TypeType) || pyisinstance(o, MethodType) || pyisinstance(o, MethodWrapperType) ? Function : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
