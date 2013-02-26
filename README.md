@@ -63,7 +63,7 @@ does not permit overloading the `.` operator yet.)  See also the section on
 composite types that simulate `.` access (this is what `@pyimport` does).
 For example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
 
-    @pyimport Bio.seq as s
+    @pyimport Bio.Seq as s
     @pyimport Bio.Alphabet as a
     my_dna = s.Seq("AGTACACTGGT", a.generic_dna)
     my_dna[:find]("ACT")
