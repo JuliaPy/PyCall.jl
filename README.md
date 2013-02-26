@@ -68,7 +68,7 @@ For example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
     my_dna = s.Seq("AGTACACTGGT", a.generic_dna)
     my_dna[:find]("ACT")
 
-whereas in Python the last step would have been `mydna.find("ACT")`.
+whereas in Python the last step would have been `my_dna.find("ACT")`.
 
 ## Python object interfaces
 
