@@ -99,19 +99,17 @@ MethodWrapperType = PyObject(C_NULL)
 # special function type used in NumPy and SciPy (if available)
 ufuncType = PyObject(C_NULL)
 
-pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('$var')"`))
+# Py_SetProgramName needs its argument to persist as long as Python does
+pyprogramname = bytestring("")
 
-function libpython_name(python::String)
-    lib = pyconfigvar(python, "LDLIBRARY")
-    @osx_only if lib[1] != '/'; lib = pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/"*lib end
-    lib
-end
-
+# low-level initialization, given a pointer to dlopen result on libpython,
+# or C_NULL if python symbols are in the global namespace:
 # initialize the Python interpreter (no-op on subsequent calls)
-function pyinitialize(python::String)
+function pyinitialize(libpy::Ptr{Void})
     global initialized
     global finalized
     global libpython
+    global pyprogramname
     global inspect
     global BuiltinFunctionType
     global TypeType
@@ -128,16 +126,14 @@ function pyinitialize(python::String)
             # For example, numpy and scipy seem to crash if this is done.
             error("Calling pyinitialize after pyfinalize is not supported")
         end
-        if method_exists(dlopen,(String,Integer))
-            libpython::Ptr{Void} = dlopen(libpython_name(python),
-                                          RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-        else # Julia 0.1 - can't support inter-library dependencies
-            warn("your Julia version is out of date - PyCall will be broken")
-            libpython::Ptr{Void} = dlopen(libpython_name(python))
+        libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Uint32), C_NULL, 0) : libpy
+        if 0 == ccall(pyfunc(:Py_IsInitialized), Int32, ())
+            if !isempty(pyprogramname::ASCIIString)
+                ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
+                      bytestring(pyprogramname::ASCIIString))
+            end
+            ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         end
-        ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
-              bytestring(python))
-        ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         initialized::Bool = true
         inspect::PyObject = pyimport("inspect")
         types = pyimport("types")
@@ -151,6 +147,32 @@ function pyinitialize(python::String)
         catch
             ufuncType = PyObject(C_NULL) # NumPy not available
         end
+    end
+    return
+end
+
+pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('$var')"`))
+
+function libpython_name(python::String)
+    lib = pyconfigvar(python, "LDLIBRARY")
+    @osx_only if lib[1] != '/'; lib = pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/"*lib end
+    lib
+end
+
+# initialize the Python interpreter (no-op on subsequent calls)
+function pyinitialize(python::String)
+    global initialized
+    global pyprogramname
+    if !initialized::Bool
+        if method_exists(dlopen,(String,Integer))
+            libpy = dlopen(libpython_name(python),
+                                          RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+        else # Julia 0.1 - can't support inter-library dependencies
+            warn("your Julia version is out of date - PyCall will be broken")
+            libpy = dlopen(libpython_name(python))
+        end
+        pyprogramname = bytestring(python)
+        pyinitialize(libpy)
     end
     return
 end
