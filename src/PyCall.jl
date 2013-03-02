@@ -130,7 +130,7 @@ function pyinitialize(libpy::Ptr{Void})
         if 0 == ccall(pyfunc(:Py_IsInitialized), Int32, ())
             if !isempty(pyprogramname::ASCIIString)
                 ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
-                      bytestring(pyprogramname::ASCIIString))
+                      pyprogramname::ASCIIString)
             end
             ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
         end
@@ -171,7 +171,7 @@ function pyinitialize(python::String)
             warn("your Julia version is out of date - PyCall will be broken")
             libpy = dlopen(libpython_name(python))
         end
-        pyprogramname = bytestring(python)
+        pyprogramname::ASCIIString = bytestring(python)
         pyinitialize(libpy)
     end
     return
