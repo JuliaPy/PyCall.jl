@@ -10,15 +10,14 @@ PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSize_t),
 PyObject(i::Integer) = PyObject(@pycheckn ccall(pyfunc(:PyInt_FromSsize_t),
                                                 PyPtr, (Int,), i))
 
-PyObject(b::Bool) = OS_NAME == :Windows ?
-  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int32,), b)) :
-  PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), PyPtr, (Int,), b))
+PyObject(b::Bool) = PyObject(@pycheckn ccall(pyfunc(:PyBool_FromLong), 
+                                             PyPtr, (Clong,), b))
 
 PyObject(r::Real) = PyObject(@pycheckn ccall(pyfunc(:PyFloat_FromDouble),
-                                             PyPtr, (Float64,), r))
+                                             PyPtr, (Cdouble,), r))
 
 PyObject(c::Complex) = PyObject(@pycheckn ccall(pyfunc(:PyComplex_FromDoubles),
-                                                PyPtr, (Float64,Float64), 
+                                                PyPtr, (Cdouble,Cdouble), 
                                                 real(c), imag(c)))
 
 # fixme: PyString_* was renamed to PyBytes_* in Python 3.x?
@@ -35,15 +34,15 @@ convert(::Type{Bool}, po::PyObject) =
   convert(Bool, @pycheck ccall(pyfunc(:PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) = 
-  convert(T, @pycheck ccall(pyfunc(:PyFloat_AsDouble), Float64, (PyPtr,), po))
+  convert(T, @pycheck ccall(pyfunc(:PyFloat_AsDouble), Cdouble, (PyPtr,), po))
 
 convert{T<:Complex}(::Type{T}, po::PyObject) = 
   convert(T,
     begin
         re = @pycheck ccall(pyfunc(:PyComplex_RealAsDouble),
-                            Float64, (PyPtr,), po)
+                            Cdouble, (PyPtr,), po)
         complex128(re, ccall(pyfunc(:PyComplex_ImagAsDouble), 
-                             Float64, (PyPtr,), po))
+                             Cdouble, (PyPtr,), po))
     end)
 
 convert{T<:String}(::Type{T}, po::PyObject) =
@@ -86,7 +85,7 @@ function PyObject(t::Tuple)
                                  length(t)))
     for i = 1:length(t)
         oi = PyObject(t[i])
-        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
         pyincref(oi) # PyTuple_SetItem steals the reference
     end
@@ -110,7 +109,7 @@ function PyObject(v::AbstractVector)
     o = PyObject(@pycheckn ccall(pyfunc(:PyList_New), PyPtr,(Int,), length(v)))
     for i = 1:length(v)
         oi = PyObject(v[i])
-        @pycheckzi ccall(pyfunc(:PyList_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(pyfunc(:PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
         pyincref(oi) # PyList_SetItem steals the reference
     end
@@ -162,7 +161,7 @@ convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
 has(d::PyDict, key) = 1 == ccall(pyfunc(d.isdict ? :PyDict_Contains :
                                                    :PyMapping_HasKey),
-                                  Int32, (PyPtr, PyPtr), d, PyObject(key))
+                                  Cint, (PyPtr, PyPtr), d, PyObject(key))
 
 pyobject_call(d::PyDict, vec::String) = PyObject(@pycheckni ccall(pyfunc(:PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
 
@@ -174,7 +173,7 @@ similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
 
 function assign(d::PyDict, v, k)
-    @pycheckzi ccall(pyfunc(:PyObject_SetItem), Int32, (PyPtr, PyPtr, PyPtr),
+    @pycheckzi ccall(pyfunc(:PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      d, PyObject(k), PyObject(v))
     d
 end
@@ -192,7 +191,7 @@ end
 function delete!(d::PyDict, k)
     v = d[k]
     @pycheckzi ccall(pyfunc(d.isdict ? :PyDict_DelItem : :PyObject_DelItem),
-                     Int32, (PyPtr, PyPtr), d, PyObject(k))
+                     Cint, (PyPtr, PyPtr), d, PyObject(k))
     return v
 end
 
@@ -250,7 +249,7 @@ done(d::PyDict, itr::PyDict_Iterator) = itr.i >= itr.len
 function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
     if itr.items.o == C_NULL
         # Dict object, use PyDict_Next
-        if 0 == ccall(pyfunc(:PyDict_Next), Int32,
+        if 0 == ccall(pyfunc(:PyDict_Next), Cint,
                       (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
                       d, itr.pa, itr.ka, itr.va)
             error("unexpected end of PyDict_Next")
@@ -286,7 +285,7 @@ end
 function PyObject(d::Associative)
     o = PyObject(@pycheckn ccall(pyfunc(:PyDict_New), PyPtr, ()))
     for k in keys(d)
-        @pycheckzi ccall(pyfunc(:PyDict_SetItem), Int32, (PyPtr,PyPtr,PyPtr),
+        @pycheckzi ccall(pyfunc(:PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
                          o, PyObject(k), PyObject(d[k]))
     end
     return o
@@ -322,7 +321,7 @@ pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstanc
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, :PyDict_Type) || (pyquery(:PyMapping_Check, o) && ccall(pyfunc(:PyObject_HasAttrString), Int32, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
+pydict_query(o::PyObject) = pyisinstance(o, :PyDict_Type) || (pyquery(:PyMapping_Check, o) && ccall(pyfunc(:PyObject_HasAttrString), Cint, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
 
 function pysequence_query(o::PyObject)
     # pyquery(:PySequence_Check, o) always succeeds according to the docs,

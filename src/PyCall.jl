@@ -66,13 +66,13 @@ function pyincref(o::PyObject)
 end
 
 pyisinstance(o::PyObject, t::PyObject) = 
-  t.o != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, t.o) == 1
+  t.o != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
 pyisinstance(o::PyObject, t::Symbol) = 
-  ccall(pyfunc(:PyObject_IsInstance), Int32, (PyPtr,PyPtr), o, pyfunc(t)) == 1
+  ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, pyfunc(t)) == 1
 
 pyquery(q::Symbol, o::PyObject) =
-  ccall(pyfunc(q), Int32, (PyPtr,), o) == 1
+  ccall(pyfunc(q), Cint, (PyPtr,), o) == 1
 
 pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(PyCall.TypeType, PyObject, o)
 
@@ -126,13 +126,13 @@ function pyinitialize(libpy::Ptr{Void})
             # For example, numpy and scipy seem to crash if this is done.
             error("Calling pyinitialize after pyfinalize is not supported")
         end
-        libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Uint32), C_NULL, 0) : libpy
-        if 0 == ccall(pyfunc(:Py_IsInitialized), Int32, ())
+        libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
+        if 0 == ccall(pyfunc(:Py_IsInitialized), Cint, ())
             if !isempty(pyprogramname::ASCIIString)
                 ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
                       pyprogramname::ASCIIString)
             end
-            ccall(pyfunc(:Py_InitializeEx), Void, (Int32,), 0)
+            ccall(pyfunc(:Py_InitializeEx), Void, (Cint,), 0)
         end
         initialized::Bool = true
         inspect::PyObject = pyimport("inspect")
@@ -336,7 +336,7 @@ function assign(o::PyObject, v, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
-    if -1 == ccall(pyfunc(:PyObject_SetAttrString), Int32,
+    if -1 == ccall(pyfunc(:PyObject_SetAttrString), Cint,
                    (PyPtr, Ptr{Uint8}, PyPtr), o, bytestring(s), PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
@@ -366,12 +366,12 @@ function pywrap(o::PyObject)
                       pycall(inspect["getmembers"], PyObject, o))
     tname = gensym("PyCall_PyWrapper")
     @eval begin
-        $(expr(:type, expr(:<:, tname, :PyWrapper),
-               expr(:block, :(___jl_PyCall_PyObject___::PyObject),
-                    map(m -> expr(:(::), symbol(m[1]),
+        $(Expr(:type, Expr(:<:, tname, :PyWrapper),
+               Expr(:block, :(___jl_PyCall_PyObject___::PyObject),
+                    map(m -> Expr(:(::), symbol(m[1]),
                                   typesymbol(pytype_query(m[2]))), 
                         members)...)))
-        $(expr(:call, tname, o,
+        $(Expr(:call, tname, o,
                [ :(convert(PyAny, $(members[i][2])))
                 for i = 1:length(members) ]...))
     end
@@ -444,14 +444,14 @@ PyObject(kw::PyKW) = isempty(kw.d) ? PyObject(C_NULL) : PyObject(kw.d)
 # from a single :(x = y) expression make a single :(x => y) expression
 function pykw1(ex::Expr)
     if ex.head == :(=) && length(ex.args) == 2 && typeof(ex.args[1]) == Symbol
-        expr(:(=>), string(ex.args[1]), ex.args[2])
+        Expr(:(=>), string(ex.args[1]), ex.args[2])
     else
         throw(ArgumentError("invalid keyword expression $ex"))
     end
 end
 
 macro pykw(args...)
-    :(PyKW($(expr(:typed_dict, :(String=>Any), map(pykw1, args)...))))
+    :(PyKW($(Expr(:typed_dict, :(String=>Any), map(pykw1, args)...))))
 end
 
 #########################################################################
@@ -468,7 +468,7 @@ function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     arg = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
                                    nargs))
     for i = 1:nargs
-        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Int32, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
                          arg, i-1, oargs[i])
         pyincref(oargs[i]) # PyTuple_SetItem steals the reference
     end

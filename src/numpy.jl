@@ -179,7 +179,7 @@ const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     @npyinitialize
     p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
-              (PyPtr,Int32,Ptr{Int},Int32, Ptr{Int},Ptr{T}, Int32,Int32,PyPtr),
+              (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
               npy_api[:PyArray_Type], 
               ndims(a), [size(a)...], npy_type(T),
               [strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
