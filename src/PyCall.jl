@@ -359,7 +359,7 @@ function pywrap(o::PyObject)
                       pycall(inspect["getmembers"], PyObject, o))
     tname = gensym("PyCall_PyWrapper")
     @eval begin
-        $(Expr(:type, Expr(:<:, tname, :PyWrapper),
+        $(Expr(:type, true, Expr(:<:, tname, :PyWrapper),
                Expr(:block, :(___jl_PyCall_PyObject___::PyObject),
                     map(m -> Expr(:(::), symbol(m[1]),
                                   typesymbol(pytype_query(m[2]))), 
