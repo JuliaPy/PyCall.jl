@@ -35,28 +35,18 @@ end
 
 type PyObject
     o::PyPtr # the actual PyObject*
-
-    # For copy-free wrapping of arrays, the PyObject may reference a
-    # pointer to Julia array data.  In this case, we must keep a
-    # reference to the Julia object inside the PyObject so that the
-    # former is not garbage collected before the latter.
-    keep::Any
-
-    function PyObject(o::PyPtr, keep::Any)
-        po = new(o, keep)
+    function PyObject(o::PyPtr)
+        po = new(o)
         finalizer(po, pydecref)
         return po
     end
 end
-
-PyObject(o::PyPtr) = PyObject(o, nothing) # no Julia object to keep
 
 function pydecref(o::PyObject)
     if initialized::Bool # don't decref after pyfinalize!
         ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
     end
     o.o = C_NULL
-    o.keep = nothing
     o
 end
 
@@ -99,6 +89,10 @@ MethodWrapperType = PyObject(C_NULL)
 # special function type used in NumPy and SciPy (if available)
 ufuncType = PyObject(C_NULL)
 
+# cache Python None and PyNoneType
+pynothing = PyObject(C_NULL)
+PyNoneType = PyObject(C_NULL)
+
 # Py_SetProgramName needs its argument to persist as long as Python does
 pyprogramname = bytestring("")
 
@@ -116,6 +110,8 @@ function pyinitialize(libpy::Ptr{Void})
     global MethodType
     global MethodWrapperType
     global ufuncType
+    global pynothing
+    global PyNoneType
     if !initialized::Bool
         if finalized::Bool
             # From the Py_Finalize documentation:
@@ -147,6 +143,8 @@ function pyinitialize(libpy::Ptr{Void})
         catch
             ufuncType = PyObject(C_NULL) # NumPy not available
         end
+        pynothing = pybuiltin("None")
+        PyNoneType = types["NoneType"]
     end
     return
 end
@@ -185,14 +183,20 @@ function pyfinalize()
     global TypeType
     global MethodType
     global MethodWrapperType
+    global ufuncType
+    global pynothing
+    global PyNoneType
     if initialized::Bool
-        npyfinalize()
         pydecref(ufuncType)
+        npyfinalize()
+        pydecref(PyNoneType)
+        pydecref(pynothing)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)
         pydecref(MethodType::PyObject)
         pydecref(MethodWrapperType::PyObject)
         pydecref(inspect::PyObject)
+        pygc_finalize()
         gc() # collect/decref any remaining PyObjects
         ccall(pyfunc(:Py_Finalize), Void, ())
         dlclose(libpython::Ptr{Void})
@@ -284,6 +288,16 @@ macro pycheckz(ex)
 end
 
 #########################################################################
+
+include("gc.jl")
+
+# make a PyObject that embeds a reference to keep, to prevent Julia
+# from garbage-collecting keep until o is finalized.
+PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
+
+#########################################################################
+
+include("callback.jl")
 
 include("conversions.jl")
 

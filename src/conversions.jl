@@ -25,6 +25,8 @@ PyObject(s::String) = PyObject(@pycheckn ccall(pyfunc(:PyString_FromString),
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
 
+PyObject(n::Nothing) = pyincref(pynothing)
+
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
@@ -48,6 +50,8 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
 convert{T<:String}(::Type{T}, po::PyObject) =
   bytestring(@pycheck ccall(pyfunc(:PyString_AsString),
                              Ptr{Uint8}, (PyPtr,), po))
+
+convert(::Type{Nothing}, po::PyObject) = nothing
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{PyAny}, etc.,
@@ -318,6 +322,8 @@ pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
 
 pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) || pyisinstance(o, TypeType) || pyisinstance(o, MethodType) || pyisinstance(o, MethodWrapperType) ? Function : None
 
+pynone_query(o::PyObject) = pyisinstance(o, PyNoneType) ? Nothing : None
+
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
 # scipy scalar array members, grrr.
@@ -365,6 +371,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pyfunction_query(o)
     @return_not_None pydict_query(o)
     @return_not_None pysequence_query(o)
+    @return_not_None pynone_query(o)
     return default
 end
 

@@ -111,11 +111,7 @@ interface to provide a data pointer and shape information.)
 
 Conversely, when passing arrays *to* Python, Julia `Array` types are
 converted to `PyObject` types *without* making a copy via NumPy,
-e.g. when passed as `pycall` arguments. **Warning:** If Python creates
-a new reference to an `Array` object and returns it from `pycall`, you
-*must* ensure that the original `Array` object still exists (i.e., is not
-garbage collected) as long as any such "hidden" Python references
-exist.
+e.g. when passed as `pycall` arguments.
 
 #### PyDict
 
