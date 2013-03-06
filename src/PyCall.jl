@@ -164,13 +164,8 @@ function pyinitialize(python::String)
     global initialized
     global pyprogramname
     if !initialized::Bool
-        if method_exists(dlopen,(String,Integer))
-            libpy = dlopen(libpython_name(python),
-                                          RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-        else # Julia 0.1 - can't support inter-library dependencies
-            warn("your Julia version is out of date - PyCall will be broken")
-            libpy = dlopen(libpython_name(python))
-        end
+        libpy = dlopen(libpython_name(python),
+                       RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
         pyprogramname::ASCIIString = bytestring(python)
         pyinitialize(libpy)
     end
@@ -355,9 +350,7 @@ abstract PyWrapper
 # still provide w["foo"] low-level access to unconverted members:
 ref(w::PyWrapper, s) = ref(w.___jl_PyCall_PyObject___, s)
 
-typesymbol(T::AbstractKind) = T.name.name
-typesymbol(T::BitsKind) = T.name.name
-typesymbol(T::CompositeKind) = T.name.name
+typesymbol(T::DataType) = T.name.name
 typesymbol(T) = :Any # punt
 
 function pywrap(o::PyObject)
