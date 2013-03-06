@@ -25,7 +25,7 @@ PyObject(s::String) = PyObject(@pycheckn ccall(pyfunc(:PyString_FromString),
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
 
-PyObject(n::Nothing) = pyincref(pynothing)
+PyObject(n::Nothing) = pyincref(PyObject(pynothing.o))
 
 # conversions to Julia types from PyObject
 
@@ -322,7 +322,7 @@ pystring_query(o::PyObject) = pyisinstance(o, :PyString_Type) ? String : None
 
 pyfunction_query(o::PyObject) = pyisinstance(o, :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) || pyisinstance(o, TypeType) || pyisinstance(o, MethodType) || pyisinstance(o, MethodWrapperType) ? Function : None
 
-pynone_query(o::PyObject) = pyisinstance(o, PyNoneType) ? Nothing : None
+pynothing_query(o::PyObject) = pyisinstance(o, PyNoneType) ? Nothing : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
@@ -371,7 +371,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pyfunction_query(o)
     @return_not_None pydict_query(o)
     @return_not_None pysequence_query(o)
-    @return_not_None pynone_query(o)
+    @return_not_None pynothing_query(o)
     return default
 end
 
