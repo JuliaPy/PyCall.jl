@@ -3,7 +3,7 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyfunc, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, @pykw, pytypeof
+       PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -463,7 +463,9 @@ end
 
 #########################################################################
 
-function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
+typealias TypeTuple Union(Type,NTuple{Type})
+
+function pycall(o::PyObject, returntype::TypeTuple, args...)
     oargs = map(PyObject, args)
     nargs = length(args)
     if nargs > 0 && isa(args[end], PyKW)
@@ -484,6 +486,37 @@ function pycall(o::PyObject, returntype::Union(Type,NTuple{Type}), args...)
     jret = convert(returntype, ret)
     return jret
 end
+
+#########################################################################
+
+const Py_eval_input = 258 # from Python.h
+const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
+
+# evaluate a python string, returning PyObject, given a dictionary
+# (string/symbol => value) of local variables to use in the expression
+function pyeval_(s::String, locals::PyDict) 
+    sb = bytestring(s) # use temp var to prevent gc before we are done with o
+    o = PyObject(@pycheckn ccall(pyfunc(:Py_CompileString), PyPtr,
+                                  (Ptr{Uint8}, Ptr{Uint8}, Cint),
+                                  sb, pyeval_fname, Py_eval_input))
+    main = @pycheckni ccall(pyfunc(:PyImport_AddModule),
+                           PyPtr, (Ptr{Uint8},),
+                           bytestring("__main__"))
+    maindict = @pycheckni ccall(pyfunc(:PyModule_GetDict), PyPtr, (PyPtr,),
+                                main)
+    PyObject(@pycheckni ccall(pyfunc(:PyEval_EvalCode),
+                              PyPtr, (PyPtr, PyPtr, PyPtr),
+                              o, maindict, locals))
+end
+
+pyeval(s::String, locals::PyDict, returntype::TypeTuple) =
+   convert(returntype, pyeval_(s, locals))
+pyeval(s::String, locals::PyDict) = pyeval(s, locals, PyAny)
+pyeval(s::String, locals::Associative, returntype::TypeTuple) =
+   pyeval(s, PyDict(PyObject(locals)), returntype)
+pyeval(s::String, locals::Associative) =
+   pyeval(s, PyDict(PyObject(locals)), PyAny)
+pyeval(s::String) = pyeval(s, PyDict())
 
 #########################################################################
 

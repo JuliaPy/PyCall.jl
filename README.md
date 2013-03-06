@@ -91,6 +91,7 @@ and PyCall also supplies `convert(T, o::PyObject)` to convert
 PyObjects back into Julia types `T`.  Currently, the only types
 supported are numbers (integer, real, and complex), booleans, and
 strings, along with tuples and arrays/lists thereof, but more are planned.
+(Julia symbols are converted to Python strings.)
 
 Given a `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a
@@ -164,6 +165,13 @@ and also by providing more type information to the Julia compiler.
   macro, this does not define a structure type and module members cannot
   be accessed with `s.name` (the `s[name]` syntax can also be used
   with `@pyimport` modules in order to obtain the raw `PyObject` members).
+
+* `pyeval(s::String [, locals::Associative, [, rtype]])` evaluates `s`
+  as a Python string and returns the result converted to `rtype`
+  (which defaults to `PyAny`).  `locals` defines local variables that
+  can be used in the expression: it is a dictionary of where the keys
+  are the variables (`Symbol` or `String`) and the values (`Any`) are
+  the corresponding variable values.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins, returning a `PyObject`
