@@ -25,6 +25,8 @@ PyObject(s::String) = PyObject(@pycheckn ccall(pyfunc(:PyString_FromString),
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
 
+PyObject(s::Symbol) = PyObject(string(s))
+
 PyObject(n::Nothing) = pyincref(PyObject(pynothing.o))
 
 # conversions to Julia types from PyObject
