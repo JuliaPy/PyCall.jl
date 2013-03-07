@@ -160,7 +160,7 @@ end
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
 PyDict() = PyDict{PyAny,PyAny}()
-PyDict{K,V}(d::Dict{K,V}) = PyDict{K,V}(PyObject(d))
+PyDict{K,V}(d::Associative{K,V}) = PyDict{K,V}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 convert(::Type{PyPtr}, d::PyDict) = d.o.o
