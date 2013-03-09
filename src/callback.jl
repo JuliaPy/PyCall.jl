@@ -6,30 +6,6 @@
 # is called from Python and calls the former as needed.
 
 ################################################################
-# mirror of Python API types and constants from methodobject.h
-
-type PyMethodDef
-    ml_name::Ptr{Uint8}
-    ml_meth::Ptr{Void}
-    ml_flags::Cint
-    ml_doc::Ptr{Uint8} # may be NULL
-end
-
-# A PyCFunction is a C function of the form
-#     PyObject *func(PyObject *self, PyObject *args)
-# The first parameter is the "self" function for method, or 
-# for module functions it is the module object.  The second
-# parameter is either a tuple of args (for METH_VARARGS),
-# a single arg (for METH_O), or NULL (for METH_NOARGS).  func
-# must return non-NULL (Py_None is okay) unless there was an
-# error, in which case an exception must have been set.
-
-# ml_flags should be one of:
-const METH_VARARGS = 0x0001 # args are a tuple of arguments
-const METH_NOARGS = 0x0004  # no arguments (NULL argument pointer)
-const METH_O = 0x0008       # single argument (not wrapped in tuple)
-
-################################################################
 
 # Define a Python method/function object from f(PyPtr,PyPtr)::PyPtr.
 # Requires f to be a top-level function.
@@ -50,3 +26,58 @@ function pymethod(f::Function, name::String, flags::Integer)
 end
 
 ################################################################
+
+# To pass an arbitrary Julia function to Python, we wrap it
+# in a jl_Function Python class, where jl_Function.__call__
+# executes the jl_Function_callback function in Julia, which
+# in turn fetches the actual Julia function from the "f" attribute
+# and calls it.
+
+function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
+    ret_ = C_NULL
+    args = PyObject(args_)
+    try
+        if kw_ != C_NULL
+            throw(ArgumentError("keywords not yet supported in callbacks"))
+        end
+        f = unsafe_pyjlwrap_to_objref(self_)::Function
+        ret = PyObject(f(convert(PyAny, args)...))
+        ret_ = ret.o
+        ret.o = C_NULL # don't decref
+    catch e
+        ccall(pyfunc(:PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
+              pyfunc(:PyExc_RuntimeError),
+              bytestring(string("Julia exception: ", e)))
+    finally
+        args.o = C_NULL # don't decref
+    end
+    return ret_::PyPtr
+end
+
+jl_FunctionType = PyTypeObject()
+
+function pycallback_initialize()
+    global jl_FunctionType
+    if (jl_FunctionType::PyTypeObject).tp_name == C_NULL
+        jl_FunctionType::PyTypeObject = 
+         pyjlwrap_type("PyCall.jl_Function",
+                       t -> t.tp_call = cfunction(jl_Function_call,
+                                                  PyPtr, (PyPtr,PyPtr,PyPtr)))
+    end
+    return
+end
+
+function pycallback_finalize()
+    global jl_FunctionType
+    jl_FunctionType::PyTypeObject = PyTypeObject()
+end
+
+function pycallback(f::Function) 
+    global jl_FunctionType
+    if (jl_FunctionType::PyTypeObject).tp_name == C_NULL
+        pycallback_initialize()
+    end
+    pyjlwrap_new(jl_FunctionType::PyTypeObject, f)
+end
+
+PyObject(f::Function) = pycallback(f)

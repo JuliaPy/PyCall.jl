@@ -227,9 +227,10 @@ function pyerr_check(msg::String, val::Any)
     # only use this in contexts where initialization was already done
     e = ccall(pyfunc(:PyErr_Occurred), PyPtr, ())
     if e != C_NULL
-        o = pyincref(PyObject(e)) # PyErr_Occurred returns borrowed ref
+        # PyErr_Occurred returns borrowed ref
+        ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), e)
         pyerr_clear()
-        throw(PyError(msg, o))
+        throw(PyError(msg, PyObject(e)))
     end
     val # the val argument is there just to pass through to the return value
 end
@@ -240,7 +241,7 @@ pyerr_check() = pyerr_check("")
 # Macros for common pyerr_check("Foo", ccall(pyfunc(:Foo), ...)) pattern.
 # (The "i" variant assumes Python is initialized.)
 macro pychecki(ex)
-    :(pyerr_check($(string(ex.args[1].args[2])), $ex))
+    :(pyerr_check($(string(ex.args[1].args[2].args[1])), $ex))
 end
 macro pycheck(ex)
     quote
@@ -256,8 +257,8 @@ macro pycheckvi(ex, bad)
         val = $ex
         if val == $bad
             # throw a PyError if available, otherwise throw ErrorException
-            pyerr_check($(string(ex.args[1].args[2])), nothing)
-            error($(string(ex.args[1].args[2])), " failed")
+            pyerr_check($(string(ex.args[1].args[2].args[1])), nothing)
+            error($(string(ex.args[1].args[2].args[1])), " failed")
         end
         val
     end
@@ -297,6 +298,8 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
+include("pytype.jl")
+
 include("callback.jl")
 
 include("conversions.jl")
@@ -308,10 +311,10 @@ function show(io::IO, o::PyObject)
     if o.o == C_NULL
         print(io, "PyObject NULL")
     else
-        s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
+        s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             pyerr_clear()
-            s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
+            s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
                 return print(io, "PyObject $(o.o)")

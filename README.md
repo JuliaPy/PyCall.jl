@@ -29,10 +29,11 @@ compare it to the built-in Julia `sin`:
     @pyimport math
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
-Type conversions are automatically performed for numeric, boolean, and
-string types, along with tuples, arrays/lists, and dictionaries of
-these types.  Python functions can be converted to Julia functions but
-not vice-versa.  Other types are supported via the generic PyObject type, below.
+Type conversions are automatically performed for numeric, boolean,
+string, and function types, along with tuples, arrays/lists, and
+dictionaries of these types.  Python functions can be converted to
+Julia functions but not vice-versa.  Other types are supported via the
+generic PyObject type, below.
 
 Python submodules must be imported by a separate `@pyimport` call, and
 in this case you must supply an identifier to to use in Julia.  For example
@@ -88,10 +89,10 @@ The PyCall module also provides a new type `PyObject` (a wrapper around
 
 Constructors `PyObject(o)` are provided for a number of Julia types,
 and PyCall also supplies `convert(T, o::PyObject)` to convert
-PyObjects back into Julia types `T`.  Currently, the only types
-supported are numbers (integer, real, and complex), booleans, and
-strings, along with tuples and arrays/lists thereof, but more are planned.
-(Julia symbols are converted to Python strings.)
+PyObjects back into Julia types `T`.  Currently, the types supported
+are numbers (integer, real, and complex), booleans, strings, and
+functions, along with tuples and arrays/lists thereof, but more are
+planned.  (Julia symbols are converted to Python strings.)
 
 Given a `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a
@@ -263,8 +264,6 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 ## Work in Progress
 
 * Conversions for many more types (set, range, xrange, etc.). 
-
-* Support for Julia callback functions passed to Python.
 
 * A PyList type for no-copy sharing of Python sequence objects.
 
