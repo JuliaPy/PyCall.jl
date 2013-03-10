@@ -57,12 +57,20 @@ plot options, and this functionality is accessed from Julia by:
     pylab.plot(x, y, @pykw color="red" linewidth=2.0 linestyle="--")
     pylab.show() 
 
+Arbitrary Julia functions can be passed to Python routines taking
+function arguments.  For example, to find the root of cos(x) - x,
+we could call the Newton solver in scipy.optimize via:
+
+    @pyimport scipy.optimize as so
+    so.newton(x -> cos(x) - x, 1)
+
 The biggest diffence from Python is that object attributes/members are
-accessed with `o[:attribute]` rather than `o.attribute`.  (This is because Julia
-does not permit overloading the `.` operator yet.)  See also the section on
-`PyObject` below, as well as the `pywrap` function to create anonymous
-composite types that simulate `.` access (this is what `@pyimport` does).
-For example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
+accessed with `o[:attribute]` rather than `o.attribute`.  (This is
+because Julia does not permit overloading the `.` operator yet.)  See
+also the section on `PyObject` below, as well as the `pywrap` function
+to create anonymous composite types that simulate `.` access (this is
+what `@pyimport` does).  For example, using
+[Biopython](http://biopython.org/wiki/Seq) we can do:
 
     @pyimport Bio.Seq as s
     @pyimport Bio.Alphabet as a
