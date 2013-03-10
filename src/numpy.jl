@@ -295,7 +295,7 @@ ndims{T,N}(a::PyArray{T,N}) = N
 similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 
 function copy{T,N}(a::PyArray{T,N}) 
-    if a.c_contig # equivalent to f_contig with reversed dimensions
+    if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = pointer_to_array(a.data, ntuple(N, n -> a.dims[N - n + 1]))
         return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
     end
