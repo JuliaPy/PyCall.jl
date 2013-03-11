@@ -380,7 +380,14 @@ end
 pytype_query(o::PyObject) = pytype_query(o, PyObject)
 
 function convert(::Type{PyAny}, o::PyObject)
+    if (o.o == C_NULL)
+        return o
+    end
     try 
+        T = pytype_query(o)
+        if T == PyObject && is_pyjlwrap(o)
+            return unsafe_pyjlwrap_to_objref(o.o)
+        end
         convert(pytype_query(o), o)
     catch
         pyerr_clear() # just in case

@@ -336,17 +336,37 @@ function pyjlwrap_repr(o::PyPtr)
     return oret
 end
 
-# use this to create a new jlwrap type, with init to set up custom members
-function pyjlwrap_type(name::String, init::Function)
+jlWrapType = PyTypeObject()
+
+function pyjlwrap_init()
     if pyversion() < v"2.6"
         error("Python version 2.6 or later required for T_PYSSIZET")
     end
-    PyTypeObject(name, sizeof(Py_jlWrap), 
+    global jlWrapType
+    if (jlWrapType::PyTypeObject).tp_name == C_NULL
+        jlWrapType::PyTypeObject =
+          PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
+                       t::PyTypeObject -> begin
+                           t.tp_flags |= Py_TPFLAGS_BASETYPE
+                           t.tp_members = convert(Ptr{Void}, pyjlwrap_members);
+                           t.tp_dealloc = cfunction(pyjlwrap_dealloc,
+                                                    Void, (PyPtr,))
+                           t.tp_repr = cfunction(pyjlwrap_repr,
+                                                 PyPtr, (PyPtr,))
+                       end)
+    end
+
+end
+
+# use this to create a new jlwrap type, with init to set up custom members
+function pyjlwrap_type(name::String, init::Function)
+    pyjlwrap_init()
+    PyTypeObject(name, 
+                 sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
                  t::PyTypeObject -> begin
-                     t.tp_members = convert(Ptr{Void}, pyjlwrap_members);
-                     t.tp_dealloc = cfunction(pyjlwrap_dealloc,
-                                              Void, (PyPtr,))
-                     t.tp_repr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
+                     t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, 
+                                       (Ptr{PyTypeObject},),
+                                       &(jlWrapType::PyTypeObject))
                      init(t)
                  end)
 end
@@ -364,6 +384,14 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     unsafe_assign(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
     return o
 end
+
+is_pyjlwrap(o::PyObject) = (jlWrapType::PyTypeObject).tp_name != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &(jlWrapType::PyTypeObject)) == 1
+
+################################################################
+# Fallback conversion: if we don't have a better conversion function,
+# just wrap the Julia object in a Python object
+
+PyObject(x::Any) = begin  pyjlwrap_init(); pyjlwrap_new(jlWrapType, x); end
 
 ################################################################
 
