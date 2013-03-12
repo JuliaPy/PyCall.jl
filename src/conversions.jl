@@ -56,6 +56,29 @@ convert{T<:String}(::Type{T}, po::PyObject) =
 convert(::Type{Nothing}, po::PyObject) = nothing
 
 #########################################################################
+# Pointer conversions, using ctypes, PyCObject, or PyCapsule
+
+PyObject(p::Ptr) = begin @pyinitialize; (py_void_p::Function)(p); end
+
+function convert(::Type{Ptr{Void}}, po::PyObject)
+    @pyinitialize
+    if pyisinstance(po, c_void_p_Type::PyObject)
+        convert(Ptr{Void}, convert(Uint, po["value"]))
+    elseif pyisinstance(po, PyCObject_Type::Ptr{Void})
+        @pychecki ccall((@pysym :PyCObject_AsVoidPtr), Ptr{Void}, (PyPtr,), po)
+    elseif pyisinstance(po, PyCapsule_Type::Ptr{Void})
+        @pychecki ccall((@pysym :PyCapsule_GetPointer), 
+                        Ptr{Void}, (PyPtr,Ptr{Uint8}),
+                        po, ccall((@pysym :PyCapsule_GetName), 
+                                  Ptr{Uint8}, (PyPtr,), po))
+    else
+        convert(Ptr{Void}, convert(Uint, po))
+    end
+end
+
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type::PyObject) || pyisinstance(po, PyCObject_Type::Ptr{Void}) || pyisinstance(po, PyCapsule_Type::Ptr{Void}) ? Ptr{Void} : None
+
+#########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{PyAny}, etc.,
 # but since PyAny is an abstract type I need to convert this to Any
 # before actually creating the Julia object
@@ -78,7 +101,7 @@ for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :String,
 end
 
 #########################################################################
-# Function conversion (TODO: Julia to Python conversion for callbacks)
+# Function conversion (see callback.jl for conversion the other way)
 
 convert(::Type{Function}, po::PyObject) =
     (args...) -> pycall(po, PyAny, args...)
@@ -368,6 +391,8 @@ end
 
 function pytype_query(o::PyObject, default::Type)
     @pyinitialize
+    # Would be faster to have some kind of hash table here, but
+    # that seems a bit tricky when we take subclasses into account
     @return_not_None pyint_query(o)
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)
@@ -375,6 +400,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pyfunction_query(o)
     @return_not_None pydict_query(o)
     @return_not_None pysequence_query(o)
+    @return_not_None pyptr_query(o)
     @return_not_None pynothing_query(o)
     return default
 end

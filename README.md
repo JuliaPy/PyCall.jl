@@ -271,8 +271,7 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 ## Work in Progress
 
-* Conversions for many more types (set, range, xrange, etc.).  Pointer
-  conversions via ctypes.
+* Conversions for many more types (set, range, xrange, etc.).
 
 * A PyList type for no-copy sharing of Python sequence objects.
 

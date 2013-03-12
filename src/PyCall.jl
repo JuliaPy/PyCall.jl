@@ -35,7 +35,8 @@ finalized = false # whether Python has been finalized
 libpython = C_NULL # Python shared library (from dlopen)
 
 pysym(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
-pyhassym(func::Symbol) = dlsym_e(libpython::Ptr{Void}, func) != C_NULL
+pysym_e(func::Symbol) = dlsym_e(libpython::Ptr{Void}, func)
+pyhassym(func::Symbol) = pysym_e(func) != C_NULL
 
 # Macro version of pysym to cache dlsym lookup (thanks to vtjnash)
 macro pysym(func)
@@ -86,7 +87,7 @@ pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
 pyisinstance(o::PyObject, t::Ptr{Void}) = 
-  ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+  t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Void}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
@@ -127,6 +128,16 @@ pyint_from_size_t = C_NULL
 pyint_from_ssize_t = C_NULL
 pyint_as_ssize_t = C_NULL
 
+# cache ctypes.c_void_p type and function if available
+c_void_p_Type = PyObject()
+py_void_p = p::Ptr -> PyObject(uint(p))
+
+# PyCObject_Check and PyCapsule_CheckExact are actually macros
+# that check against PyCObject_Type and PyCapsule_Type global variables,
+# which we cache if they are available:
+PyCObject_Type = C_NULL
+PyCapsule_Type = C_NULL
+
 # Py_SetProgramName needs its argument to persist as long as Python does
 pyprogramname = bytestring("")
 
@@ -159,6 +170,10 @@ function pyinitialize(libpy::Ptr{Void})
     global pyint_from_ssize_t
     global pyint_as_ssize_t
     global pyversion
+    global PyCObject_Type
+    global PyCapsule_Type
+    global c_void_p_Type
+    global py_void_p
     if !initialized::Bool
         if finalized::Bool
             # From the Py_Finalize documentation:
@@ -208,6 +223,15 @@ function pyinitialize(libpy::Ptr{Void})
             pyint_from_size_t::Ptr{Void} = pysym(:PyLong_FromSize_t)
             pyint_from_ssize_t::Ptr{Void} = pysym(:PyLong_FromSsize_t)
             pyint_as_ssize_t::Ptr{Void} = pysym(:PyLong_AsSsize_t)
+        end
+        PyCObject_Type::Ptr{Void} = pysym_e(:PyCObject_Type)
+        PyCapsule_Type::Ptr{Void} = pysym_e(:PyCapsule_Type)
+        try
+            c_void_p_Type::PyObject = pyimport("ctypes")["c_void_p"]
+            py_void_p::Function = p::Ptr -> pycall(c_void_p_Type::PyObject, PyObject, uint(p))
+        catch # fallback to CObject
+            pycobject_new = pysym(:PyCObject_FromVoidPtr)
+            py_void_p::Function = p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL))
         end
         pyversion::VersionNumber = 
           VersionNumber(convert((Int,Int,Int,String,Int), 
