@@ -336,6 +336,20 @@ function pyjlwrap_repr(o::PyPtr)
     return oret
 end
 
+function pyjlwrap_hash(o::PyPtr) 
+    h = hash(unsafe_pyjlwrap_to_objref(o))
+    # Python hashes are not permitted to return -1!!
+    return h == uint(-1) ? pysalt::Uint : h::Uint
+end
+
+# 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
+function pyjlwrap_hash32(o::PyPtr)
+    h = ccall(:int64to32hash, Uint32, (Uint64,), 
+              hash(unsafe_pyjlwrap_to_objref(o)))
+    # Python hashes are not permitted to return -1!!
+    return h == uint32(-1) ? uint32(pysalt::Uint) : h::Uint32
+end
+
 jlWrapType = PyTypeObject()
 
 function pyjlwrap_init()
@@ -353,6 +367,10 @@ function pyjlwrap_init()
                                                     Void, (PyPtr,))
                            t.tp_repr = cfunction(pyjlwrap_repr,
                                                  PyPtr, (PyPtr,))
+                           t.tp_hash = pyhashlong::Bool && WORD_SIZE == 64 &&
+                                       sizeof(Clong) == 4 ?
+                              cfunction(pyjlwrap_hash32, Uint32, (PyPtr,)) :
+                              cfunction(pyjlwrap_hash, Uint, (PyPtr,))
                        end)
     end
 

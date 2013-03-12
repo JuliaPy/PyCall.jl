@@ -9,7 +9,7 @@ import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
        Base.show, Base.has, Base.keys, Base.values, Base.eltype, Base.get,
        Base.delete!, Base.empty!, Base.length, Base.isempty, Base.start,
-       Base.done, Base.next, Base.filter!
+       Base.done, Base.next, Base.filter!, Base.hash
 
 typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
 
@@ -109,6 +109,9 @@ PyNoneType = PyObject(C_NULL)
 # Py_SetProgramName needs its argument to persist as long as Python does
 pyprogramname = bytestring("")
 
+# cache whether Python hash values are Clong (Python < 3.2) or Int (>= 3.2)
+pyhashlong = false
+
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
 # initialize the Python interpreter (no-op on subsequent calls)
@@ -125,6 +128,7 @@ function pyinitialize(libpy::Ptr{Void})
     global ufuncType
     global pynothing
     global PyNoneType
+    global pyhashlong
     if !initialized::Bool
         if finalized::Bool
             # From the Py_Finalize documentation:
@@ -158,6 +162,7 @@ function pyinitialize(libpy::Ptr{Void})
         end
         pynothing = pybuiltin("None")
         PyNoneType = types["NoneType"]
+        pyhashlong::Bool = pyversion() < v"3.2"
     end
     return
 end
@@ -334,6 +339,30 @@ function show(io::IO, o::PyObject)
             end
         end
         print(io, "PyObject $(convert(String, PyObject(s)))")
+    end
+end
+
+#########################################################################
+# computing hashes of PyObjects
+
+pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
+
+function hash(o::PyObject)
+    if o.o == C_NULL
+        bitmix(pysalt::Uint, hash(C_NULL))
+    elseif is_pyjlwrap(o)
+        # call native Julia hash directly on wrapped Julia objects,
+        # since on 64-bit Windows the Python 2.x hash is only 32 bits
+        bitmix(pysalt::Uint, hash(unsafe_pyjlwrap_to_objref(o.o)))
+    else
+        h = pyhashlong::Bool ? # changed to Py_hash_t in Python 3.2
+               ccall((@pysym :PyObject_Hash), Clong, (PyPtr,), o) :
+               ccall((@pysym :PyObject_Hash), Int, (PyPtr,), o)
+        if h == -1 # error
+            pyerr_clear()
+            return bitmix(pysalt::Uint, hash(o.o))
+        end
+        bitmix(pysalt::Uint, uint(h))
     end
 end
 
