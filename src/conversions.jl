@@ -242,7 +242,7 @@ end
 function start(d::PyDict)
     if d.isdict
         PyDict_Iterator(Array(PyPtr,1), Array(PyPtr,1), zeros(Int,1),
-                        PyObject(C_NULL), 0, length(d))
+                        PyObject(), 0, length(d))
     else
         items = convert(Vector{PyObject}, pyobject_call(d, PyObject, "items"))
         PyDict_Iterator(Array(PyPtr,0), Array(PyPtr,0), zeros(Int,0),

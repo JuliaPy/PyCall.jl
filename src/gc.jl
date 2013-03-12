@@ -24,7 +24,7 @@ function weakref_callback(callback::PyPtr, wo::PyPtr)
     pyincref(pynothing).o
 end
 
-weakref_callback_obj = PyObject(C_NULL) # weakref_callback Python method
+weakref_callback_obj = PyObject() # weakref_callback Python method
 
 function pygc_finalize()
     global pycall_gc

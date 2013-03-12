@@ -11,7 +11,19 @@ import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.delete!, Base.empty!, Base.length, Base.isempty, Base.start,
        Base.done, Base.next, Base.filter!, Base.hash
 
-typealias PyPtr Ptr{Void} # type for PythonObject* in ccall
+#########################################################################
+
+# Mirror of C PyObject struct (for non-debugging Python builds).  
+# We won't actually access these fields directly; we'll use the Python
+# C API for everything.  However, we need to define a unique Ptr type
+# for PyObject*, and we might as well define the actual struct layout
+# while we're at it.
+immutable PyObject_struct
+    ob_refcnt::Int
+    ob_type::Ptr{Void}
+end
+
+typealias PyPtr Ptr{PyObject_struct} # type for PythonObject* in ccall
 
 #########################################################################
 
@@ -54,6 +66,7 @@ type PyObject
         finalizer(po, pydecref)
         return po
     end
+    PyObject() = PyObject(convert(PyPtr, C_NULL))
 end
 
 function pydecref(o::PyObject)
@@ -89,22 +102,22 @@ PyObject(o::PyObject) = o
 
 #########################################################################
 
-inspect = PyObject(C_NULL) # inspect module, needed for module introspection
+inspect = PyObject() # inspect module, needed for module introspection
 
 # Python has zillions of types that a function be, in addition to the FunctionType
 # in the C API.  We have to obtain these at runtime and cache them in globals
-BuiltinFunctionType = PyObject(C_NULL)
-TypeType = PyObject(C_NULL) # type constructor
-MethodType = PyObject(C_NULL)
-MethodWrapperType = PyObject(C_NULL)
+BuiltinFunctionType = PyObject()
+TypeType = PyObject() # type constructor
+MethodType = PyObject()
+MethodWrapperType = PyObject()
 # also WrapperDescriptorType = type(list.__add__) and
 #      MethodDescriptorType = type(list.append) ... is it worth detecting these?
 
 # special function type used in NumPy and SciPy (if available)
-ufuncType = PyObject(C_NULL)
+ufuncType = PyObject()
 
 # cache Python None
-pynothing = PyObject(C_NULL)
+pynothing = PyObject()
 
 # Python 2/3 compatibility: cache dlsym for renamed functions
 pystring_fromstring = C_NULL
@@ -175,9 +188,9 @@ function pyinitialize(libpy::Ptr{Void})
         try
             ufuncType = pyimport("numpy")["ufunc"]
         catch
-            ufuncType = PyObject(C_NULL) # NumPy not available
+            ufuncType = PyObject() # NumPy not available
         end
-        pynothing = pyincref(PyObject(pysym(:_Py_NoneStruct)))
+        pynothing = pyincref(PyObject(convert(PyPtr, pysym(:_Py_NoneStruct))))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
@@ -522,7 +535,7 @@ pybuiltin(name::Symbol) = pybuiltin(string(name))
 type PyKW
     d::Dict{String,Any} # dictionary of (keyword => value) pairs.
 end
-PyObject(kw::PyKW) = isempty(kw.d) ? PyObject(C_NULL) : PyObject(kw.d)
+PyObject(kw::PyKW) = isempty(kw.d) ? PyObject() : PyObject(kw.d)
 
 # from a single :(x = y) expression make a single :(x => y) expression
 function pykw1(ex::Expr)
@@ -548,7 +561,7 @@ function pycall(o::PyObject, returntype::TypeTuple, args...)
         kw = PyObject(args[end])
         nargs -= 1
     else
-        kw = PyObject(C_NULL)
+        kw = PyObject()
     end
     arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
                                    nargs))

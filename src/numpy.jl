@@ -25,7 +25,7 @@ typealias Tnpy_api Dict{Symbol, Ptr{Void}}
 # need a global to cache pyimport("numpy.core.multiarray"), in order
 # to ensure the module is not garbage-collected as long as we are using it
 # for the npy_api pointers.
-npy_multiarray = PyObject(C_NULL)
+npy_multiarray = PyObject()
 
 npy_initialized = false # global to prevent multiple initializations
 
@@ -160,7 +160,7 @@ npy_type(::Type{Float32}) = NPY_FLOAT
 npy_type(::Type{Float64}) = NPY_DOUBLE
 npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
-# npy_type(::Type{PyPtr}) = NPY_OBJECT # problem: not all Ptr{Void} are PyPtr
+npy_type(::Type{PyPtr}) = NPY_OBJECT
 
 typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128)
 
