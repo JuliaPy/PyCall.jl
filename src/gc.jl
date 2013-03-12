@@ -19,7 +19,7 @@ function weakref_callback(callback::PyPtr, wo::PyPtr)
         delete!(pycall_gc::Dict{PyPtr,Any}, wo)
         # not sure what to do if there is an exception here
     finally
-        ccall((@pyfunc :Py_DecRef), Void, (PyPtr,), wo)
+        ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
     end
     pyincref(pynothing).o
 end
@@ -42,7 +42,7 @@ function pyembed(po::PyObject, jo::Any)
                                                   "weakref_callback",
                                                   METH_O)
     end
-    wo = @pycheckn ccall((@pyfunc :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr), 
+    wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr), 
                          po, weakref_callback_obj)
     (pycall_gc::Dict{PyPtr,Any})[wo] = jo
     return po

@@ -20,7 +20,7 @@ function pymethod(f::Function, name::String, flags::Integer)
                                    $(cfunction(f, PyPtr, (PyPtr,PyPtr))),
                                    convert(Cint, $flags),
                                    convert(Ptr{Uint8}, C_NULL))
-    PyObject(@pycheckn ccall((@pyfunc :PyCFunction_NewEx), PyPtr,
+    PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
                              (Ptr{PyMethodDef}, Ptr{Void}, Ptr{Void}),
                              &eval(def), C_NULL, C_NULL))
 end
@@ -45,8 +45,8 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
         ret_ = ret.o
         ret.o = C_NULL # don't decref
     catch e
-        ccall((@pyfunc :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
-              (@pyfunc :PyExc_RuntimeError),
+        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
+              (@pysym :PyExc_RuntimeError),
               bytestring(string("Julia exception: ", e)))
     finally
         args.o = C_NULL # don't decref

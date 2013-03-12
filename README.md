@@ -230,8 +230,8 @@ accomplished using:
 If you want to call low-level functions in the Python C API, you can
 do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
-* Use `pyfunc(func::Symbol)` to get a function pointer to pass to `ccall`
-  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(pyfunc(:Py_IsInitialized), Int32, ())`.
+* Use `pysym(func::Symbol)` to get a function pointer to pass to `ccall`
+  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(pysym(:Py_IsInitialized), Int32, ())`.
 
 * PyCall defines the typealias `PyPtr` for `PythonObject*` argument types,
   and `PythonObject` (see above) arguments are correctly converted to this
@@ -274,8 +274,6 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 * Conversions for many more types (set, range, xrange, etc.). 
 
 * A PyList type for no-copy sharing of Python sequence objects.
-
-* Caching of `pyfunc` results, following [this suggestion](https://github.com/stevengj/PyCall.jl/pull/2).
 
 ## Author
 
