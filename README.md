@@ -271,9 +271,16 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 
 ## Work in Progress
 
-* Conversions for many more types (set, range, xrange, etc.). 
+* Conversions for many more types (set, range, xrange, etc.).  Pointer
+  conversions via ctypes.
 
 * A PyList type for no-copy sharing of Python sequence objects.
+
+* Better conversion of Julia exceptions to Python exceptions in callbacks.
+
+* Access to members of Julia composite types in Python.
+
+* Python 3.x support (currently broken).
 
 ## Author
 
