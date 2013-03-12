@@ -161,6 +161,7 @@ type PyTypeObject
     tp_name_save::ASCIIString
 
     function PyTypeObject(name::String, basicsize::Integer, init::Function)
+        @pyinitialize
         if WORD_SIZE == 64 && pyversion::VersionNumber <= v"2.4"
             error("requires Python 2.5 or later on 64-bit systems")
         end
@@ -352,6 +353,7 @@ end
 jlWrapType = PyTypeObject()
 
 function pyjlwrap_init()
+    @pyinitialize
     if pyversion::VersionNumber < v"2.6"
         error("Python version 2.6 or later required for T_PYSSIZET")
     end
