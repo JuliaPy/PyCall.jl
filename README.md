@@ -222,8 +222,8 @@ accomplished using:
   to access any Python functions or data (that has not been *copied*
   to native Julia types) after `pyfinalize` runs!
 
-* The Python version number is returned by `pyversion()`, which returns
-  Julia's native `VersionNumber` type.
+* The Python version number is stored in the global variable
+  `pyversion::VersionNumber`.
 
 ### Low-level Python API access
 

@@ -161,13 +161,10 @@ type PyTypeObject
     tp_name_save::ASCIIString
 
     function PyTypeObject(name::String, basicsize::Integer, init::Function)
-        # (Note: don't worry about caching things like pyversion checks
-        #  since new PyTypeObjects are created only infrequently)
-        vers = pyversion()
-        if WORD_SIZE == 64 && vers <= v"2.4"
+        if WORD_SIZE == 64 && pyversion::VersionNumber <= v"2.4"
             error("requires Python 2.5 or later on 64-bit systems")
         end
-        if dlsym_e(libpython::Ptr{Void}, :_Py_NewReference) != C_NULL
+        if pyhassym(:_Py_NewReference)
             # when Python is compiled with Py_TRACE_REFS, _Py_NewReference
             # becomes a function (otherwise it is a macro), which allows
             # us to detect debugging builds.  These are not supported
@@ -181,17 +178,19 @@ type PyTypeObject
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch 0; end
         Py_TPFLAGS_DEFAULT = 
-          vers >= v"3.0" ? (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
-                            Py_TPFLAGS_HAVE_VERSION_TAG) :
-          vers >= v"2.5" ? (Py_TPFLAGS_HAVE_GETCHARBUFFER |
-                            Py_TPFLAGS_HAVE_SEQUENCE_IN |
-                            Py_TPFLAGS_HAVE_INPLACEOPS |
-                            Py_TPFLAGS_HAVE_RICHCOMPARE |
-                            Py_TPFLAGS_HAVE_WEAKREFS |
-                            Py_TPFLAGS_HAVE_ITER |
-                            Py_TPFLAGS_HAVE_CLASS |
-                            Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
-                            Py_TPFLAGS_HAVE_INDEX) :
+          pyversion::VersionNumber >= v"3.0" ?
+            (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
+             Py_TPFLAGS_HAVE_VERSION_TAG) :
+          pyversion::VersionNumber >= v"2.5" ?
+            (Py_TPFLAGS_HAVE_GETCHARBUFFER |
+             Py_TPFLAGS_HAVE_SEQUENCE_IN |
+             Py_TPFLAGS_HAVE_INPLACEOPS |
+             Py_TPFLAGS_HAVE_RICHCOMPARE |
+             Py_TPFLAGS_HAVE_WEAKREFS |
+             Py_TPFLAGS_HAVE_ITER |
+             Py_TPFLAGS_HAVE_CLASS |
+             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
+             Py_TPFLAGS_HAVE_INDEX) :
           error("Python < 2.5 not supported")
         name_save = bytestring(name)
         t = new(0,C_NULL,0,
@@ -353,7 +352,7 @@ end
 jlWrapType = PyTypeObject()
 
 function pyjlwrap_init()
-    if pyversion() < v"2.6"
+    if pyversion::VersionNumber < v"2.6"
         error("Python version 2.6 or later required for T_PYSSIZET")
     end
     global jlWrapType

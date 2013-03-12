@@ -5,9 +5,9 @@
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(@pycheckn ccall((@pysym :PyInt_FromSize_t),
+PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyint_from_size_t::Ptr{Void},
                                                  PyPtr, (Uint,), i))
-PyObject(i::Integer) = PyObject(@pycheckn ccall((@pysym :PyInt_FromSsize_t),
+PyObject(i::Integer) = PyObject(@pycheckn ccall(pyint_from_ssize_t::Ptr{Void},
                                                 PyPtr, (Int,), i))
 
 PyObject(b::Bool) = PyObject(@pycheckn ccall((@pysym :PyBool_FromLong), 
@@ -21,21 +21,21 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 real(c), imag(c)))
 
 # fixme: PyString_* was renamed to PyBytes_* in Python 3.x?
-PyObject(s::String) = PyObject(@pycheckn ccall((@pysym :PyString_FromString),
+PyObject(s::String) = PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
 
 PyObject(s::Symbol) = PyObject(string(s))
 
-PyObject(n::Nothing) = pyincref(PyObject(pynothing.o))
+PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(PyObject(pynothing.o))); end
 
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
-  convert(T, @pycheck ccall((@pysym :PyInt_AsSsize_t), Int, (PyPtr,), po))
+  convert(T, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
 
 convert(::Type{Bool}, po::PyObject) = 
-  convert(Bool, @pycheck ccall((@pysym :PyInt_AsSsize_t), Int, (PyPtr,), po))
+  convert(Bool, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) = 
   convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), po))
@@ -50,8 +50,8 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
     end)
 
 convert{T<:String}(::Type{T}, po::PyObject) =
-  bytestring(@pycheck ccall((@pysym :PyString_AsString),
-                             Ptr{Uint8}, (PyPtr,), po))
+  bytestring(@pycheck ccall(pystring_asstring::Ptr{Void},
+                            Ptr{Uint8}, (PyPtr,), po))
 
 convert(::Type{Nothing}, po::PyObject) = nothing
 
@@ -314,7 +314,7 @@ end
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or None if there isn't one.
 
-pyint_query(o::PyObject) = pyisinstance(o, @pysym :PyInt_Type) ? 
+pyint_query(o::PyObject) = pyisinstance(o, pyint_type::Ptr{Void}) ? 
   (pyisinstance(o, @pysym :PyBool_Type) ? Bool : Int) : None
 
 pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : None
@@ -326,7 +326,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pysym :PyString_Type) ? String : 
 
 pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) || pyisinstance(o, TypeType) || pyisinstance(o, MethodType) || pyisinstance(o, MethodWrapperType) ? Function : None
 
-pynothing_query(o::PyObject) = pyisinstance(o, PyNoneType) ? Nothing : None
+pynothing_query(o::PyObject) = o.o == pynothing.o ? Nothing : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 

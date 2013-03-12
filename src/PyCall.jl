@@ -3,7 +3,7 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval
+       PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval, pyhassym
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -23,6 +23,7 @@ finalized = false # whether Python has been finalized
 libpython = C_NULL # Python shared library (from dlopen)
 
 pysym(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
+pyhassym(func::Symbol) = dlsym_e(libpython::Ptr{Void}, func) != C_NULL
 
 # Macro version of pysym to cache dlsym lookup (thanks to vtjnash)
 macro pysym(func)
@@ -102,15 +103,25 @@ MethodWrapperType = PyObject(C_NULL)
 # special function type used in NumPy and SciPy (if available)
 ufuncType = PyObject(C_NULL)
 
-# cache Python None and PyNoneType
+# cache Python None
 pynothing = PyObject(C_NULL)
-PyNoneType = PyObject(C_NULL)
+
+# Python 2/3 compatibility: cache dlsym for renamed functions
+pystring_fromstring = C_NULL
+pystring_asstring = C_NULL
+pyint_type = C_NULL
+pyint_from_size_t = C_NULL
+pyint_from_ssize_t = C_NULL
+pyint_as_ssize_t = C_NULL
 
 # Py_SetProgramName needs its argument to persist as long as Python does
 pyprogramname = bytestring("")
 
 # cache whether Python hash values are Clong (Python < 3.2) or Int (>= 3.2)
 pyhashlong = false
+
+# Return the Python version as a Julia VersionNumber
+pyversion = v"0"
 
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
@@ -127,8 +138,14 @@ function pyinitialize(libpy::Ptr{Void})
     global MethodWrapperType
     global ufuncType
     global pynothing
-    global PyNoneType
     global pyhashlong
+    global pystring_fromstring
+    global pystring_asstring
+    global pyint_type
+    global pyint_from_size_t
+    global pyint_from_ssize_t
+    global pyint_as_ssize_t
+    global pyversion
     if !initialized::Bool
         if finalized::Bool
             # From the Py_Finalize documentation:
@@ -160,14 +177,34 @@ function pyinitialize(libpy::Ptr{Void})
         catch
             ufuncType = PyObject(C_NULL) # NumPy not available
         end
-        pynothing = pybuiltin("None")
-        PyNoneType = types["NoneType"]
-        pyhashlong::Bool = pyversion() < v"3.2"
+        pynothing = pyincref(PyObject(pysym(:_Py_NoneStruct)))
+        if pyhassym(:PyString_FromString)
+            pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
+            pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
+        else
+            pystring_fromstring::Ptr{Void} = pysym(:PyBytes_FromString)
+            pystring_asstring::Ptr{Void} = pysym(:PyBytes_AsString)
+        end
+        if pyhassym(:PyInt_Type)
+            pyint_type::Ptr{Void} = pysym(:PyInt_Type)
+            pyint_from_size_t::Ptr{Void} = pysym(:PyInt_FromSize_t)
+            pyint_from_ssize_t::Ptr{Void} = pysym(:PyInt_FromSsize_t)
+            pyint_as_ssize_t::Ptr{Void} = pysym(:PyInt_AsSsize_t)
+        else
+            pyint_type::Ptr{Void} = pysym(:PyLong_Type)
+            pyint_from_size_t::Ptr{Void} = pysym(:PyLong_FromSize_t)
+            pyint_from_ssize_t::Ptr{Void} = pysym(:PyLong_FromSsize_t)
+            pyint_as_ssize_t::Ptr{Void} = pysym(:PyLong_AsSsize_t)
+        end
+        pyversion::VersionNumber = 
+          VersionNumber(convert((Int,Int,Int,String,Int), 
+                                pyimport("sys")["version_info"])[1:3]...)
+        pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
     end
     return
 end
 
-pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print distutils.sysconfig.get_config_var('$var')"`))
+pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 
 function libpython_name(python::String)
     lib = pyconfigvar(python, "LDLIBRARY")
@@ -203,11 +240,9 @@ function pyfinalize()
     global MethodWrapperType
     global ufuncType
     global pynothing
-    global PyNoneType
     if initialized::Bool
         pydecref(ufuncType)
         npyfinalize()
-        pydecref(PyNoneType)
         pydecref(pynothing)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)
@@ -224,10 +259,6 @@ function pyfinalize()
     end
     return
 end
-
-# Return the Python version as a Julia VersionNumber<
-pyversion() = VersionNumber(convert((Int,Int,Int,String,Int), 
-                                    pyimport("sys")["version_info"])[1:3]...)
 
 #########################################################################
 # Conversion of Python exceptions into Julia exceptions
