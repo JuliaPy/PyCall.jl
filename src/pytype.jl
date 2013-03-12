@@ -217,10 +217,10 @@ type PyTypeObject
                 name_save)
         init(t) # initialize any other fields as needed
         if t.tp_new == C_NULL
-            t.tp_new = pyfunc(:PyType_GenericNew)
+            t.tp_new = @pyfunc :PyType_GenericNew
         end
-        @pycheckzi ccall(pyfunc(:PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
-        ccall(pyfunc(:Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
+        @pycheckzi ccall((@pyfunc :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
+        ccall((@pyfunc :Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
         return t
     end
     function PyTypeObject()
@@ -377,7 +377,7 @@ end
 #  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     global pycall_gc
-    o = PyObject(@pycheckn ccall(pyfunc(:_PyObject_New),
+    o = PyObject(@pycheckn ccall((@pyfunc :_PyObject_New),
                                  PyPtr, (Ptr{PyTypeObject},), &pyT))
     (pycall_gc::Dict{PyPtr,Any})[o.o] = value
     p = convert(Ptr{Ptr{Void}}, o.o)
@@ -385,7 +385,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     return o
 end
 
-is_pyjlwrap(o::PyObject) = (jlWrapType::PyTypeObject).tp_name != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &(jlWrapType::PyTypeObject)) == 1
+is_pyjlwrap(o::PyObject) = (jlWrapType::PyTypeObject).tp_name != C_NULL && ccall((@pyfunc :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &(jlWrapType::PyTypeObject)) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,

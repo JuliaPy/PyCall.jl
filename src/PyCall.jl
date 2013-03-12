@@ -24,6 +24,19 @@ libpython = C_NULL # Python shared library (from dlopen)
 
 pyfunc(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
 
+# Macro version of pyfunc to cache dlsym lookup (thanks to vtjnash)
+macro pyfunc(func)
+    z = gensym(string(func))
+    @eval global $z = C_NULL
+    quote begin
+        global $z
+        if $z::Ptr{Void} == C_NULL
+            $z::Ptr{Void} = dlsym(libpython::Ptr{Void}, $(esc(func)))
+        end
+        $z::Ptr{Void}
+    end end
+end
+
 # Macro version of pyinitialize() to inline initialized? check
 macro pyinitialize()
     :(initialized::Bool ? nothing : pyinitialize())
@@ -44,25 +57,25 @@ end
 
 function pydecref(o::PyObject)
     if initialized::Bool # don't decref after pyfinalize!
-        ccall(pyfunc(:Py_DecRef), Void, (PyPtr,), o.o)
+        ccall((@pyfunc :Py_DecRef), Void, (PyPtr,), o.o)
     end
     o.o = C_NULL
     o
 end
 
 function pyincref(o::PyObject)
-    ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), o)
+    ccall((@pyfunc :Py_IncRef), Void, (PyPtr,), o)
     o
 end
 
 pyisinstance(o::PyObject, t::PyObject) = 
-  t.o != C_NULL && ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
+  t.o != C_NULL && ccall((@pyfunc :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-pyisinstance(o::PyObject, t::Symbol) = 
-  ccall(pyfunc(:PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, pyfunc(t)) == 1
+pyisinstance(o::PyObject, t::Ptr{Void}) = 
+  ccall((@pyfunc :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
-pyquery(q::Symbol, o::PyObject) =
-  ccall(pyfunc(q), Cint, (PyPtr,), o) == 1
+pyquery(q::Ptr{Void}, o::PyObject) =
+  ccall(q, Cint, (PyPtr,), o) == 1
 
 pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(PyCall.TypeType, PyObject, o)
 
@@ -123,12 +136,12 @@ function pyinitialize(libpy::Ptr{Void})
             error("Calling pyinitialize after pyfinalize is not supported")
         end
         libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
-        if 0 == ccall(pyfunc(:Py_IsInitialized), Cint, ())
+        if 0 == ccall((@pyfunc :Py_IsInitialized), Cint, ())
             if !isempty(pyprogramname::ASCIIString)
-                ccall(pyfunc(:Py_SetProgramName), Void, (Ptr{Uint8},), 
+                ccall((@pyfunc :Py_SetProgramName), Void, (Ptr{Uint8},), 
                       pyprogramname::ASCIIString)
             end
-            ccall(pyfunc(:Py_InitializeEx), Void, (Cint,), 0)
+            ccall((@pyfunc :Py_InitializeEx), Void, (Cint,), 0)
         end
         initialized::Bool = true
         inspect::PyObject = pyimport("inspect")
@@ -198,7 +211,7 @@ function pyfinalize()
         pydecref(inspect::PyObject)
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
-        ccall(pyfunc(:Py_Finalize), Void, ())
+        ccall((@pyfunc :Py_Finalize), Void, ())
         dlclose(libpython::Ptr{Void})
         libpython::Ptr{Void} = C_NULL
         initialized::Bool = false
@@ -215,7 +228,7 @@ pyversion() = VersionNumber(convert((Int,Int,Int,String,Int),
 # Conversion of Python exceptions into Julia exceptions
 
 # call when we are throwing our own exception
-pyerr_clear() = ccall(pyfunc(:PyErr_Clear), Void, ())
+pyerr_clear() = ccall((@pyfunc :PyErr_Clear), Void, ())
 
 type PyError <: Exception
     msg::String
@@ -225,10 +238,10 @@ end
 function pyerr_check(msg::String, val::Any)
     # note: don't call pyinitialize here since we will
     # only use this in contexts where initialization was already done
-    e = ccall(pyfunc(:PyErr_Occurred), PyPtr, ())
+    e = ccall((@pyfunc :PyErr_Occurred), PyPtr, ())
     if e != C_NULL
         # PyErr_Occurred returns borrowed ref
-        ccall(pyfunc(:Py_IncRef), Void, (PyPtr,), e)
+        ccall((@pyfunc :Py_IncRef), Void, (PyPtr,), e)
         pyerr_clear()
         throw(PyError(msg, PyObject(e)))
     end
@@ -238,7 +251,7 @@ end
 pyerr_check(msg::String) = pyerr_check(msg, nothing)
 pyerr_check() = pyerr_check("")
 
-# Macros for common pyerr_check("Foo", ccall(pyfunc(:Foo), ...)) pattern.
+# Macros for common pyerr_check("Foo", ccall((@pyfunc :Foo), ...)) pattern.
 # (The "i" variant assumes Python is initialized.)
 macro pychecki(ex)
     :(pyerr_check($(string(ex.args[1].args[2].args[1])), $ex))
@@ -250,7 +263,7 @@ macro pycheck(ex)
     end
 end
 
-# Macros to check that ccall(pyfunc(:Foo), ...) returns value != bad
+# Macros to check that ccall((@pyfunc :Foo), ...) returns value != bad
 # (The "i" variants assume Python is initialized.)
 macro pycheckvi(ex, bad)
     quote
@@ -311,10 +324,10 @@ function show(io::IO, o::PyObject)
     if o.o == C_NULL
         print(io, "PyObject NULL")
     else
-        s = ccall(pyfunc(:PyObject_Repr), PyPtr, (PyPtr,), o)
+        s = ccall((@pyfunc :PyObject_Repr), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             pyerr_clear()
-            s = ccall(pyfunc(:PyObject_Str), PyPtr, (PyPtr,), o)
+            s = ccall((@pyfunc :PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
                 return print(io, "PyObject $(o.o)")
@@ -333,7 +346,7 @@ function ref(o::PyObject, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
+    p = ccall((@pyfunc :PyObject_GetAttrString), PyPtr,
               (PyPtr, Ptr{Uint8}), o, bytestring(s))
     if p == C_NULL
         pyerr_clear()
@@ -348,7 +361,7 @@ function assign(o::PyObject, v, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
-    if -1 == ccall(pyfunc(:PyObject_SetAttrString), Cint,
+    if -1 == ccall((@pyfunc :PyObject_SetAttrString), Cint,
                    (PyPtr, Ptr{Uint8}, PyPtr), o, bytestring(s), PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
@@ -390,7 +403,7 @@ end
 #########################################################################
 
 pyimport(name::String) =
-    PyObject(@pycheckn ccall(pyfunc(:PyImport_ImportModule), PyPtr,
+    PyObject(@pycheckn ccall((@pyfunc :PyImport_ImportModule), PyPtr,
                              (Ptr{Uint8},), bytestring(name)))
 
 pyimport(name::Symbol) = pyimport(string(name))
@@ -425,10 +438,10 @@ end
 
 # look up a global variable (in module __main__)
 function pybuiltin(name::String)
-    main = @pycheckn ccall(pyfunc(:PyImport_AddModule), 
+    main = @pycheckn ccall((@pyfunc :PyImport_AddModule), 
                            PyPtr, (Ptr{Uint8},),
                            bytestring("__main__"))
-    PyObject(@pycheckni ccall(pyfunc(:PyObject_GetAttrString), PyPtr,
+    PyObject(@pycheckni ccall((@pyfunc :PyObject_GetAttrString), PyPtr,
                               (PyPtr, Ptr{Uint8}), main,
                               bytestring("__builtins__")))[bytestring(name)]
 end
@@ -477,14 +490,14 @@ function pycall(o::PyObject, returntype::TypeTuple, args...)
     else
         kw = PyObject(C_NULL)
     end
-    arg = PyObject(@pycheckn ccall(pyfunc(:PyTuple_New), PyPtr, (Int,), 
+    arg = PyObject(@pycheckn ccall((@pyfunc :PyTuple_New), PyPtr, (Int,), 
                                    nargs))
     for i = 1:nargs
-        @pycheckzi ccall(pyfunc(:PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
+        @pycheckzi ccall((@pyfunc :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
                          arg, i-1, oargs[i])
         pyincref(oargs[i]) # PyTuple_SetItem steals the reference
     end
-    ret = PyObject(@pycheckni ccall(pyfunc(:PyObject_Call), PyPtr,
+    ret = PyObject(@pycheckni ccall((@pyfunc :PyObject_Call), PyPtr,
                                     (PyPtr,PyPtr,PyPtr), o, arg, kw))
     jret = convert(returntype, ret)
     return jret
@@ -499,15 +512,15 @@ const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
 # (string/symbol => value) of local variables to use in the expression
 function pyeval_(s::String, locals::PyDict) 
     sb = bytestring(s) # use temp var to prevent gc before we are done with o
-    o = PyObject(@pycheckn ccall(pyfunc(:Py_CompileString), PyPtr,
+    o = PyObject(@pycheckn ccall((@pyfunc :Py_CompileString), PyPtr,
                                   (Ptr{Uint8}, Ptr{Uint8}, Cint),
                                   sb, pyeval_fname, Py_eval_input))
-    main = @pycheckni ccall(pyfunc(:PyImport_AddModule),
+    main = @pycheckni ccall((@pyfunc :PyImport_AddModule),
                            PyPtr, (Ptr{Uint8},),
                            bytestring("__main__"))
-    maindict = @pycheckni ccall(pyfunc(:PyModule_GetDict), PyPtr, (PyPtr,),
+    maindict = @pycheckni ccall((@pyfunc :PyModule_GetDict), PyPtr, (PyPtr,),
                                 main)
-    PyObject(@pycheckni ccall(pyfunc(:PyEval_EvalCode),
+    PyObject(@pycheckni ccall((@pyfunc :PyEval_EvalCode),
                               PyPtr, (PyPtr, PyPtr, PyPtr),
                               o, maindict, locals))
 end
