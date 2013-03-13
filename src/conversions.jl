@@ -132,6 +132,53 @@ function convert(tt::NTuple{Type}, o::PyObject)
 end
 
 #########################################################################
+# PyVector: no-copy wrapping of a Julia object around a Python sequence
+
+type PyVector{T} <: AbstractVector{T}
+    o::PyObject
+    function PyVector(o::PyObject)
+        if o.o == C_NULL
+            throw(ArgumentError("cannot make PyVector from NULL PyObject"))
+        elseif pysequence_query(o) == None
+            throw(ArgumentError("only List and Sequence objects can be converted to PyVector"))
+        end
+        new(o)
+    end
+end
+
+PyVector(o::PyObject) = PyVector{PyAny}(o)
+convert(::Type{PyVector}, o::PyObject) = PyVector(o)
+convert{T}(::Type{PyVector{T}}, o::PyObject) = PyVector{T}(o)
+convert(::Type{PyPtr}, a::PyVector) = a.o.o
+
+# when a PyVector is copied it is converted into an ordinary Julia Vector
+similar(a::PyVector, T, dims::Dims) = Array(T, dims)
+similar{T}(a::PyVector{T}) = similar(a, pyany_toany(T), size(a))
+similar{T}(a::PyVector{T}, dims::Dims) = similar(a, pyany_toany(T), dims)
+similar{T}(a::PyVector{T}, dims::Int...) = similar(a, pyany_toany(T), dims)
+eltype{T}(::PyVector{T}) = pyany_toany(T)
+eltype{T}(::Type{PyVector{T}}) = pyany_toany(T)
+
+size(a::PyVector) = ((@pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), a)),)
+
+ref(a::PyVector) = ref(a, 1)
+ref{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckni ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
+
+assign(a::PyVector, v) = assign(a, v, 1)
+assign(a::PyVector, v, i::Integer) = @pycheckzi ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
+
+function delete!(a::PyVector, i::Integer)
+    v = a[i]
+    @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    v
+end
+
+pop!(a::PyVector) = delete!(a, length(a))
+
+summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
+                                   string(pyany_toany(T)), " PyVector")
+
+#########################################################################
 # Lists and 1d arrays.
 
 function PyObject(v::AbstractVector)

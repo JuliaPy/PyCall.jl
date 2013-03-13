@@ -123,9 +123,24 @@ Conversely, when passing arrays *to* Python, Julia `Array` types are
 converted to `PyObject` types *without* making a copy via NumPy,
 e.g. when passed as `pycall` arguments.
 
+#### PyVector
+
+The PyCall module provides a new type `PyVector` (a subclass of
+`AbstractVector`) which implements a no-copy wrapper around an
+arbitrary Python list or sequence object.  (Unlike `PyArray`, the
+`PyVector` type is not limited to `NumPy` arrays, although using
+`PyArray` for the latter is generally more efficient.)  Just use
+`PyArray` as the return type of a `pycall` returning a list or
+sequence object (including tuples), or call `PyVector(o::PyObject)` on
+a sequence object `o`.
+
+A `v::PyVector` supports the usual `v[index]` referencing and assignment,
+along with `delete!` and `pop!` operations.  `copy(v)` converts `v` to
+an ordinary Julia `Vector`.
+
 #### PyDict
 
-Similar to `PyArray`, PyCall also provides a type `PyDict` (a subclass
+Similar to `PyVector`, PyCall also provides a type `PyDict` (a subclass
 of `Association`) that implements a no-copy wrapper around a Python
 dictionary (or any object implementing the mapping protocol).  Just
 use `PyDict` as the return type of a `pycall` returning a dictionary,
@@ -272,8 +287,6 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
 ## Work in Progress
 
 * Conversions for many more types (set, range, xrange, etc.).
-
-* A PyList type for no-copy sharing of Python sequence objects.
 
 * Better conversion of Julia exceptions to Python exceptions in callbacks.
 
