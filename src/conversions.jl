@@ -50,14 +50,15 @@ convert(::Type{Nothing}, po::PyObject) = nothing
 PyObject(s::UTF8String) =
   PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
                            PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
-                           bytestring(s), length(s), C_NULL))
+                           bytestring(s), length(s.data), C_NULL))
 
 function PyObject(s::String)
     @pyinitialize
     if pyunicode_literals::Bool
+        sb = bytestring(s)
         PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
                                  PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
-                                 bytestring(s), length(s), C_NULL))
+                                 sb, length(sb.data), C_NULL))
     else
         PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
                                  PyPtr, (Ptr{Uint8},), bytestring(s)))
