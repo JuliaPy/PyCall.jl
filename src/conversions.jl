@@ -89,7 +89,10 @@ PyObject(p::Ptr) = begin @pyinitialize; (py_void_p::Function)(p); end
 function convert(::Type{Ptr{Void}}, po::PyObject)
     @pyinitialize
     if pyisinstance(po, c_void_p_Type::PyObject)
-        convert(Ptr{Void}, convert(Uint, po["value"]))
+        v = po["value"]
+        # ctypes stores the NULL pointer specially, grrr
+        pynothing_query(v) == Nothing ? C_NULL : 
+          convert(Ptr{Void}, convert(Uint, po["value"]))
     elseif pyisinstance(po, PyCObject_Type::Ptr{Void})
         @pychecki ccall((@pysym :PyCObject_AsVoidPtr), Ptr{Void}, (PyPtr,), po)
     elseif pyisinstance(po, PyCapsule_Type::Ptr{Void})
