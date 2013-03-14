@@ -20,7 +20,6 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble), 
                                                 real(c), imag(c)))
 
-# fixme: PyString_* was renamed to PyBytes_* in Python 3.x?
 PyObject(s::String) = PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
                                                PyPtr, (Ptr{Uint8},),
                                                bytestring(s)))
