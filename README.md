@@ -284,16 +284,6 @@ do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
   given a Python type object `t`.  `pytypeof(o::PyObject)` returns the
   Python type of `o`, equivalent to `type(o)` in Python.
 
-## Work in Progress
-
-* Conversions for many more types (set, range, xrange, etc.).
-
-* Better conversion of Julia exceptions to Python exceptions in callbacks.
-
-* Access to members of Julia composite types in Python.
-
-* Python 3.x support (currently broken).
-
 ## Author
 
 This package was written by [Steven G. Johnson](http://math.mit.edu/~stevenj/).
