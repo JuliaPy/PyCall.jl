@@ -39,6 +39,17 @@ pysym(func::Symbol) = dlsym(libpython::Ptr{Void}, func)
 pysym_e(func::Symbol) = dlsym_e(libpython::Ptr{Void}, func)
 pyhassym(func::Symbol) = pysym_e(func) != C_NULL
 
+# call pysym_e on the arguments and return the first non-NULL result
+function pysym_e(funcs...)
+    for func in funcs
+        p = pysym_e(func)
+        if p != C_NULL
+            return p
+        end
+    end
+    return C_NULL
+end
+
 # Macro version of pysym to cache dlsym lookup (thanks to vtjnash)
 macro pysym(func)
     z = gensym(string(func))
@@ -93,7 +104,7 @@ pyisinstance(o::PyObject, t::Ptr{Void}) =
 pyquery(q::Ptr{Void}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
 
-pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(PyCall.TypeType, PyObject, o)
+pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(TypeType, PyObject, o)
 
 # conversion to pass PyObject as ccall arguments:
 convert(::Type{PyPtr}, po::PyObject) = po.o
@@ -109,7 +120,7 @@ inspect = PyObject() # inspect module, needed for module introspection
 # Python has zillions of types that a function be, in addition to the FunctionType
 # in the C API.  We have to obtain these at runtime and cache them in globals
 BuiltinFunctionType = PyObject()
-TypeType = PyObject() # type constructor
+TypeType = PyObject() # "type" function
 MethodType = PyObject()
 MethodWrapperType = PyObject()
 # also WrapperDescriptorType = type(list.__add__) and
@@ -124,6 +135,7 @@ pynothing = PyObject()
 # Python 2/3 compatibility: cache dlsym for renamed functions
 pystring_fromstring = C_NULL
 pystring_asstring = C_NULL
+pystring_type = C_NULL
 pyint_type = C_NULL
 pyint_from_size_t = C_NULL
 pyint_from_ssize_t = C_NULL
@@ -141,6 +153,14 @@ PyCapsule_Type = C_NULL
 
 # Py_SetProgramName needs its argument to persist as long as Python does
 pyprogramname = bytestring("")
+
+# PyUnicode_* may actually be a #define for another symbol,
+# so we cache the correct dlsym
+PyUnicode_AsUTF8String = C_NULL
+PyUnicode_DecodeUTF8 = C_NULL
+
+# whether to use unicode for strings by default, ala Python 3
+pyunicode_literals = false
 
 # cache whether Python hash values are Clong (Python < 3.2) or Int (>= 3.2)
 pyhashlong = false
@@ -162,10 +182,14 @@ function pyinitialize(libpy::Ptr{Void})
     global MethodType
     global MethodWrapperType
     global ufuncType
+    global PyUnicode_AsUTF8String
+    global PyUnicode_DecodeUTF8
+    global pyunicode_literals
     global pynothing
     global pyhashlong
     global pystring_fromstring
     global pystring_asstring
+    global pystring_type
     global pyint_type
     global pyint_from_size_t
     global pyint_from_ssize_t
@@ -197,22 +221,31 @@ function pyinitialize(libpy::Ptr{Void})
         inspect::PyObject = pyimport("inspect")
         types = pyimport("types")
         BuiltinFunctionType::PyObject = types["BuiltinFunctionType"]
-        TypeType::PyObject = types["TypeType"]
+        TypeType::PyObject = pybuiltin("type")
         MethodType::PyObject = types["MethodType"]
-        MethodWrapperType::PyObject = pycall(TypeType::PyObject, PyObject, 
-                                             PyObject(PyObject[])["__add__"])
+        MethodWrapperType::PyObject = pytypeof(PyObject(PyObject[])["__add__"])
         try
             ufuncType = pyimport("numpy")["ufunc"]
         catch
             ufuncType = PyObject() # NumPy not available
         end
+        PyUnicode_AsUTF8String::Ptr{Void} =
+          pysym_e(:PyUnicode_AsUTF8String,
+                  :PyUnicodeUCS4_AsUTF8String,
+                  :PyUnicodeUCS2_AsUTF8String)
+        PyUnicode_DecodeUTF8::Ptr{Void} =
+          pysym_e(:PyUnicode_DecodeUTF8,
+                  :PyUnicodeUCS4_DecodeUTF8,
+                  :PyUnicodeUCS2_DecodeUTF8)
         pynothing = pyincref(PyObject(convert(PyPtr, pysym(:_Py_NoneStruct))))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
+            pystring_type::Ptr{Void} = pysym(:PyString_Type)
         else
             pystring_fromstring::Ptr{Void} = pysym(:PyBytes_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyBytes_AsString)
+            pystring_type::Ptr{Void} = pysym(:PyBytes_Type)
         end
         if pyhassym(:PyInt_Type)
             pyint_type::Ptr{Void} = pysym(:PyInt_Type)
@@ -238,6 +271,7 @@ function pyinitialize(libpy::Ptr{Void})
           VersionNumber(convert((Int,Int,Int,String,Int), 
                                 pyimport("sys")["version_info"])[1:3]...)
         pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
+        pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
     end
     return
 end
@@ -278,9 +312,11 @@ function pyfinalize()
     global MethodWrapperType
     global ufuncType
     global pynothing
+    global c_void_p_Type
     if initialized::Bool
         pydecref(ufuncType)
         npyfinalize()
+        pydecref(c_void_p_Type)
         pydecref(pynothing)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)

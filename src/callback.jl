@@ -34,7 +34,7 @@ end
 # and calls it.
 
 function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
-    ret_ = C_NULL
+    ret_ = convert(PyPtr, C_NULL)
     args = PyObject(args_)
     try
         if kw_ != C_NULL

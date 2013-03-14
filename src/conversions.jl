@@ -1,7 +1,7 @@
 # Conversions between Julia and Python types for the PyCall module.
 
 #########################################################################
-# Conversions of simple types (numbers and strings)
+# Conversions of simple types (numbers and nothing)
 
 # conversions from Julia types to PyObject:
 
@@ -19,12 +19,6 @@ PyObject(r::Real) = PyObject(@pycheckn ccall((@pysym :PyFloat_FromDouble),
 PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble), 
                                                 real(c), imag(c)))
-
-PyObject(s::String) = PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
-                                               PyPtr, (Ptr{Uint8},),
-                                               bytestring(s)))
-
-PyObject(s::Symbol) = PyObject(string(s))
 
 PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(PyObject(pynothing.o))); end
 
@@ -48,11 +42,43 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
                              Cdouble, (PyPtr,), po))
     end)
 
-convert{T<:String}(::Type{T}, po::PyObject) =
-  bytestring(@pycheck ccall(pystring_asstring::Ptr{Void},
-                            Ptr{Uint8}, (PyPtr,), po))
-
 convert(::Type{Nothing}, po::PyObject) = nothing
+
+#########################################################################
+# String conversions (both bytes arrays and unicode strings)
+
+PyObject(s::UTF8String) =
+  PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
+                           PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
+                           bytestring(s), length(s), C_NULL))
+
+function PyObject(s::String)
+    @pyinitialize
+    if pyunicode_literals::Bool
+        PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
+                                 PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
+                                 bytestring(s), length(s), C_NULL))
+    else
+        PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
+                                 PyPtr, (Ptr{Uint8},), bytestring(s)))
+    end
+end
+
+function convert{T<:String}(::Type{T}, po::PyObject)
+    @pyinitialize
+    if pyisinstance(po, @pysym :PyUnicode_Type)
+        convert(T, PyObject(@pycheckni ccall(PyUnicode_AsUTF8String::Ptr{Void},
+                                             PyPtr, (PyPtr,), po)))
+    else
+        convert(T, bytestring(@pycheckni ccall(pystring_asstring::Ptr{Void},
+                                               Ptr{Uint8}, (PyPtr,), po)))
+    end
+end
+
+# TODO: should symbols be converted to a subclass of Python strings/bytes,
+#       so that PyAny conversion can convert it back to a Julia symbol?
+PyObject(s::Symbol) = PyObject(string(s))
+convert(::Type{Symbol}, po::PyObject) = symbol(convert(String, po))
 
 #########################################################################
 # Pointer conversions, using ctypes, PyCObject, or PyCapsule
@@ -391,9 +417,9 @@ pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : N
 pycomplex_query(o::PyObject) = 
   pyisinstance(o, @pysym :PyComplex_Type) ? Complex128 : None
 
-pystring_query(o::PyObject) = pyisinstance(o, @pysym :PyString_Type) ? String : None
+pystring_query(o::PyObject) = pyisinstance(o, pystring_type::Ptr{Void}) ? String : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
 
-pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType) || pyisinstance(o, ufuncType) || pyisinstance(o, TypeType) || pyisinstance(o, MethodType) || pyisinstance(o, MethodWrapperType) ? Function : None
+pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
 
 pynothing_query(o::PyObject) = o.o == pynothing.o ? Nothing : None
 
