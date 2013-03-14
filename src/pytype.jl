@@ -332,7 +332,7 @@ function pyjlwrap_repr(o::PyPtr)
     o = PyObject(try string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
                  catch "<PyCall.jlwrap NULL>"; end)
     oret = o.o
-    o.o = C_NULL # don't decref
+    o.o = convert(PyPtr, C_NULL) # don't decref
     return oret
 end
 

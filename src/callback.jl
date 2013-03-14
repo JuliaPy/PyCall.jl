@@ -43,13 +43,13 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
         f = unsafe_pyjlwrap_to_objref(self_)::Function
         ret = PyObject(f(convert(PyAny, args)...))
         ret_ = ret.o
-        ret.o = C_NULL # don't decref
+        ret.o = convert(PyPtr, C_NULL) # don't decref
     catch e
         ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
               (@pysym :PyExc_RuntimeError),
               bytestring(string("Julia exception: ", e)))
     finally
-        args.o = C_NULL # don't decref
+        args.o = convert(PyPtr, C_NULL) # don't decref
     end
     return ret_::PyPtr
 end
