@@ -177,15 +177,19 @@ const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
 # no-copy conversion of Julia arrays to NumPy arrays.
 
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
-    @npyinitialize
-    p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
+    try
+        @npyinitialize
+        p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
               npy_api[:PyArray_Type], 
               ndims(a), [size(a)...], npy_type(T),
               [strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
               NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
               C_NULL)
-    return PyObject(p, a)
+        return PyObject(p, a)
+    catch
+        array2py(a) # fallback to non-NumPy version
+    end
 end
 
 #########################################################################
@@ -386,8 +390,12 @@ PyObject(a::PyArray) = a.o
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
 function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
-    info = PyArray_Info(o)
-    copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+    try
+        info = PyArray_Info(o)
+        copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+    catch
+        py2array(T, o)
+    end
 end
 
 # seems to conflict with the previous definition:

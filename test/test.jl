@@ -25,9 +25,19 @@ roundtripeq(x) = roundtrip(x) == x
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 @test roundtrip(x -> x + 1)(314158) == 314159
 
-@test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
+if PyCall.npy_initialized
+    @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
+end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
 @test PyDict(PyObject([1 => "hello", 2 => "goodbye"])) == [1 => "hello", 2 => "goodbye"]
+
+@test roundtripeq({1 2 3; 4 5 6})
+@test roundtripeq([])
+@test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
+if PyCall.npy_initialized
+    @test roundtripeq(begin A = Array(Int); A[1] = 3; A; end)
+end
+@test convert(PyAny, PyObject(begin A = Array(Any); A[1] = 3; A; end)) == 3
 
 @pyimport math
 @test_approx_eq math.sin(3) sin(3)

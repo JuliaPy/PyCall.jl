@@ -41,7 +41,7 @@ in this case you must supply an identifier to to use in Julia.  For example
     @pyimport numpy.random as nr
     nr.rand(3,4)
 
-Multidimensional arrays rely on the NumPy array interface for
+Multidimensional arrays exploit the NumPy array interface for
 conversions between Python and Julia.  By default, they are passed
 from Julia to Python without making a copy, but from Python to Julia a
 copy is made; no-copy conversion of Python to Julia arrays can be achieved

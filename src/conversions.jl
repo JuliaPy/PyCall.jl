@@ -210,28 +210,117 @@ summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
 #########################################################################
 # Lists and 1d arrays.
 
-function PyObject(v::AbstractVector)
-    o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr,(Int,), length(v)))
-    for i = 1:length(v)
-        oi = PyObject(v[i])
-        @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
-                         o, i-1, oi)
-        pyincref(oi) # PyList_SetItem steals the reference
+# recursive conversion of A to a list of list of lists... starting
+# with dimension dim and index i in A.
+function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
+    if dim > N
+        return PyObject(A[i])
+    elseif dim == N # special case last dim to coarsen recursion leaves
+        len = size(A, dim)
+        s = stride(A, dim)
+        o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
+        for j = 0:len-1
+            oi = PyObject(A[i+j*s])
+            @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
+                             o, j, oi)
+            pyincref(oi) # PyList_SetItem steals the reference  
+        end
+        return o
+    else # dim < N: store multidimensional array as list of lists
+        len = size(A, dim)
+        s = stride(A, dim)
+        o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
+        for j = 0:len-1
+            oi = PyObject(array2py(A, dim+1, i+j*s))
+            @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
+                             o, j, oi)
+            pyincref(oi) # PyList_SetItem steals the reference  
+        end
+        return o
     end
-    return o
 end
 
-function convert{T}(::Type{Vector{T}}, o::PyObject)
-    len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    if len < 0 || len+1 < 0 
-        # scipy IndexExpression instances pretend to be sequences
-        # with infinite (intmax) length, so we need to catch this, grr
-        throw(ArgumentError("invalid PySequence length $len"))
+array2py(A::AbstractArray) = array2py(A, 1, 1)
+
+PyObject(A::AbstractArray) = array2py(A)
+
+function py2array{TA,N}(T, A::Array{TA,N}, o::PyObject,
+                        dim::Integer, i::Integer)
+    if dim > N
+        A[i] = convert(T, o)
+        return A
+    elseif dim == N
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        if len != size(A, dim)
+            error("dimension mismatch in py2array")
+        end
+        s = stride(A, dim)
+        for j = 0:len-1
+            A[i+j*s] = convert(T, PyObject(ccall((@pysym :PySequence_GetItem),
+                                                 PyPtr, (PyPtr, Int), o, j)))
+        end
+        return A
+    else # dim < N: recursively extract list of lists into A
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        if len != size(A, dim)
+            error("dimension mismatch in py2array")
+        end
+        s = stride(A, dim)
+        for j = 0:len-1
+            py2array(T, A, PyObject(ccall((@pysym :PySequence_GetItem),
+                                       PyPtr, (PyPtr, Int), o, j)),
+                     dim+1, i+j*s)
+        end
+        return A
     end
-    TA = pyany_toany(T)
-    TA[ convert(T, PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, 
-                                  (PyPtr, Int), o, i-1))) for i in 1:len ]
 end
+
+# figure out if we can treat o as a multidimensional array, and return
+# the dimensions
+function pyarray_dims(o::PyObject)
+    len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    if len < 0 || # not a sequence
+       len+1 < 0 || # object pretending to be a sequence of infinite length
+       pystring_query(o) != None ||
+       pyisinstance(o, @pysym :PyTuple_Type)
+        pyerr_clear()
+        return ()
+    elseif len == 0
+        return (0,)
+    end
+    dims0 = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
+                                        PyPtr, (PyPtr, Int), o, 0)))
+    if length(dims0) == 0 # not a nested sequence
+        return (len,)
+    end
+    for j = 1:len-1
+        dims = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
+                                           PyPtr, (PyPtr, Int), o, j)))
+        if dims != dims0
+            # elements don't have equal lengths, cannot
+            # treat as multidimensional array
+            return (len,)
+        end
+    end
+    return tuple(len, dims0...)
+end
+
+function py2array(T, o::PyObject)
+    dims = pyarray_dims(o)
+    A = Array(pyany_toany(T), dims)
+    py2array(T, A, o, 1, 1)
+end
+            
+function convert{T}(::Type{Vector{T}}, o::PyObject) 
+    len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    if len < 0 || # not a sequence
+       len+1 < 0  # object pretending to be a sequence of infinite length
+        throw(ArgumentError("expected Python sequence"))
+    end
+    py2array(T, Array(pyany_toany(T), len), o, 1, 1)
+end
+
+convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
 
 # NumPy conversions (multidimensional arrays)
 include("numpy.jl")
@@ -451,7 +540,7 @@ function pysequence_query(o::PyObject)
             return Array{T}
         catch
             # only handle PyList for now
-            return pyisinstance(o, @pysym :PyList_Type) ? Vector{PyAny} : None
+            return pyisinstance(o, @pysym :PyList_Type) ? Array : None
         end
     end
 end
