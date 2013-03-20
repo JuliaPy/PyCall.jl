@@ -95,6 +95,14 @@ function pyincref(o::PyObject)
     o
 end
 
+# doing an incref *before* creating a PyObject may safer in the
+# case of borrowed references, to ensure that no exception or interrupt
+# induces a double decref.
+function pyincref(o::PyPtr)
+    ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
+    PyObject(o)
+end
+
 pyisinstance(o::PyObject, t::PyObject) = 
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
@@ -237,7 +245,7 @@ function pyinitialize(libpy::Ptr{Void})
           pysym_e(:PyUnicode_DecodeUTF8,
                   :PyUnicodeUCS4_DecodeUTF8,
                   :PyUnicodeUCS2_DecodeUTF8)
-        pynothing = pyincref(PyObject(convert(PyPtr, pysym(:_Py_NoneStruct))))
+        pynothing = pyincref(convert(PyPtr, pysym(:_Py_NoneStruct)))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
@@ -350,10 +358,9 @@ function pyerr_check(msg::String, val::Any)
     # only use this in contexts where initialization was already done
     e = ccall((@pysym :PyErr_Occurred), PyPtr, ())
     if e != C_NULL
-        # PyErr_Occurred returns borrowed ref
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), e)
+        eo = pyincref(e) # PyErr_Occurred returns borrowed ref
         pyerr_clear()
-        throw(PyError(msg, PyObject(e)))
+        throw(PyError(msg, eo))
     end
     val # the val argument is there just to pass through to the return value
 end

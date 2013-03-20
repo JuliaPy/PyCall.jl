@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble), 
                                                 real(c), imag(c)))
 
-PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(PyObject(pynothing.o))); end
+PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(pynothing.o)); end
 
 # conversions to Julia types from PyObject
 
@@ -231,7 +231,7 @@ function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
         s = stride(A, dim)
         o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
         for j = 0:len-1
-            oi = PyObject(array2py(A, dim+1, i+j*s))
+            oi = array2py(A, dim+1, i+j*s)
             @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
                              o, j, oi)
             pyincref(oi) # PyList_SetItem steals the reference  
@@ -450,8 +450,8 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
                       d, itr.pa, itr.ka, itr.va)
             error("unexpected end of PyDict_Next")
         end
-        ko = pyincref(PyObject(itr.ka[1])) # PyDict_Next returns
-        vo = pyincref(PyObject(itr.va[1])) #   borrowed ref, so incref
+        ko = pyincref(itr.ka[1]) # PyDict_Next returns
+        vo = pyincref(itr.va[1]) #   borrowed ref, so incref
         ((convert(K,ko), convert(V,vo)),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     else
