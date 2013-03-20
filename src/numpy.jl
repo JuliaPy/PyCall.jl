@@ -71,11 +71,11 @@ function npyinitialize()
     hdr = replace(hdr, r"\\\s*\n", " "); # rm backslashed newlines
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
-    for m in each_match(r, hdr) # search for max index into PyArray_API 
+    for m in eachmatch(r, hdr) # search for max index into PyArray_API 
         PyArray_API_length = max(PyArray_API_length, int(m.captures[2])+1)
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
-    for m in each_match(r, hdr) # build npy_api table
+    for m in eachmatch(r, hdr) # build npy_api table
         (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[int(m.captures[2])+1]
     end
     if !has(npy_api::Tnpy_api, :PyArray_New)
