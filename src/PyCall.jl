@@ -286,6 +286,13 @@ function pyinitialize(libpy::Ptr{Void})
                                 pyimport("sys")["version_info"])[1:3]...)
         pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
+        if !isempty(pyprogramname::ASCIIString)
+            # some modules (e.g. IPython) expect sys.argv to be set
+            sys = pyimport("sys")
+            ccall(pysym(:PyModule_AddObject), Cint,
+                  (PyPtr, Ptr{Uint8}, PyPtr), 
+                  sys, bytestring("argv"), PyObject(["julia"]))
+        end
     end
     return
 end
