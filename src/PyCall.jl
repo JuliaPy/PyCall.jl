@@ -229,7 +229,13 @@ function pyinitialize(libpy::Ptr{Void})
         inspect::PyObject = pyimport("inspect")
         types = pyimport("types")
         BuiltinFunctionType::PyObject = types["BuiltinFunctionType"]
-        TypeType::PyObject = pybuiltin("type")
+        TypeType::PyObject = try
+            types["TypeType"]
+        catch
+            # types.TypeType doesn't exist in Python 3, but for some reason
+            # the pybuiltin("type") doesn't work in IPython remote mode
+            pybuiltin("type")
+        end
         MethodType::PyObject = types["MethodType"]
         MethodWrapperType::PyObject = pytypeof(PyObject(PyObject[])["__add__"])
         try
