@@ -124,6 +124,7 @@ PyObject(o::PyObject) = o
 #########################################################################
 
 inspect = PyObject() # inspect module, needed for module introspection
+builtin = PyObject() # __builtin__ module, needed for pybuiltin
 
 # Python has zillions of types that a function be, in addition to the FunctionType
 # in the C API.  We have to obtain these at runtime and cache them in globals
@@ -229,13 +230,7 @@ function pyinitialize(libpy::Ptr{Void})
         inspect::PyObject = pyimport("inspect")
         types = pyimport("types")
         BuiltinFunctionType::PyObject = types["BuiltinFunctionType"]
-        TypeType::PyObject = try
-            types["TypeType"]
-        catch
-            # types.TypeType doesn't exist in Python 3, but for some reason
-            # the pybuiltin("type") doesn't work in IPython remote mode
-            pybuiltin("type")
-        end
+        TypeType::PyObject = pybuiltin("type")
         MethodType::PyObject = types["MethodType"]
         MethodWrapperType::PyObject = pytypeof(PyObject(PyObject[])["__add__"])
         try
@@ -327,6 +322,7 @@ function pyfinalize()
     global finalized
     global libpython
     global inspect
+    global builtin
     global BuiltinFunctionType
     global TypeType
     global MethodType
@@ -343,6 +339,7 @@ function pyfinalize()
         pydecref(TypeType::PyObject)
         pydecref(MethodType::PyObject)
         pydecref(MethodWrapperType::PyObject)
+        pydecref(builtin::PyObject)
         pydecref(inspect::PyObject)
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
@@ -590,17 +587,18 @@ end
 
 #########################################################################
 
-# look up a global variable (in module __main__)
-function pybuiltin(name::String)
-    main = @pycheckn ccall((@pysym :PyImport_AddModule), 
-                           PyPtr, (Ptr{Uint8},),
-                           bytestring("__main__"))
-    PyObject(@pycheckni ccall((@pysym :PyObject_GetAttrString), PyPtr,
-                              (PyPtr, Ptr{Uint8}), main,
-                              bytestring("__builtins__")))[bytestring(name)]
+# look up a global builtin
+function pybuiltin(name)
+    global builtin
+    if (builtin::PyObject).o == C_NULL
+        builtin::PyObject = try
+            pyimport("__builtin__")
+        catch
+            pyimport("builtins") # renamed in Python 3
+        end
+    end
+    (builtin::PyObject)[name]
 end
-
-pybuiltin(name::Symbol) = pybuiltin(string(name))
 
 #########################################################################
 # Keyword arguments are just passed to pycall as @pykw kw1=val1 kw2=val2...

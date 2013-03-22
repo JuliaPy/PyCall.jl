@@ -198,7 +198,8 @@ and also by providing more type information to the Julia compiler.
   the corresponding variable values.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
-  builtins, returning a `PyObject`
+  builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
+  symbol it returns the builtin converted to `PyAny`.
 
 * `pywrap(o::PyObject)` returns a wrapper `w` that is an anonymous
   composite type (a subclass of `PyWrapper`) which provides (read)
