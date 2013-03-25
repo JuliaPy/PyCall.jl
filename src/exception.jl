@@ -17,9 +17,9 @@ type PyError <: Exception
         pexc = convert(Uint, pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
         ccall((@pysym :PyErr_Fetch), Void, (Uint,Uint,Uint),
-              pexc, pexc + sizeof(Uint), pexc + 2*sizeof(Uint))
+              pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         ccall((@pysym :PyErr_NormalizeException), Void, (Uint,Uint,Uint),
-              pexc, pexc + sizeof(Uint), pexc + 2*sizeof(Uint))
+              pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         new(msg, exc[1], exc[2], exc[3])
     end
 end
@@ -54,8 +54,7 @@ pyerr_clear() = ccall((@pysym :PyErr_Clear), Void, ())
 function pyerr_check(msg::String, val::Any)
     # note: don't call pyinitialize here since we will
     # only use this in contexts where initialization was already done
-    e = ccall((@pysym :PyErr_Occurred), PyPtr, ())
-    if e != C_NULL
+    if ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
         throw(PyError(msg))
     end
     val # the val argument is there just to pass through to the return value
