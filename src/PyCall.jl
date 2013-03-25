@@ -4,7 +4,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
        PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval, pyhassym,
-       PyVector
+       PyVector, pystring
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -171,6 +171,9 @@ PyUnicode_DecodeUTF8 = C_NULL
 # whether to use unicode for strings by default, ala Python 3
 pyunicode_literals = false
 
+# traceback.format_tb function, for show(PyError)
+format_traceback = PyObject()
+
 # cache whether Python hash values are Clong (Python < 3.2) or Int (>= 3.2)
 pyhashlong = false
 
@@ -208,6 +211,7 @@ function pyinitialize(libpy::Ptr{Void})
     global PyCapsule_Type
     global c_void_p_Type
     global py_void_p
+    global format_traceback
     if !initialized::Bool
         if finalized::Bool
             # From the Py_Finalize documentation:
@@ -281,6 +285,7 @@ function pyinitialize(libpy::Ptr{Void})
                                 pyimport("sys")["version_info"])[1:3]...)
         pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
+        format_traceback::PyObject = pyimport("traceback")["format_tb"]
         if !isempty(pyprogramname::ASCIIString)
             # some modules (e.g. IPython) expect sys.argv to be set
             sys = pyimport("sys")
@@ -330,11 +335,13 @@ function pyfinalize()
     global ufuncType
     global pynothing
     global c_void_p_Type
+    global format_traceback
     if initialized::Bool
-        pydecref(ufuncType)
+        pydecref(ufuncType::PyObject)
         npyfinalize()
-        pydecref(c_void_p_Type)
-        pydecref(pynothing)
+        pydecref(format_traceback::PyObject)
+        pydecref(c_void_p_Type::PyObject)
+        pydecref(pynothing::PyObject)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)
         pydecref(MethodType::PyObject)
@@ -353,80 +360,8 @@ function pyfinalize()
 end
 
 #########################################################################
-# Conversion of Python exceptions into Julia exceptions
 
-# call when we are throwing our own exception
-pyerr_clear() = ccall((@pysym :PyErr_Clear), Void, ())
-
-type PyError <: Exception
-    msg::String
-    o::PyObject
-end
-
-function pyerr_check(msg::String, val::Any)
-    # note: don't call pyinitialize here since we will
-    # only use this in contexts where initialization was already done
-    e = ccall((@pysym :PyErr_Occurred), PyPtr, ())
-    if e != C_NULL
-        eo = pyincref(e) # PyErr_Occurred returns borrowed ref
-        pyerr_clear()
-        throw(PyError(msg, eo))
-    end
-    val # the val argument is there just to pass through to the return value
-end
-
-pyerr_check(msg::String) = pyerr_check(msg, nothing)
-pyerr_check() = pyerr_check("")
-
-# Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
-# (The "i" variant assumes Python is initialized.)
-macro pychecki(ex)
-    :(pyerr_check($(string(ex.args[1].args[2].args[1])), $ex))
-end
-macro pycheck(ex)
-    quote
-        @pyinitialize
-        @pychecki $ex
-    end
-end
-
-# Macros to check that ccall((@pysym :Foo), ...) returns value != bad
-# (The "i" variants assume Python is initialized.)
-macro pycheckvi(ex, bad)
-    quote
-        val = $ex
-        if val == $bad
-            # throw a PyError if available, otherwise throw ErrorException
-            pyerr_check($(string(ex.args[1].args[2].args[1])), nothing)
-            error($(string(ex.args[1].args[2].args[1])), " failed")
-        end
-        val
-    end
-end
-macro pycheckni(ex)
-    :(@pycheckvi $ex C_NULL)
-end
-macro pycheckzi(ex)
-    :(@pycheckvi $ex -1)
-end
-macro pycheckv(ex, bad)
-    quote
-        @pyinitialize
-        @pycheckvi $ex $bad
-    end
-end
-macro pycheckn(ex)
-    quote
-        @pyinitialize
-        @pycheckni $ex
-    end
-end
-macro pycheckz(ex)
-    quote
-        @pyinitialize
-        @pycheckzi $ex
-    end
-end
+include("exception.jl")
 
 #########################################################################
 
@@ -447,9 +382,9 @@ include("conversions.jl")
 #########################################################################
 # Pretty-printing PyObject
 
-function show(io::IO, o::PyObject)
+function pystring(o::PyObject)
     if o.o == C_NULL
-        print(io, "PyObject NULL")
+        return "NULL"
     else
         s = ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
@@ -457,11 +392,15 @@ function show(io::IO, o::PyObject)
             s = ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
-                return print(io, "PyObject $(o.o)")
+                return string(o.o)
             end
         end
-        print(io, "PyObject $(convert(String, PyObject(s)))")
+        return convert(String, PyObject(s))
     end
+end    
+
+function show(io::IO, o::PyObject)
+    print(io, "PyObject $(pystring(o))")
 end
 
 #########################################################################
