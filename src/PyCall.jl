@@ -4,7 +4,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
        PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval, pyhassym,
-       PyVector, pystring
+       PyVector, pystring, pyraise
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
        Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
@@ -286,6 +286,7 @@ function pyinitialize(libpy::Ptr{Void})
         pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
         format_traceback::PyObject = pyimport("traceback")["format_tb"]
+        pyexc_initialize()
         if !isempty(pyprogramname::ASCIIString)
             # some modules (e.g. IPython) expect sys.argv to be set
             sys = pyimport("sys")
@@ -348,6 +349,7 @@ function pyfinalize()
         pydecref(MethodWrapperType::PyObject)
         pydecref(builtin::PyObject)
         pydecref(inspect::PyObject)
+        pyexc_finalize()
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
         ccall((@pysym :Py_Finalize), Void, ())

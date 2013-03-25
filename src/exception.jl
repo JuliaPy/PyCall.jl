@@ -114,3 +114,54 @@ macro pycheckz(ex)
 end
 
 #########################################################################
+# Mapping of Julia Exception types to Python exceptions
+
+pyexc = Dict{DataType, PyPtr}()
+
+function pyexc_initialize()
+    global pyexc
+    exc = [Exception => :PyExc_RuntimeError,
+           ErrorException => :PyExc_RuntimeError,
+           SystemError => :PyExc_SystemError,
+           TypeError => :PyExc_TypeError,
+           ParseError => :PyExc_SyntaxError,
+           ArgumentError => :PyExc_ValueError,
+           KeyError => :PyExc_KeyError,
+           LoadError => :PyExc_ImportError,
+           MethodError => :PyExc_RuntimeError,
+           EOFError => :PyExc_EOFError,
+           BoundsError => :PyExc_IndexError,
+           DivideByZeroError => :PyExc_ZeroDivisionError,
+           DomainError => :PyExc_RuntimeError,
+           OverflowError => :PyExc_OverflowError,
+           InexactError => :PyExc_ArithmeticError,
+           MemoryError => :PyExc_MemoryError,
+           StackOverflowError => :PyExc_MemoryError,
+           UndefRefError => :PyExc_RuntimeError,
+           InterruptException => :PyExc_KeyboardInterrupt]
+    for (k,v) in exc
+        p = convert(Ptr{PyPtr}, pysym_e(v))
+        if p != C_NULL
+            (pyexc::Dict)[k] = unsafe_ref(p)
+        end
+    end
+end
+
+function pyexc_finalize()
+    global pyexc
+    pyexc::Dict = Dict{DataType, PyPtr}()
+end
+
+function pyraise(e)
+    global pyexc
+    eT = typeof(e)
+    pyeT = has(pyexc::Dict, eT) ? (pyexc::Dict)[eT] : (pyexc::Dict)[Exception]
+    ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
+          pyeT, bytestring(string("Julia exception: ", e)))
+end
+
+function pyraise(e::PyError)
+    ccall((@pysym :PyErr_Restore), Void, (PyPtr, PyPtr, PyPtr),
+          e.T, e.val, e.traceback)
+    e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
+end

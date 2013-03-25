@@ -45,9 +45,7 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
         ret_ = ret.o
         ret.o = convert(PyPtr, C_NULL) # don't decref
     catch e
-        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
-              (@pysym :PyExc_RuntimeError),
-              bytestring(string("Julia exception: ", e)))
+        pyraise(e)
     finally
         args.o = convert(PyPtr, C_NULL) # don't decref
     end
