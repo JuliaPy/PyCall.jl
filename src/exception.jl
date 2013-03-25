@@ -29,7 +29,7 @@ function show(io::IO, e::PyError)
           isempty(e.msg) ? e.msg : string(" (",e.msg,")"),
           " ")
 
-    if e.T == C_NULL
+    if e.T.o == C_NULL
         println(io, "None")
     else
         println(io, pystring(e.T), "\n", pystring(e.val))
@@ -82,7 +82,7 @@ macro pycheckvi(ex, bad)
         val = $ex
         if val == $bad
             # throw a PyError if available, otherwise throw ErrorException
-            pyerr_check($(string(ex.args[1].args[2].args[1])), nothing)
+            pyerr_check($(string(ex.args[1].args[2].args[1])))
             error($(string(ex.args[1].args[2].args[1])), " failed")
         end
         val
