@@ -51,6 +51,8 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     end
     return ret_::PyPtr
 end
+const jl_Function_call_ptr = cfunction(jl_Function_call,
+                                       PyPtr, (PyPtr,PyPtr,PyPtr))
 
 jl_FunctionType = PyTypeObject()
 
@@ -59,8 +61,7 @@ function pycallback_initialize()
     if (jl_FunctionType::PyTypeObject).tp_name == C_NULL
         jl_FunctionType::PyTypeObject = 
          pyjlwrap_type("PyCall.jl_Function",
-                       t -> t.tp_call = cfunction(jl_Function_call,
-                                                  PyPtr, (PyPtr,PyPtr,PyPtr)))
+                       t -> t.tp_call = jl_Function_call_ptr)
     end
     return
 end

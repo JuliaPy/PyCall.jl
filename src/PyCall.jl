@@ -375,11 +375,11 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
+include("conversions.jl")
+
 include("pytype.jl")
 
 include("callback.jl")
-
-include("conversions.jl")
 
 #########################################################################
 # Pretty-printing PyObject

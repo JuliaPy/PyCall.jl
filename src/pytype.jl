@@ -324,6 +324,7 @@ function pyjlwrap_dealloc(o::PyPtr)
     end
     return nothing
 end
+const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
 
 unsafe_pyjlwrap_to_objref(o::PyPtr) = 
   unsafe_pointer_to_objref(unsafe_ref(convert(Ptr{Ptr{Void}}, o), 3))
@@ -335,12 +336,14 @@ function pyjlwrap_repr(o::PyPtr)
     o.o = convert(PyPtr, C_NULL) # don't decref
     return oret
 end
+const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
 
 function pyjlwrap_hash(o::PyPtr) 
     h = hash(unsafe_pyjlwrap_to_objref(o))
     # Python hashes are not permitted to return -1!!
     return h == uint(-1) ? pysalt::Uint : h::Uint
 end
+const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, Uint, (PyPtr,))
 
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
 function pyjlwrap_hash32(o::PyPtr)
@@ -349,6 +352,7 @@ function pyjlwrap_hash32(o::PyPtr)
     # Python hashes are not permitted to return -1!!
     return h == uint32(-1) ? uint32(pysalt::Uint) : h::Uint32
 end
+const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, Uint32, (PyPtr,))
 
 jlWrapType = PyTypeObject()
 
@@ -364,14 +368,11 @@ function pyjlwrap_init()
                        t::PyTypeObject -> begin
                            t.tp_flags |= Py_TPFLAGS_BASETYPE
                            t.tp_members = convert(Ptr{Void}, pyjlwrap_members);
-                           t.tp_dealloc = cfunction(pyjlwrap_dealloc,
-                                                    Void, (PyPtr,))
-                           t.tp_repr = cfunction(pyjlwrap_repr,
-                                                 PyPtr, (PyPtr,))
+                           t.tp_dealloc = pyjlwrap_dealloc_ptr
+                           t.tp_repr = pyjlwrap_repr_ptr
                            t.tp_hash = pyhashlong::Bool && WORD_SIZE == 64 &&
                                        sizeof(Clong) == 4 ?
-                              cfunction(pyjlwrap_hash32, Uint32, (PyPtr,)) :
-                              cfunction(pyjlwrap_hash, Uint, (PyPtr,))
+                              pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
                        end)
     end
 
