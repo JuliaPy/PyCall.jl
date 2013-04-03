@@ -311,8 +311,11 @@ function pyinitialize(python::String)
     global initialized
     global pyprogramname
     if !initialized::Bool
-        libpy = dlopen(libpython_name(python),
-                       RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+        libpy = try
+            dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+          catch
+            dlopen(libpython_name(python), RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+          end
         pyprogramname::ASCIIString = bytestring(python)
         pyinitialize(libpy)
     end
