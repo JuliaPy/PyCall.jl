@@ -398,10 +398,17 @@ function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
     end
 end
 
-# seems to conflict with the previous definition:
-#function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
-#    info = PyArray_Info(o)
-#    copy(PyArray{T, N}(o, info)) # will check T == info.T && N == length(info.sz)
-#end
+function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
+    try
+        info = PyArray_Info(o)
+        copy(PyArray{T,N}(o, info)) # will check T == info.T and N == length(info.sz)
+    catch
+        A = py2array(T, o)
+        if ndims(A) != N
+            throw(ArgumentError("cannot convert $(ndims(A))d array to $(N)d"))
+        end
+        A
+    end
+end
 
 #########################################################################
