@@ -39,5 +39,12 @@ if PyCall.npy_initialized
 end
 @test convert(PyAny, PyObject(begin A = Array(Any); A[1] = 3; A; end)) == 3
 
+array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
+@test array2py2arrayeq(rand(3))
+@test array2py2arrayeq(rand(3,4))
+@test array2py2arrayeq(rand(3,4,5))
+
+@test roundtrip(1:10) == [1:10]
+
 @pyimport math
 @test_approx_eq math.sin(3) sin(3)
