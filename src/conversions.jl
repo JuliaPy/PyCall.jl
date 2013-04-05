@@ -217,7 +217,7 @@ function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
         return PyObject(A[i])
     elseif dim == N # special case last dim to coarsen recursion leaves
         len = size(A, dim)
-        s = stride(A, dim)
+        s = N == 1 ? 1 : stride(A, dim)
         o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
         for j = 0:len-1
             oi = PyObject(A[i+j*s])
@@ -242,7 +242,9 @@ end
 
 array2py(A::AbstractArray) = array2py(A, 1, 1)
 
-PyObject(A::AbstractArray) = array2py(A)
+PyObject(A::AbstractArray) = 
+   ndims(A) <= 1 || method_exists(stride,(typeof(A),Int)) ? array2py(A) :
+   pyjlwrap_new(A)
 
 function py2array{TA,N}(T, A::Array{TA,N}, o::PyObject,
                         dim::Integer, i::Integer)

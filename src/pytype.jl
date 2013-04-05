@@ -405,13 +405,15 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     return o
 end
 
+pyjlwrap_new(x::Any) = begin pyjlwrap_init(); pyjlwrap_new(jlWrapType::PyTypeObject, x); end
+
 is_pyjlwrap(o::PyObject) = (jlWrapType::PyTypeObject).tp_name != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &(jlWrapType::PyTypeObject)) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,
 # just wrap the Julia object in a Python object
 
-PyObject(x::Any) = begin  pyjlwrap_init(); pyjlwrap_new(jlWrapType, x); end
+PyObject(x::Any) = pyjlwrap_new(x)
 
 ################################################################
 
