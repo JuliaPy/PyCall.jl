@@ -223,7 +223,9 @@ function pyinitialize(libpy::Ptr{Void})
             error("Calling pyinitialize after pyfinalize is not supported")
         end
         libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
+        already_inited = true
         if 0 == ccall((@pysym :Py_IsInitialized), Cint, ())
+            already_inited = false
             if !isempty(pyprogramname::ASCIIString)
                 ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},), 
                       pyprogramname::ASCIIString)
@@ -287,12 +289,12 @@ function pyinitialize(libpy::Ptr{Void})
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
         format_traceback::PyObject = pyimport("traceback")["format_tb"]
         pyexc_initialize()
-        if !isempty(pyprogramname::ASCIIString)
+        if !already_inited
             # some modules (e.g. IPython) expect sys.argv to be set
-            sys = pyimport("sys")
-            ccall(pysym(:PyModule_AddObject), Cint,
-                  (PyPtr, Ptr{Uint8}, PyPtr), 
-                  sys, bytestring("argv"), PyObject(["julia"]))
+            argv_s = bytestring("")
+            argv = convert(Ptr{Uint8}, argv_s)
+            ccall(pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{Uint8}},Cint),
+                  1, &argv, 0)
         end
     end
     return
