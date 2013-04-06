@@ -223,9 +223,8 @@ function pyinitialize(libpy::Ptr{Void})
             error("Calling pyinitialize after pyfinalize is not supported")
         end
         libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
-        already_inited = true
-        if 0 == ccall((@pysym :Py_IsInitialized), Cint, ())
-            already_inited = false
+        already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
+        if !already_inited
             if !isempty(pyprogramname::ASCIIString)
                 ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},), 
                       pyprogramname::ASCIIString)
