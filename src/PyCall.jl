@@ -3,7 +3,7 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, @pykw, pytypeof, pyeval, pyhassym,
+       PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
        PyVector, pystring, pyraise
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
