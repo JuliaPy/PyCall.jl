@@ -547,47 +547,13 @@ function pybuiltin(name)
 end
 
 #########################################################################
-# Keyword arguments are just passed to pycall as @pykw kw1=val1 kw2=val2...
-# in the last pycall argument.  The @pykw macro converts this into a special
-# dictionary object for passing to pycall.
-#
-# Note that I don't use the Options package because a lot of the things
-# like typechecking and defaults don't make sense the pycall context,
-# so this can be a lot simpler.  All Python needs is a dictionary.
-
-# In order for PyCall to differentiate between the keyword dictionary
-# and an ordinary dictionary parameter, we wrap it in a special type.
-type PyKW
-    d::Dict{String,Any} # dictionary of (keyword => value) pairs.
-end
-PyObject(kw::PyKW) = isempty(kw.d) ? PyObject() : PyObject(kw.d)
-
-# from a single :(x = y) expression make a single :(x => y) expression
-function pykw1(ex::Expr)
-    if ex.head == :(=) && length(ex.args) == 2 && typeof(ex.args[1]) == Symbol
-        Expr(:(=>), string(ex.args[1]), ex.args[2])
-    else
-        throw(ArgumentError("invalid keyword expression $ex"))
-    end
-end
-
-macro pykw(args...)
-    :(PyKW($(Expr(:typed_dict, :(String=>Any), map(pykw1, args)...))))
-end
-
-#########################################################################
 
 typealias TypeTuple Union(Type,NTuple{Type})
 
-function pycall(o::PyObject, returntype::TypeTuple, args...)
+function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
-    if nargs > 0 && isa(args[end], PyKW)
-        kw = PyObject(args[end])
-        nargs -= 1
-    else
-        kw = PyObject()
-    end
+    kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
     arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
                                    nargs))
     for i = 1:nargs

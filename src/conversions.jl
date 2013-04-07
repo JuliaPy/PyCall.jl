@@ -133,7 +133,9 @@ end
 # Function conversion (see callback.jl for conversion the other way)
 
 convert(::Type{Function}, po::PyObject) =
-    (args...) -> pycall(po, PyAny, args...)
+    function fn(args...; kwargs...)
+        pycall(po, PyAny, args...; kwargs...)
+    end
 
 #########################################################################
 # Tuple conversion
