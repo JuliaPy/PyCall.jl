@@ -552,7 +552,6 @@ typealias TypeTuple Union(Type,NTuple{Type})
 function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
-    kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
     arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
                                    nargs))
     for i = 1:nargs
@@ -560,8 +559,14 @@ function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
                          arg, i-1, oargs[i])
         pyincref(oargs[i]) # PyTuple_SetItem steals the reference
     end
-    ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
-                                    (PyPtr,PyPtr,PyPtr), o, arg, kw))
+    if isempty(kwargs)
+        ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
+                                        (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
+    else
+        kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
+        ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
+                                        (PyPtr,PyPtr,PyPtr), o, arg, kw))
+    end
     jret = convert(returntype, ret)
     return jret
 end
