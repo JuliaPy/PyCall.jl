@@ -131,7 +131,7 @@ function pyexc_initialize()
            MethodError => :PyExc_RuntimeError,
            EOFError => :PyExc_EOFError,
            BoundsError => :PyExc_IndexError,
-           DivideByZeroError => :PyExc_ZeroDivisionError,
+           DivideError => :PyExc_ZeroDivisionError,
            DomainError => :PyExc_RuntimeError,
            OverflowError => :PyExc_OverflowError,
            InexactError => :PyExc_ArithmeticError,
