@@ -47,14 +47,13 @@ from Julia to Python without making a copy, but from Python to Julia a
 copy is made; no-copy conversion of Python to Julia arrays can be achieved
 with the `PyArray` type below.
 
-Keyword arguments can be passed as the *last* argument of a function,
-prefixed by the `@pykw` macro, and separated by *spaces*.  For example,
-matplotlib's [pylab](http://matplotlib.org/) uses keyword arguments to specify
-plot options, and this functionality is accessed from Julia by:
+Keyword arguments can also be passed. For example, matplotlib's
+[pylab](http://matplotlib.org/) uses keyword arguments to specify plot
+options, and this functionality is accessed from Julia by:
 
     @pyimport pylab
     x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
-    pylab.plot(x, y, @pykw color="red" linewidth=2.0 linestyle="--")
+    pylab.plot(x, y; color="red", linewidth=2.0, linestyle="--")
     pylab.show() 
 
 Arbitrary Julia functions can be passed to Python routines taking
