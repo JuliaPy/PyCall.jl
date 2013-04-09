@@ -37,11 +37,14 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     ret_ = convert(PyPtr, C_NULL)
     args = PyObject(args_)
     try
-        if kw_ != C_NULL
-            throw(ArgumentError("keywords not yet supported in callbacks"))
-        end
         f = unsafe_pyjlwrap_to_objref(self_)::Function
-        ret = PyObject(f(convert(PyAny, args)...))
+        if kw_ == C_NULL
+            ret = PyObject(f(convert(PyAny, args)...))
+        else
+            kw = PyDict{Symbol,PyAny}(PyObject(kw_))
+            kwargs = [ (k,v) for (k,v) in kw ]
+            ret = PyObject(f(convert(PyAny, args)...; kwargs...))
+        end
         ret_ = ret.o
         ret.o = convert(PyPtr, C_NULL) # don't decref
     catch e

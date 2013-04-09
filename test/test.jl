@@ -25,6 +25,12 @@ roundtripeq(x) = roundtrip(x) == x
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 @test roundtrip(x -> x + 1)(314158) == 314159
 
+testkw(x; y=0) = x + 2*y
+@test pycall(PyObject(testkw), PyAny, 314157) == 314157
+@test pycall(PyObject(testkw), PyAny, 314157, y=1) == 314159
+@test roundtrip(testkw)(314157) == 314157
+@test roundtrip(testkw)(314157, y=1) == 314159
+
 if PyCall.npy_initialized
     @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
 end
