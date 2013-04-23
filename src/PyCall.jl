@@ -479,10 +479,20 @@ ref(w::PyWrapper, s) = ref(w.___jl_PyCall_PyObject___, s)
 typesymbol(T::DataType) = T.name.name
 typesymbol(T) = :Any # punt
 
+# we skip wrapping Julia reserved words (which cannot be type members)
+const reserved = Set("while", "if", "for", "try", "return", "break", 
+                     "continue", "function", "macro", "quote", "let", "local",
+                     "global", "const", "abstract", "typealias", "type",
+                     "bitstype", "immutable", "ccall", "do", "module",
+                     "baremodule", "using", "import", "export", "importall",
+                     "Function" # Julia issue 2919
+                     )
+
 function pywrap(o::PyObject)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
+    filter!(m -> !contains(reserved, m[1]), members)
     tname = gensym("PyCall_PyWrapper")
     @eval begin
         $(Expr(:type, true, Expr(:<:, tname, :PyWrapper),
@@ -491,8 +501,7 @@ function pywrap(o::PyObject)
                                   typesymbol(pytype_query(m[2]))), 
                         members)...)))
         $(Expr(:call, tname, o,
-               [ :(convert(PyAny, $(members[i][2])))
-                for i = 1:length(members) ]...))
+               [ convert(PyAny, members[i][2]) for i = 1:length(members) ]...))
     end
 end
 
