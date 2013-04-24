@@ -150,6 +150,8 @@ pyint_from_size_t = C_NULL
 pyint_from_ssize_t = C_NULL
 pyint_as_ssize_t = C_NULL
 
+pyxrange = PyObject() # xrange type (or range in Python 3)
+
 # cache ctypes.c_void_p type and function if available
 c_void_p_Type = PyObject()
 py_void_p = p::Ptr -> PyObject(uint(p))
@@ -198,6 +200,7 @@ function pyinitialize(libpy::Ptr{Void})
     global PyUnicode_DecodeUTF8
     global pyunicode_literals
     global pynothing
+    global pyxrange
     global pyhashlong
     global pystring_fromstring
     global pystring_asstring
@@ -251,7 +254,8 @@ function pyinitialize(libpy::Ptr{Void})
           pysym_e(:PyUnicode_DecodeUTF8,
                   :PyUnicodeUCS4_DecodeUTF8,
                   :PyUnicodeUCS2_DecodeUTF8)
-        pynothing = pyincref(convert(PyPtr, pysym(:_Py_NoneStruct)))
+        pynothing::PyObject = pyincref(convert(PyPtr, pysym(:_Py_NoneStruct)))
+        pyxrange::PyObject = pyincref(convert(PyPtr, pysym(:PyRange_Type)))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
@@ -339,6 +343,7 @@ function pyfinalize()
     global MethodWrapperType
     global ufuncType
     global pynothing
+    global pyxrange
     global c_void_p_Type
     global format_traceback
     if initialized::Bool
@@ -346,6 +351,7 @@ function pyfinalize()
         npyfinalize()
         pydecref(format_traceback::PyObject)
         pydecref(c_void_p_Type::PyObject)
+        pydecref(pyxrange::PyObject)
         pydecref(pynothing::PyObject)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)

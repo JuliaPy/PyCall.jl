@@ -50,7 +50,8 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test array2py2arrayeq(rand(3,4))
 @test array2py2arrayeq(rand(3,4,5))
 
-@test roundtrip(1:10) == [1:10]
+@test roundtripeq(2:10) && roundtripeq(10:-1:2)
+@test roundtrip(2:2.0:10) == [2:2.0:10]
 
 @pyimport math
 @test_approx_eq math.sin(3) sin(3)

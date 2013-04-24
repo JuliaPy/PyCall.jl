@@ -497,6 +497,42 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
 end
 
 #########################################################################
+# Ranges: integer ranges are converted to xrange,
+#         while other ranges (<: AbstractVector) are converted to lists
+
+xrange(start, stop, step) = pycall(pyxrange::PyObject, PyObject,
+                                   start, stop, step)
+
+function PyObject{T<:Integer}(r::Ranges{T})
+    s = step(r)
+    f = first(r)
+    l = last(r) + s
+    if max(f,l) > typemax(Clong) || min(f,l) < typemin(Clong)
+        # in Python 2.x, xrange is limited to Clong
+        PyObject(T[r...])
+    else
+        @pyinitialize
+        xrange(f, l, s)
+    end
+end
+
+function convert{T<:Ranges}(::Type{T}, o::PyObject)
+    v = PyVector(o)
+    len = length(v)
+    if len == 0
+        return 1:0 # no way to get more info from an xrange
+    elseif len == 1
+        start = v[1]
+        return start:start
+    else
+        start = v[1]
+        stop = v[len]
+        step = v[2] - start
+        return step == 1 ? (start:stop) : (start:step:stop)
+    end
+end
+
+#########################################################################
 # Inferring Julia types at runtime from Python objects:
 #
 # [Note that we sometimes use the PyFoo_Check API and sometimes we use
@@ -536,6 +572,8 @@ function pysequence_query(o::PyObject)
                       pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), 
                                                   PyPtr, (PyPtr,Int), o,i-1)),
                                    PyAny))
+    elseif pyisinstance(o, pyxrange::PyObject)
+        return Ranges
     else
         try
             otypestr = PyObject(@pycheckni ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
