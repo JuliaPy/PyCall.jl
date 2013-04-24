@@ -602,14 +602,13 @@ function pyeval_(s::String, locals::PyDict)
                               o, maindict, locals))
 end
 
-pyeval(s::String, locals::PyDict, returntype::TypeTuple) =
-   convert(returntype, pyeval_(s, locals))
-pyeval(s::String, locals::PyDict) = pyeval(s, locals, PyAny)
-pyeval(s::String, locals::Associative, returntype::TypeTuple) =
-   pyeval(s, PyDict(locals), returntype)
-pyeval(s::String, locals::Associative) =
-   pyeval(s, PyDict(locals), PyAny)
-pyeval(s::String) = pyeval(s, PyDict())
+function pyeval(s::String, returntype::TypeTuple=PyAny; kwargs...)
+    locals = PyDict{String,PyObject}()
+    for (k, v) in kwargs
+        locals[string(k)] = v
+    end
+    return convert(returntype, pyeval_(s, locals))
+end
 
 #########################################################################
 

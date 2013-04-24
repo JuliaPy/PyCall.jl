@@ -189,12 +189,11 @@ and also by providing more type information to the Julia compiler.
   be accessed with `s.name` (the `s[name]` syntax can also be used
   with `@pyimport` modules in order to obtain the raw `PyObject` members).
 
-* `pyeval(s::String [, locals::Associative, [, rtype]])` evaluates `s`
+* `pyeval(s::String, rtype=PyAny; locals...)` evaluates `s`
   as a Python string and returns the result converted to `rtype`
-  (which defaults to `PyAny`).  `locals` defines local variables that
-  can be used in the expression: it is a dictionary of where the keys
-  are the variables (`Symbol` or `String`) and the values (`Any`) are
-  the corresponding variable values.
+  (which defaults to `PyAny`).  The remaining arguments are keywords
+  that define local variables to be used in the expression.  For 
+  example, `pyeval("x + y", x=1, y=2)` returns `3`.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
