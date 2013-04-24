@@ -491,7 +491,12 @@ const reserved = Set("while", "if", "for", "try", "return", "break",
                      "global", "const", "abstract", "typealias", "type",
                      "bitstype", "immutable", "ccall", "do", "module",
                      "baremodule", "using", "import", "export", "importall",
-                     "Function" # Julia issue 2919
+                     # Julia issue #2919:
+                     #   the member name cannot shadow a member type name,
+                     #   so exclude names of types with native conversions
+                     "Function", "Dict", "Array", "Ranges", "Nothing",
+                     "Float64", "Complex128", "String", "UTF8String",
+                     "Bool", "Int", "PyObject", "Any", "Ptr"
                      )
 
 function pywrap(o::PyObject)
