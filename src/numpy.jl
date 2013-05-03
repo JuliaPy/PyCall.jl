@@ -78,7 +78,7 @@ function npyinitialize()
     for m in eachmatch(r, hdr) # build npy_api table
         (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[int(m.captures[2])+1]
     end
-    if !has(npy_api::Tnpy_api, :PyArray_New)
+    if !haskey(npy_api::Tnpy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
     end
 
@@ -312,52 +312,52 @@ function copy{T,N}(a::PyArray{T,N})
     end
 end
 
-ref{T}(a::PyArray{T,0}) = unsafe_ref(a.data)
-ref{T}(a::PyArray{T,1}, i::Integer) = unsafe_ref(a.data, 1 + (i-1)*a.st[1])
+getindex{T}(a::PyArray{T,0}) = unsafe_load(a.data)
+getindex{T}(a::PyArray{T,1}, i::Integer) = unsafe_load(a.data, 1 + (i-1)*a.st[1])
 
-ref{T}(a::PyArray{T,2}, i::Integer, j::Integer) = 
-  unsafe_ref(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
+getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer) = 
+  unsafe_load(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
-function ref(a::PyArray, i::Integer) 
+function getindex(a::PyArray, i::Integer) 
     if a.f_contig
-        return unsafe_ref(a.data, i)
+        return unsafe_load(a.data, i)
     else
         return a[ind2sub(a.dims, i)...]
     end
 end
 
-function ref(a::PyArray, is::Integer...)
+function getindex(a::PyArray, is::Integer...)
     index = 1
     for i = 1:length(is)
         index += (is[i]-1)*a.st[i]
     end
-    unsafe_ref(a.data, index)
+    unsafe_load(a.data, index)
 end
 
 function writeok_assign(a::PyArray, v, i::Integer)
     if a.info.readonly
         throw(ArgumentError("read-only PyArray"))
     else
-        unsafe_assign(a.data, v, i)
+        unsafe_store!(a.data, v, i)
     end
     return a
 end
 
-assign{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
-assign{T}(a::PyArray{T,1}, v, i::Integer) = writeok_assign(a, v, 1 + (i-1)*a.st[1])
+setindex!{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
+setindex!{T}(a::PyArray{T,1}, v, i::Integer) = writeok_assign(a, v, 1 + (i-1)*a.st[1])
 
-assign{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) = 
+setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) = 
   writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
-function assign(a::PyArray, v, i::Integer) 
+function setindex!(a::PyArray, v, i::Integer) 
     if a.f_contig
         return writeok_assign(a, v, i)
     else
-        return assign(a, v, ind2sub(a.dims, i)...)
+        return setindex!(a, v, ind2sub(a.dims, i)...)
     end
 end
 
-function assign(a::PyArray, v, is::Integer...)
+function setindex!(a::PyArray, v, is::Integer...)
     index = 1
     for i = 1:length(is)
         index += (is[i]-1)*a.st[i]

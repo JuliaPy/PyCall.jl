@@ -6,11 +6,12 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
        PyVector, pystring, pyraise
 
-import Base.size, Base.ndims, Base.similar, Base.copy, Base.ref, Base.assign,
-       Base.stride, Base.convert, Base.pointer, Base.summary, Base.convert,
-       Base.show, Base.has, Base.keys, Base.values, Base.eltype, Base.get,
-       Base.delete!, Base.empty!, Base.length, Base.isempty, Base.start,
-       Base.done, Base.next, Base.filter!, Base.hash, Base.delete!, Base.pop!
+import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
+       Base.setindex!, Base.stride, Base.convert, Base.pointer,
+       Base.summary, Base.convert, Base.show, Base.haskey, Base.keys,
+       Base.values, Base.eltype, Base.get, Base.delete!, Base.empty!,
+       Base.length, Base.isempty, Base.start, Base.done, Base.next,
+       Base.filter!, Base.hash, Base.delete!, Base.pop!
 
 #########################################################################
 
@@ -444,7 +445,7 @@ end
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function ref(o::PyObject, s::String)
+function getindex(o::PyObject, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("ref of NULL PyObject"))
     end
@@ -457,9 +458,9 @@ function ref(o::PyObject, s::String)
     return PyObject(p)
 end
 
-ref(o::PyObject, s::Symbol) = convert(PyAny, ref(o, string(s)))
+getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
-function assign(o::PyObject, v, s::String)
+function setindex!(o::PyObject, v, s::String)
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
@@ -471,7 +472,7 @@ function assign(o::PyObject, v, s::String)
     o
 end
 
-assign(o::PyObject, v, s::Symbol) = assign(o, v, string(s))
+setindex!(o::PyObject, v, s::Symbol) = setindex!(o, v, string(s))
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
@@ -480,7 +481,7 @@ assign(o::PyObject, v, s::Symbol) = assign(o, v, string(s))
 abstract PyWrapper
 
 # still provide w["foo"] low-level access to unconverted members:
-ref(w::PyWrapper, s) = ref(w.___jl_PyCall_PyObject___, s)
+getindex(w::PyWrapper, s) = getindex(w.___jl_PyCall_PyObject___, s)
 
 typesymbol(T::DataType) = T.name.name
 typesymbol(T) = :Any # punt

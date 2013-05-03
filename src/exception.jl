@@ -142,7 +142,7 @@ function pyexc_initialize()
     for (k,v) in exc
         p = convert(Ptr{PyPtr}, pysym_e(v))
         if p != C_NULL
-            (pyexc::Dict)[k] = unsafe_ref(p)
+            (pyexc::Dict)[k] = unsafe_load(p)
         end
     end
 end
@@ -155,7 +155,7 @@ end
 function pyraise(e)
     global pyexc
     eT = typeof(e)
-    pyeT = has(pyexc::Dict, eT) ? (pyexc::Dict)[eT] : (pyexc::Dict)[Exception]
+    pyeT = haskey(pyexc::Dict, eT) ? (pyexc::Dict)[eT] : (pyexc::Dict)[Exception]
     ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
           pyeT, bytestring(string("Julia exception: ", e)))
 end

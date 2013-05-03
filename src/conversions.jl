@@ -192,11 +192,11 @@ eltype{T}(::Type{PyVector{T}}) = pyany_toany(T)
 
 size(a::PyVector) = ((@pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), a)),)
 
-ref(a::PyVector) = ref(a, 1)
-ref{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckni ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
+getindex(a::PyVector) = getindex(a, 1)
+getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckni ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
 
-assign(a::PyVector, v) = assign(a, v, 1)
-assign(a::PyVector, v, i::Integer) = @pycheckzi ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
+setindex!(a::PyVector, v) = setindex!(a, v, 1)
+setindex!(a::PyVector, v, i::Integer) = @pycheckzi ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
 
 function delete!(a::PyVector, i::Integer)
     v = a[i]
@@ -357,7 +357,7 @@ convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
-has(d::PyDict, key) = 1 == ccall(d.isdict ? (@pysym :PyDict_Contains)
+haskey(d::PyDict, key) = 1 == ccall(d.isdict ? (@pysym :PyDict_Contains)
                                           : (@pysym :PyMapping_HasKey),
                                   Cint, (PyPtr, PyPtr), d, PyObject(key))
 
@@ -370,7 +370,7 @@ values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pychec
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
 
-function assign(d::PyDict, v, k)
+function setindex!(d::PyDict, v, k)
     @pycheckzi ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      d, PyObject(k), PyObject(v))
     d

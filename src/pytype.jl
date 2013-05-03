@@ -327,7 +327,7 @@ end
 const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
 
 unsafe_pyjlwrap_to_objref(o::PyPtr) = 
-  unsafe_pointer_to_objref(unsafe_ref(convert(Ptr{Ptr{Void}}, o), 3))
+  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Void}}, o), 3))
 
 function pyjlwrap_repr(o::PyPtr)
     o = PyObject(try string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
@@ -401,7 +401,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
                                  PyPtr, (Ptr{PyTypeObject},), &pyT))
     (pycall_gc::Dict{PyPtr,Any})[o.o] = value
     p = convert(Ptr{Ptr{Void}}, o.o)
-    unsafe_assign(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
+    unsafe_store!(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
     return o
 end
 
