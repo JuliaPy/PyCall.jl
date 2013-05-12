@@ -494,7 +494,15 @@ abstract PyWrapper
 # still provide w["foo"] low-level access to unconverted members:
 getindex(w::PyWrapper, s) = getindex(w.___jl_PyCall_PyObject___, s)
 
-typesymbol(T::DataType) = T.name.name
+function typesymbol(T::DataType)
+    sym = Expr(:., :Main, Expr(:quote, T.name.name))
+    m = T.name.module
+    while m !== Main
+        sym.args[1] = Expr(:., sym.args[1], Expr(:quote, module_name(m)))
+        m = module_parent(m)
+    end
+    sym
+end
 typesymbol(T) = :Any # punt
 
 # we skip wrapping Julia reserved words (which cannot be type members)

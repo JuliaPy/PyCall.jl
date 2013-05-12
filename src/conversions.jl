@@ -669,6 +669,10 @@ macro return_not_None(ex)
     end
 end
 
+let
+pytype_queries = Array((PyObject,Type),0)
+global pytype_query_add, pytype_query
+pytype_query_add(py::PyObject, jl::Type) = push!(pytype_queries, (py,jl))
 function pytype_query(o::PyObject, default::Type)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)
@@ -683,7 +687,13 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pyptr_query(o)
     @return_not_None pynothing_query(o)
     @return_not_None pymp_query(o)
+    for (py,jl) in pytype_queries
+        if pyisinstance(o, py)
+            return jl
+        end
+    end
     return default
+end
 end
 
 pytype_query(o::PyObject) = pytype_query(o, PyObject)
@@ -697,7 +707,7 @@ function convert(::Type{PyAny}, o::PyObject)
         if T == PyObject && is_pyjlwrap(o)
             return unsafe_pyjlwrap_to_objref(o.o)
         end
-        convert(pytype_query(o), o)
+        convert(T, o)
     catch
         pyerr_clear() # just in case
         o
