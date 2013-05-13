@@ -497,8 +497,9 @@ getindex(w::PyWrapper, s) = getindex(w.___jl_PyCall_PyObject___, s)
 function typesymbol(T::DataType)
     sym = Expr(:., :Main, Expr(:quote, T.name.name))
     m = T.name.module
+    ex = sym
     while m !== Main
-        sym.args[1] = Expr(:., sym.args[1], Expr(:quote, module_name(m)))
+        ex = ex.args[1] = Expr(:., :Main, Expr(:quote, module_name(m)))
         m = module_parent(m)
     end
     sym
