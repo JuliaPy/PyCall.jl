@@ -171,6 +171,11 @@ pyprogramname = bytestring("")
 PyUnicode_AsUTF8String = C_NULL
 PyUnicode_DecodeUTF8 = C_NULL
 
+# mpmath mpf/mpc types
+mpmath = PyObject()
+mpf = PyObject()
+mpc = PyObject()
+
 # whether to use unicode for strings by default, ala Python 3
 pyunicode_literals = false
 
@@ -347,7 +352,13 @@ function pyfinalize()
     global pyxrange
     global c_void_p_Type
     global format_traceback
+    global mpmath
+    global mpf
+    global mpc
     if initialized::Bool
+        pydecref(mpc::PyObject)
+        pydecref(mpf::PyObject)
+        pydecref(mpmath::PyObject)
         pydecref(ufuncType::PyObject)
         npyfinalize()
         pydecref(format_traceback::PyObject)

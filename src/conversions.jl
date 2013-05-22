@@ -533,6 +533,77 @@ function convert{T<:Ranges}(::Type{T}, o::PyObject)
 end
 
 #########################################################################
+# BigFloat and Complex{BigFloat}: convert to/from Python mpmath types
+
+# load mpmath module & initialize.  Currently, this is done 
+# the first time a BigFloat is converted to Python.  Alternatively,
+# we could do it when PyCall is initialized (if mpmath is available),
+# at the cost of slowing down initialization in the common case where
+# BigFloat conversion is not needed.
+prec = 0
+function mpmath_init()
+    global mpmath
+    global mpf
+    global mpc
+    global prec
+    if (mpmath::PyObject).o == C_NULL
+        mpmath::PyObject = pyimport("mpmath")
+        mpf = (mpmath::PyObject)["mpf"]
+        mpc = (mpmath::PyObject)["mpc"]
+    end
+    curprec = get_bigfloat_precision()
+    if prec::Int != curprec
+        prec::Int = curprec
+        (mpmath::PyObject)["mp"]["prec"] = curprec
+    end
+end
+
+# TODO: When mpmath uses MPFR internally, can we avoid the string conversions?
+# Using strings will work regardless of the mpmath backend, but is annoying
+# both from a performance perspective and because it is a lossy conversion
+# (since strings use a decimal representation, while MPFR is binary).
+
+function PyObject(x::BigFloat)
+    mpmath_init()
+    pycall(mpf::PyObject, PyObject, string(x))
+end
+
+function PyObject(x::Complex{BigFloat})
+    mpmath_init()
+    pycall(mpc::PyObject, PyObject, string(real(x)), string(imag(x)))
+end
+
+function convert(::Type{BigFloat}, o::PyObject)
+    BigFloat(convert(String, PyObject(ccall((@pysym :PyObject_Str), 
+                                            PyPtr, (PyPtr,), o))))
+end
+
+function convert(::Type{Complex{BigFloat}}, o::PyObject)
+    try
+        Complex{BigFloat}(convert(BigFloat, o["real"]),
+                          convert(BigFloat, o["imag"]))
+    catch
+        convert(Complex{BigFloat}, convert(Complex{Float64}, o))
+    end
+end
+
+pymp_query(o::PyObject) = pyisinstance(o, mpf::PyObject) ? BigFloat : pyisinstance(o, mpc::PyObject) ? Complex{BigFloat} : None
+
+#########################################################################
+# BigInt conversion to Python "long" integers
+
+function PyObject(i::BigInt)
+    PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr, 
+                             (Ptr{Uint8}, Ptr{Void}, Cint),
+                             bytestring(string(i)), C_NULL, 10))
+end
+
+function convert(::Type{BigInt}, o::PyObject)
+    BigInt(convert(String, PyObject(ccall((@pysym :PyObject_Str), 
+                                          PyPtr, (PyPtr,), o))))
+end
+
+#########################################################################
 # Inferring Julia types at runtime from Python objects:
 #
 # [Note that we sometimes use the PyFoo_Check API and sometimes we use
@@ -542,8 +613,10 @@ end
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or None if there isn't one.
 
+# TODO: In Python 3.x, the BigInt check here won't work since int == long.
 pyint_query(o::PyObject) = pyisinstance(o, pyint_type::Ptr{Void}) ? 
-  (pyisinstance(o, @pysym :PyBool_Type) ? Bool : Int) : None
+  (pyisinstance(o, @pysym :PyBool_Type) ? Bool : Int) : 
+  pyisinstance(o, @pysym :PyLong_Type) ? BigInt : None
 
 pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : None
 
@@ -597,9 +670,9 @@ macro return_not_None(ex)
 end
 
 function pytype_query(o::PyObject, default::Type)
+    # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
+    #       (A bit tricky to correctly handle Tuple and other containers.)
     @pyinitialize
-    # Would be faster to have some kind of hash table here, but
-    # that seems a bit tricky when we take subclasses into account
     @return_not_None pyint_query(o)
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)
@@ -609,6 +682,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pysequence_query(o)
     @return_not_None pyptr_query(o)
     @return_not_None pynothing_query(o)
+    @return_not_None pymp_query(o)
     return default
 end
 
