@@ -671,8 +671,16 @@ end
 
 let
 pytype_queries = Array((PyObject,Type),0)
-global pytype_query_add, pytype_query
-pytype_query_add(py::PyObject, jl::Type) = push!(pytype_queries, (py,jl))
+global pytype_mapping, pytype_query
+function pytype_mapping(py::PyObject, jl::Type)
+    for (i,(p,j)) in enumerate(pytype_queries)
+        if p == py
+            pytype_queries[i] = (py,jl)
+            return pytype_queries
+        end
+    end
+    push!(pytype_queries, (py,jl))
+end
 function pytype_query(o::PyObject, default::Type)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)

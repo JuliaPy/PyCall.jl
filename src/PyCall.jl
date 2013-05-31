@@ -4,7 +4,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
        PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
-       PyVector, pystring, pyraise
+       PyVector, pystring, pyraise, pytype_mapping
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.setindex!, Base.stride, Base.convert, Base.pointer,
