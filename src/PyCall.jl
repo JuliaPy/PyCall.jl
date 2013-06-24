@@ -4,7 +4,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
        PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
-       PyVector, pystring, pyraise
+       PyVector, pystring, pyraise, pytype_mapping
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.setindex!, Base.stride, Base.convert, Base.pointer,
@@ -494,7 +494,16 @@ abstract PyWrapper
 # still provide w["foo"] low-level access to unconverted members:
 getindex(w::PyWrapper, s) = getindex(w.___jl_PyCall_PyObject___, s)
 
-typesymbol(T::DataType) = T.name.name
+function typesymbol(T::DataType)
+    sym = Expr(:., :Main, Expr(:quote, T.name.name))
+    m = T.name.module
+    ex = sym
+    while m !== Main
+        ex = ex.args[1] = Expr(:., :Main, Expr(:quote, module_name(m)))
+        m = module_parent(m)
+    end
+    sym
+end
 typesymbol(T) = :Any # punt
 
 # we skip wrapping Julia reserved words (which cannot be type members)
