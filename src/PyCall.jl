@@ -3,9 +3,9 @@ module PyCall
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
-       PyVector, pystring, pyraise, pytype_mapping, pygui, pygui_start,
-       pygui_stop, pygui_stop_all, @pylab
+       PyDict, pyisinstance, pywrap, pywrap_module, pytypeof, pyeval,
+       pyhassym, PyVector, pystring, pyraise, pytype_mapping, pygui,
+       pygui_start, pygui_stop, pygui_stop_all, @pylab
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.setindex!, Base.stride, Base.convert, Base.pointer,
@@ -540,6 +540,17 @@ function pywrap(o::PyObject)
     end
 end
 
+function pywrap_module(o::PyObject, mname::Symbol=:__anon__)
+    @pyinitialize
+    members = convert(Vector{(String,PyObject)}, 
+                      pycall(inspect["getmembers"], PyObject, o))
+    filter!(m -> !contains(reserved, m[1]), members)
+    m = Module(mname)
+    consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
+    eval(m, Expr(:toplevel, consts...))
+    m
+end
+
 #########################################################################
 
 pyimport(name::String) =
@@ -575,7 +586,7 @@ macro pyimport(name, optional_varname...)
     mname = modulename(name)
     Name = pyimport_name(name, optional_varname)
     quote
-        $(esc(Name)) = pywrap(pyimport($mname))
+        $(esc(Name)) = pywrap_module(pyimport($mname), $(Expr(:quote, Name)))
         nothing
     end
 end
