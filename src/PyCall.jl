@@ -547,7 +547,7 @@ function pywrap_module(o::PyObject, mname::Symbol=:__anon__)
     filter!(m -> !contains(reserved, m[1]), members)
     m = Module(mname)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
-    eval(m, Expr(:toplevel, consts...))
+    eval(m, Expr(:toplevel, consts..., :(pysym(s) = getindex($(o), s))))
     m
 end
 
