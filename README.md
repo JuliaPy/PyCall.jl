@@ -51,10 +51,13 @@ Keyword arguments can also be passed. For example, matplotlib's
 [pylab](http://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
-    @pyimport pylab
+    @pylab as plt
     x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
-    pylab.plot(x, y; color="red", linewidth=2.0, linestyle="--")
-    pylab.show() 
+    plt.plot(x, y; color="red", linewidth=2.0, linestyle="--")
+
+The `@pylab` command is a specialized macro that is like `@pyimport
+pylab` except that it also starts a GUI event loop (see below) so that
+the pylab plots appear interactively and without blocking.
 
 Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
@@ -240,6 +243,54 @@ accomplished using:
 
 * The Python version number is stored in the global variable
   `pyversion::VersionNumber`.
+
+### GUI Event Loops
+
+For Python packages that have a graphical user interface (GUI),
+notably plotting packages like pylab (or MayaVi or Chaco), it is
+convenient to start the GUI event loop (which processes things like
+mouse clicks) as an asynchronous task within Julia, so that the GUI is
+responsive without blocking Julia's input prompt.  PyCall includes
+functions to implement these event loops for some of the most common
+cross-platform [GUI
+toolkits](http://en.wikipedia.org/wiki/Widget_toolkit):
+[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/),
+and [Qt](http://qt-project.org/) (via the [PyQt4](http://wiki.python.org/moin/PyQt4) or [PySide](http://qt-project.org/wiki/PySide)
+Python modules).
+
+You can set a GUI event loop via:
+
+* `pygui_start(gui::Symbol=pygui())`.  Here, `gui` is either `:wx`,
+  `:gtk`, or `:qt` to start the respective toolkit's event loop.  It
+  defaults to the return value of `pygui()`, which returns a current
+  default GUI (see below).  Passing a `gui` argument also changes the
+  default GUI, equivalent to calling `pygui(gui)` below.  You may
+  start event loops for more than one GUI toolkit (to run simultaneously).
+  Calling `pygui_start` more than once for a given toolkit does nothing
+  (except to change the current `pygui` default).
+
+* `pygui()`: return the current default GUI toolkit (`Symbol`).  If
+  the default GUI has not been set already, this is the first of
+  `:wx`, `:gtk`, or `:qt` for which the corresponding Python package
+  is installed.  `pygui(gui::Symbol)` changes the default GUI to
+  `gui`.
+
+* `pygui_stop(gui::Symbol=pygui())`: Stop any running event loop for `gui`
+  (which defaults to the current return value of `pygui`).  Returns
+  `true` if an event loop was running, and `false` otherwise.
+
+To use these GUI facilities with some Python libraries, it is enough
+to simply start the appropriate toolkit's event-loop before importing
+the library.  However, in other cases it is necessary to explicitly
+tell the library which GUI toolkit to use and that an interactive mode
+is desired.  To make this easier, PyCall may provide a specialized
+importing macro for key Python libraries.  Currently, only
+matplotlib's pylab plotting library is supported in this way:
+
+* `@pylab [as NAME]` imports the `pylab` plotting library, starting it
+in interactive mode with the default GUI toolkit (and starting the
+event loop if needed).  This is otherwise similar to `@pyimport pylab
+[as NAME]`.
 
 ### Low-level Python API access
 

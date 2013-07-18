@@ -4,7 +4,8 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
        PyDict, pyisinstance, pywrap, pytypeof, pyeval, pyhassym,
-       PyVector, pystring, pyraise, pytype_mapping
+       PyVector, pystring, pyraise, pytype_mapping, pygui, pygui_start,
+       pygui_stop, pygui_stop_all, @pylab
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.setindex!, Base.stride, Base.convert, Base.pointer,
@@ -356,6 +357,7 @@ function pyfinalize()
     global mpf
     global mpc
     if initialized::Bool
+        pygui_stop_all()
         pydecref(mpc::PyObject)
         pydecref(mpf::PyObject)
         pydecref(mpmath::PyObject)
@@ -386,6 +388,7 @@ end
 #########################################################################
 
 include("exception.jl")
+include("gui.jl")
 
 #########################################################################
 
@@ -550,14 +553,20 @@ function modulename(e::Expr)
     end
 end
 
+# separate this function in order to make it easier to write more
+# pyimport-like functions
+pyimport_name(name, optional_varname) =
+    let len = length(optional_varname)
+        len > 0 && (len != 2 || optional_varname[1] != :as) ? 
+        throw(ArgumentError("usage @pyimport module [as name]")) :
+        (len == 2 ? optional_varname[2] :
+         typeof(name) == Symbol ? name :
+         throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>")))
+    end
+
 macro pyimport(name, optional_varname...)
     mname = modulename(name)
-    len = length(optional_varname)
-    Name = len > 0 && (len != 2 || optional_varname[1] != :as) ? 
-      throw(ArgumentError("usage @pyimport module [as name]")) :
-      (len == 2 ? optional_varname[2] :
-       typeof(name) == Symbol ? name :
-       throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>")))
+    Name = pyimport_name(name, optional_varname)
     quote
         $(esc(Name)) = pywrap(pyimport($mname))
         nothing
