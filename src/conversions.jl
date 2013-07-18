@@ -319,6 +319,7 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if len < 0 || # not a sequence
        len+1 < 0  # object pretending to be a sequence of infinite length
+        pyerr_clear()
         throw(ArgumentError("expected Python sequence"))
     end
     py2array(T, Array(pyany_toany(T), len), o, 1, 1)
