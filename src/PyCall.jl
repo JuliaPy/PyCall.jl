@@ -83,9 +83,11 @@ end
 
 type PyObject
     o::PyPtr # the actual PyObject*
-    function PyObject(o::PyPtr)
+    function PyObject(o::PyPtr, finalize::Bool=true)
         po = new(o)
-        finalizer(po, pydecref)
+        if finalize
+            finalizer(po, pydecref)
+        end
         return po
     end
     PyObject() = PyObject(convert(PyPtr, C_NULL))
@@ -268,7 +270,10 @@ function pyinitialize(libpy::Ptr{Void})
           pysym_e(:PyUnicode_DecodeUTF8,
                   :PyUnicodeUCS4_DecodeUTF8,
                   :PyUnicodeUCS2_DecodeUTF8)
-        pynothing::PyObject = pyincref(convert(PyPtr, pysym(:_Py_NoneStruct)))
+        # Ensure pynothing doesn't get finalized, since it's called by some
+        # finalizers, and Julia does not guarantee the order in which
+        # finalizers are called at exit.
+        pynothing::PyObject = pyincref(PyObject(convert(PyPtr, pysym(:_Py_NoneStruct)), false))
         pyxrange::PyObject = pyincref(convert(PyPtr, pysym(:PyRange_Type)))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
