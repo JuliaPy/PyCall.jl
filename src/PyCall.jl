@@ -14,6 +14,13 @@ import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.length, Base.isempty, Base.start, Base.done, Base.next,
        Base.filter!, Base.hash, Base.delete!, Base.pop!
 
+# Python C API is not interrupt-save.  In principle, we should
+# use sigatomic for every ccall to the Python library, but this
+# should really be fixed in Julia (#2622).  However, we will 
+# use the sigatomic_begin/end functions to protect pycall and
+# similar long-running (or potentially long-running) code.
+import Base.sigatomic_begin, Base.sigatomic_end
+
 #########################################################################
 
 # Mirror of C PyObject struct (for non-debugging Python builds).  
@@ -595,23 +602,28 @@ typealias TypeTuple Union(Type,NTuple{Type})
 function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
-    arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
-                                   nargs))
-    for i = 1:nargs
-        @pycheckzi ccall((@pysym :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
-                         arg, i-1, oargs[i])
-        pyincref(oargs[i]) # PyTuple_SetItem steals the reference
+    sigatomic_begin()
+    try
+        arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
+                                       nargs))
+        for i = 1:nargs
+            @pycheckzi ccall((@pysym :PyTuple_SetItem), Cint,
+                             (PyPtr,Int,PyPtr), arg, i-1, oargs[i])
+            pyincref(oargs[i]) # PyTuple_SetItem steals the reference
+        end
+        if isempty(kwargs)
+            ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
+                                          (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
+        else
+            kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
+            ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
+                                            (PyPtr,PyPtr,PyPtr), o, arg, kw))
+        end
+        jret = convert(returntype, ret)
+        return jret
+    finally
+        sigatomic_end()
     end
-    if isempty(kwargs)
-        ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
-                                        (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
-    else
-        kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
-        ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
-                                        (PyPtr,PyPtr,PyPtr), o, arg, kw))
-    end
-    jret = convert(returntype, ret)
-    return jret
 end
 
 #########################################################################
@@ -623,17 +635,22 @@ const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
 # (string/symbol => value) of local variables to use in the expression
 function pyeval_(s::String, locals::PyDict) 
     sb = bytestring(s) # use temp var to prevent gc before we are done with o
-    o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                  (Ptr{Uint8}, Ptr{Uint8}, Cint),
-                                  sb, pyeval_fname, Py_eval_input))
-    main = @pycheckni ccall((@pysym :PyImport_AddModule),
-                           PyPtr, (Ptr{Uint8},),
-                           bytestring("__main__"))
-    maindict = @pycheckni ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,),
-                                main)
-    PyObject(@pycheckni ccall((@pysym :PyEval_EvalCode),
-                              PyPtr, (PyPtr, PyPtr, PyPtr),
-                              o, maindict, locals))
+    sigatomic_begin()
+    try
+        o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
+                                     (Ptr{Uint8}, Ptr{Uint8}, Cint),
+                                     sb, pyeval_fname, Py_eval_input))
+        main = @pycheckni ccall((@pysym :PyImport_AddModule),
+                                PyPtr, (Ptr{Uint8},),
+                                bytestring("__main__"))
+        maindict = @pycheckni ccall((@pysym :PyModule_GetDict), PyPtr,
+                                    (PyPtr,), main)
+        return PyObject(@pycheckni ccall((@pysym :PyEval_EvalCode),
+                                         PyPtr, (PyPtr, PyPtr, PyPtr),
+                                         o, maindict, locals))
+    finally
+        sigatomic_end()
+    end
 end
 
 function pyeval(s::String, returntype::TypeTuple=PyAny; kwargs...)
