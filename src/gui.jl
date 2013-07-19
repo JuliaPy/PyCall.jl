@@ -79,7 +79,7 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
     maxtime = PyObject(50)
     function doevent(async, status::Int32)
         app = pycall(instance, PyObject)
-        if app.o != (pynothing::PyObject).o
+        if app.o != pynothing::PyPtr
             app["_in_event_loop"] = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
@@ -95,7 +95,7 @@ function wx_eventloop(sec::Real=50e-3)
     EventLoopActivator = wx["EventLoopActivator"]
     function doevent(async, status::Int32)
         app = pycall(GetApp, PyObject)
-        if app.o != (pynothing::PyObject).o
+        if app.o != pynothing::PyPtr
             app["_in_event_loop"] = true
             evtloop = pycall(EventLoop, PyObject)
             ea = pycall(EventLoopActivator, PyObject, evtloop)

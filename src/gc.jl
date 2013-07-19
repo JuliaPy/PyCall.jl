@@ -21,7 +21,8 @@ function weakref_callback(callback::PyPtr, wo::PyPtr)
     finally
         ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
     end
-    pyincref(pynothing).o
+    ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
+    return pynothing::PyPtr
 end
 
 weakref_callback_obj = PyObject() # weakref_callback Python method

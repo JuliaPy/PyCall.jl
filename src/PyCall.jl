@@ -148,7 +148,8 @@ MethodWrapperType = PyObject()
 ufuncType = PyObject()
 
 # cache Python None
-pynothing = PyObject()
+pynothing = convert(PyPtr,C_NULL) # PyPtr, not PyObject, to prevent it from
+                                  # being finalized prematurely on exit
 
 # Python 2/3 compatibility: cache dlsym for renamed functions
 pystring_fromstring = C_NULL
@@ -268,7 +269,7 @@ function pyinitialize(libpy::Ptr{Void})
           pysym_e(:PyUnicode_DecodeUTF8,
                   :PyUnicodeUCS4_DecodeUTF8,
                   :PyUnicodeUCS2_DecodeUTF8)
-        pynothing::PyObject = pyincref(convert(PyPtr, pysym(:_Py_NoneStruct)))
+        pynothing::PyPtr = convert(PyPtr, pysym(:_Py_NoneStruct))
         pyxrange::PyObject = pyincref(convert(PyPtr, pysym(:PyRange_Type)))
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
@@ -356,7 +357,6 @@ function pyfinalize()
     global MethodType
     global MethodWrapperType
     global ufuncType
-    global pynothing
     global pyxrange
     global c_void_p_Type
     global format_traceback
@@ -373,7 +373,6 @@ function pyfinalize()
         pydecref(format_traceback::PyObject)
         pydecref(c_void_p_Type::PyObject)
         pydecref(pyxrange::PyObject)
-        pydecref(pynothing::PyObject)
         pydecref(BuiltinFunctionType::PyObject)
         pydecref(TypeType::PyObject)
         pydecref(MethodType::PyObject)
