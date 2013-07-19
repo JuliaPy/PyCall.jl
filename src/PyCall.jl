@@ -529,15 +529,16 @@ function pywrap(o::PyObject)
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !contains(reserved, m[1]), members)
     tname = gensym("PyCall_PyWrapper")
-    @eval begin
-        $(Expr(:type, true, Expr(:<:, tname, :PyWrapper),
+    eval((Expr(:type, true, Expr(:<:, tname, :PyWrapper),
                Expr(:block, :(___jl_PyCall_PyObject___::PyObject),
-                    map(m -> Expr(:(::), symbol(m[1]),
-                                  typesymbol(pytype_query(m[2]))), 
-                        members)...)))
-        $(Expr(:call, tname, o,
-               [ convert(PyAny, members[i][2]) for i = 1:length(members) ]...))
+                    [symbol(m[1]) for m in members]...))))
+    t = eval(tname)
+    x = ccall(:jl_new_struct_uninit, Any, (Any,), t)
+    for (name, value) in members
+        setfield(x, symbol(name), convert(PyAny, value))
     end
+    x.___jl_PyCall_PyObject___ = o
+    x
 end
 
 #########################################################################
