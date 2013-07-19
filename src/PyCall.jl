@@ -603,7 +603,9 @@ macro pyimport(name, optional_varname...)
     mname = modulename(name)
     Name = pyimport_name(name, optional_varname)
     quote
-        $(esc(Name)) = pywrap_module(pyimport($mname), $(Expr(:quote, Name)))
+        if !isdefined($(Expr(:quote, Name)))
+            const $(esc(Name)) = pywrap_module(pyimport($mname), $(Expr(:quote, Name)))
+        end
         nothing
     end
 end
