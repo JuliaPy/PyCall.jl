@@ -544,10 +544,27 @@ function pywrap_module(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
-    filter!(m -> !contains(reserved, m[1]), members)
+    filter!(m -> !contains(reserved, m[1]) && m[1] != "pymember", members)
     m = Module(mname)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
-    eval(m, Expr(:toplevel, consts..., :(pysym(s) = getindex($(o), s))))
+
+    # Determine exports
+    allind = findfirst(x -> x[1] == "__all__", members)
+    local exports
+    if allind != 0
+        try
+            exports = convert(Vector{Symbol}, members[allind][2])
+        catch
+            warn("__all__ had non-symbol elements; exporting all members")
+            allind = 0
+        end
+    end
+    if allind == 0
+        exports = [symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
+    end
+
+    eval(m, Expr(:toplevel, consts..., :(pymember(s) = getindex($(o), s)),
+                 Expr(:export, exports...)))
     m
 end
 
