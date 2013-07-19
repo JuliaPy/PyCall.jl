@@ -5,7 +5,7 @@
 ############################################################################
 
 # global variable to specify default GUI toolkit to use
-gui = :wx # one of :wx, :qt, or :gtk
+gui = :default # one of :default, :wx, :qt, or :gtk
 
 pyexists(mod) = try
     pyimport(mod)
@@ -22,7 +22,7 @@ pygui_works(gui::Symbol) =
 # get or set the default GUI; doesn't affect running GUI
 function pygui()
     global gui
-    if pygui_works(gui::Symbol)
+    if gui::Symbol != :default && pygui_works(gui::Symbol)
         return gui::Symbol
     else
         for g in (:wx, :gtk, :qt)
