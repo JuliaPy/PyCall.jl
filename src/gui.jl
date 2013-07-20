@@ -180,7 +180,7 @@ macro pylab(optional_varname...)
     quote
         if !isdefined($(Expr(:quote, Name)))
             pymatplotlib()
-            const $(esc(Name)) = pywrap_module(pylab(), $(Expr(:quote, Name)))
+            const $(esc(Name)) = pywrap(pylab(), $(Expr(:quote, Name)))
         end
         nothing
     end

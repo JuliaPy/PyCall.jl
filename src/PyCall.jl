@@ -2,10 +2,10 @@ module PyCall
 
 export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pysym, PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
-       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyWrapper,
-       PyDict, pyisinstance, pywrap, pywrap_module, pytypeof, pyeval,
-       pyhassym, PyVector, pystring, pyraise, pytype_mapping, pygui,
-       pygui_start, pygui_stop, pygui_stop_all, @pylab
+       pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
+       pyisinstance, pywrap, pytypeof, pyeval, pyhassym, PyVector, pystring,
+       pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
+       pygui_stop_all, @pylab 
 
 import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.setindex!, Base.stride, Base.convert, Base.pointer,
@@ -499,52 +499,19 @@ setindex!(o::PyObject, v, s::Symbol) = setindex!(o, v, string(s))
 # Create anonymous composite w = pywrap(o) wrapping the object o
 # and providing access to o's members (converted to PyAny) as w.member.
 
-abstract PyWrapper
-
-# still provide w["foo"] low-level access to unconverted members:
-getindex(w::PyWrapper, s) = getindex(w.___jl_PyCall_PyObject___, s)
-
-function typesymbol(T::DataType)
-    sym = Expr(:., :Main, Expr(:quote, T.name.name))
-    m = T.name.module
-    ex = sym
-    while m !== Main
-        ex = ex.args[1] = Expr(:., :Main, Expr(:quote, module_name(m)))
-        m = module_parent(m)
-    end
-    sym
-end
-typesymbol(T) = :Any # punt
-
 # we skip wrapping Julia reserved words (which cannot be type members)
 const reserved = Set("while", "if", "for", "try", "return", "break", 
                      "continue", "function", "macro", "quote", "let", "local",
                      "global", "const", "abstract", "typealias", "type",
                      "bitstype", "immutable", "ccall", "do", "module",
-                     "baremodule", "using", "import", "export", "importall")
+                     "baremodule", "using", "import", "export", "importall",
+                     "pymember")
 
-function pywrap(o::PyObject)
+function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !contains(reserved, m[1]), members)
-    tname = gensym("PyCall_PyWrapper")
-    @eval begin
-        $(Expr(:type, true, Expr(:<:, tname, :PyWrapper),
-               Expr(:block, :(___jl_PyCall_PyObject___::PyObject),
-                    map(m -> Expr(:(::), symbol(m[1]),
-                                  typesymbol(pytype_query(m[2]))), 
-                        members)...)))
-        $(Expr(:call, tname, o,
-               [ convert(PyAny, members[i][2]) for i = 1:length(members) ]...))
-    end
-end
-
-function pywrap_module(o::PyObject, mname::Symbol=:__anon__)
-    @pyinitialize
-    members = convert(Vector{(String,PyObject)}, 
-                      pycall(inspect["getmembers"], PyObject, o))
-    filter!(m -> !contains(reserved, m[1]) && m[1] != "pymember", members)
     m = Module(mname)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
 
@@ -604,7 +571,7 @@ macro pyimport(name, optional_varname...)
     Name = pyimport_name(name, optional_varname)
     quote
         if !isdefined($(Expr(:quote, Name)))
-            const $(esc(Name)) = pywrap_module(pyimport($mname), $(Expr(:quote, Name)))
+            const $(esc(Name)) = pywrap(pyimport($mname), $(Expr(:quote, Name)))
         end
         nothing
     end
