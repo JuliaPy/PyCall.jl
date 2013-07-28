@@ -282,19 +282,16 @@ end
 # figure out if we can treat o as a multidimensional array, and return
 # the dimensions
 function pyarray_dims(o::PyObject)
+    if !pyisinstance(o, @pysym :PyList_Type)
+        return () # too many non-List types can pretend to be sequences
+    end
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    if len < 0 || # not a sequence
-       len+1 < 0 || # object pretending to be a sequence of infinite length
-       pystring_query(o) != None ||
-       pyisinstance(o, @pysym :PyTuple_Type)
-        pyerr_clear()
-        return ()
-    elseif len == 0
+    if len == 0
         return (0,)
     end
     dims0 = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
                                         PyPtr, (PyPtr, Int), o, 0)))
-    if length(dims0) == 0 # not a nested sequence
+    if isempty(dims0) # not a nested sequence
         return (len,)
     end
     for j = 1:len-1
