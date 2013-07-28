@@ -169,12 +169,19 @@ function show_noop(b=false; block=false)
     nothing # no-op
 end
 
+function pylab()
+    m = pyimport("pylab")
+    m[:show] = show_noop
+    m
+end
+
 macro pylab(optional_varname...)
     Name = pyimport_name(:pylab, optional_varname)
     quote
-        pymatplotlib()
-        $(esc(Name)) = pywrap(pyimport("pylab"))
-        $(esc(Name)).show = show_noop
+        if !isdefined($(Expr(:quote, Name)))
+            pymatplotlib()
+            const $(esc(Name)) = pywrap(pylab(), $(Expr(:quote, Name)))
+        end
         nothing
     end
 end
