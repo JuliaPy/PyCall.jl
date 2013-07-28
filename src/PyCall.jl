@@ -494,6 +494,16 @@ end
 
 setindex!(o::PyObject, v, s::Symbol) = setindex!(o, v, string(s))
 
+function haskey(o::PyObject, s::String)
+    if (o.o == C_NULL)
+        throw(ArgumentError("haskey of NULL PyObject"))
+    end
+    return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
+                      (PyPtr, Ptr{Uint8}), o, bytestring(s))
+end
+
+haskey(o::PyObject, s::Symbol) = haskey(o, string(s))
+
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
 # and providing access to o's members (converted to PyAny) as w.member.
