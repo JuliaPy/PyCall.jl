@@ -70,7 +70,7 @@ The biggest diffence from Python is that object attributes/members are
 accessed with `o[:attribute]` rather than `o.attribute`.  (This is
 because Julia does not permit overloading the `.` operator yet.)  See
 also the section on `PyObject` below, as well as the `pywrap` function
-to create anonymous composite types that simulate `.` access (this is
+to create anonymous modules that simulate `.` access (this is
 what `@pyimport` does).  For example, using
 [Biopython](http://biopython.org/wiki/Seq) we can do:
 
@@ -185,12 +185,11 @@ and also by providing more type information to the Julia compiler.
   Python object reference, or of `PyAny` to request an automated conversion).
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
-  return a pointer to it (a `PyObject`).   Functions or other symbols
-  in the module may then be looked up by `s[name]` where `name` is a string
-  or symbol (`s[name]` also returns a `PyObject`).  Unlike the `@pyimport`
-  macro, this does not define a structure type and module members cannot
-  be accessed with `s.name` (the `s[name]` syntax can also be used
-  with `@pyimport` modules in order to obtain the raw `PyObject` members).
+  return a pointer to it (a `PyObject`).  Functions or other symbols
+  in the module may then be looked up by `s[name]` where `name` is a
+  string (for the raw `PyObject`) or symbol (for automatic
+  type-conversion).  Unlike the `@pyimport` macro, this does not
+  define a Julia module and members cannot be accessed with `s.name`.
 
 * `pyeval(s::String, rtype=PyAny; locals...)` evaluates `s`
   as a Python string and returns the result converted to `rtype`
@@ -203,12 +202,12 @@ and also by providing more type information to the Julia compiler.
   symbol it returns the builtin converted to `PyAny`.
 
 * `pywrap(o::PyObject)` returns a wrapper `w` that is an anonymous
-  composite type (a subclass of `PyWrapper`) which provides (read)
-  access to converted versions of `o`'s members as `w.member`.  (For
-  example, `@pyimport module as name` is equivalent to `name =
-  pywrap(pyimport("module"))`.)    If the Python module contains
-  identifiers that are reserved words in Julia (e.g. `function`),
-  they cannot be accessed as `w.member`; one must instead use `w[:member]`.
+  module which provides (read) access to converted versions of `o`'s
+  members as `w.member`.  (For example, `@pyimport module as name` is
+  equivalent to `name = pywrap(pyimport("module"))`.)  If the Python
+  module contains identifiers that are reserved words in Julia
+  (e.g. `function`), they cannot be accessed as `w.member`; one must
+  instead use `w.pymember[:member]`.
 
 ### Initialization
 
