@@ -3,7 +3,7 @@
 ################################################################
 # mirror of Python API types and constants from methodobject.h
 
-type PyMethodDef
+immutable PyMethodDef
     ml_name::Ptr{Uint8}
     ml_meth::Ptr{Void}
     ml_flags::Cint
