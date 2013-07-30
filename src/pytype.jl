@@ -28,6 +28,24 @@ const METH_O = 0x0008       # single argument (not wrapped in tuple)
 const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
+const NULL_Uint8_Ptr = convert(Ptr{Uint8}, C_NULL)
+function PyMethodDef(name::String, meth::Function, flags::Integer, doc::Ptr{Uint8} = NULL_Uint8_Ptr)
+    # Python expects the PyMethodDef strings to be constants,
+    # so we define anonymous globals to hold them
+    defname = gensym("PyMethodDef_ml_name")
+    @eval const $defname = bytestring($name)
+    PyMethodDef(convert(Ptr{Uint8}, eval(defname)),
+                cfunction(meth, PyPtr, (PyPtr,PyPtr)),
+                convert(Cint, flags),
+                doc)
+end
+
+function PyMethodDef(name::String, meth::Function, flags::Integer, doc::String)
+    defdoc = gensym("PyMethodDef_ml_doc")
+    @eval const $defdoc = bytestring($doc)    
+    PyMethodDef(name, meth, flags, convert(Ptr{Uint8}, eval(defdoc)))
+end
+
 ################################################################
 # type-flag constants, from Python object.h:
 

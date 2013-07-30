@@ -11,15 +11,9 @@
 # Requires f to be a top-level function.
 function pymethod(f::Function, name::String, flags::Integer)
     # Python expects the PyMethodDef structure to be a *constant*,
-    # and the strings pointed to therein must also be constants,
-    # so we define anonymous globals to hold these
+    # so we define an anonymous global to hold it.
     def = gensym("PyMethodDef")
-    defname = gensym("PyMethodDef_ml_name")
-    @eval const $defname = bytestring($name)
-    @eval const $def = PyMethodDef(convert(Ptr{Uint8}, $defname),
-                                   $(cfunction(f, PyPtr, (PyPtr,PyPtr))),
-                                   convert(Cint, $flags),
-                                   convert(Ptr{Uint8}, C_NULL))
+    @eval const $def = PyMethodDef($name, $f, $flags)
     PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
                              (Ptr{PyMethodDef}, Ptr{Void}, Ptr{Void}),
                              &eval(def), C_NULL, C_NULL))

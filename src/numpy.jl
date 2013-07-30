@@ -187,7 +187,7 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
               NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
               C_NULL)
         return PyObject(p, a)
-    catch
+    catch e
         array2py(a) # fallback to non-NumPy version
     end
 end
