@@ -98,6 +98,7 @@ ispybytearray(po::PyObject) =
 
 function convert(::Type{Vector{Uint8}}, po::PyObject)
     if !ispybytearray(po)
+        # TODO: support Py_buffer interface?
         try
             info = PyArray_Info(po)
             return copy(PyArray{Uint8, length(info.sz)}(po, info))
