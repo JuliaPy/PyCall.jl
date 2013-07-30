@@ -46,7 +46,8 @@ function PyMethodDef(name::String, meth::Function, flags::Integer, doc::String="
 end
     
 # used as sentinel value to end method arrays:
-PyMethodDef() = PyMethodDef(NULL_Uint8_Ptr, C_NULL, 0, NULL_Uint8_Ptr)
+PyMethodDef() = PyMethodDef(NULL_Uint8_Ptr, C_NULL, 
+                            convert(Cint, 0), NULL_Uint8_Ptr)
 
 ################################################################
 # mirror of Python API types and constants from descrobject.h
@@ -60,7 +61,7 @@ immutable PyGetSetDef
 end
 
 function PyGetSetDef(name::String, get::Function,set::Function, doc::String="")
-    PyGetSetDef(gstring_ptr(name),
+    PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
                 isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),
@@ -68,7 +69,7 @@ function PyGetSetDef(name::String, get::Function,set::Function, doc::String="")
 end
 
 function PyGetSetDef(name::String, get::Function, doc::String="")
-    PyGetSetDef(gstring_ptr(name),
+    PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 C_NULL,
                 isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),

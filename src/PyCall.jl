@@ -380,6 +380,8 @@ function pyfinalize()
         pydecref(builtin::PyObject)
         pydecref(inspect::PyObject)
         pyexc_finalize()
+        pycallback_finalize()
+        pyio_finalize()
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
         ccall((@pysym :Py_Finalize), Void, ())
@@ -411,6 +413,8 @@ include("conversions.jl")
 include("pytype.jl")
 
 include("callback.jl")
+
+include("io.jl")
 
 #########################################################################
 # Pretty-printing PyObject
