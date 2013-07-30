@@ -21,6 +21,7 @@ roundtripeq(x) = roundtrip(x) == x
 @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
 @test roundtripeq(Int32)
 @test roundtripeq([1 => "hello", 2 => "goodbye"]) && roundtripeq(Dict())
+@test roundtripeq(Uint8[1,3,4,5])
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 @test roundtrip(x -> x + 1)(314158) == 314159

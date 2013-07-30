@@ -117,6 +117,7 @@ end
 # Mapping of Julia Exception types to Python exceptions
 
 pyexc = Dict{DataType, PyPtr}()
+type PyIOError <: Exception end
 
 function pyexc_initialize()
     global pyexc
@@ -138,7 +139,8 @@ function pyexc_initialize()
            MemoryError => :PyExc_MemoryError,
            StackOverflowError => :PyExc_MemoryError,
            UndefRefError => :PyExc_RuntimeError,
-           InterruptException => :PyExc_KeyboardInterrupt]
+           InterruptException => :PyExc_KeyboardInterrupt,
+           PyIOError => :PyExc_IOError]
     for (k,v) in exc
         p = convert(Ptr{PyPtr}, pysym_e(v))
         if p != C_NULL

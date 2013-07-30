@@ -27,6 +27,11 @@ PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyi
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
   convert(T, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
 
+if WORD_SIZE == 32
+  convert{T<:Union(Int64,Uint64)}(::Type{T}, po::PyObject) = 
+    @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), po)
+end
+
 convert(::Type{Bool}, po::PyObject) = 
   convert(Bool, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
 
@@ -80,6 +85,34 @@ end
 #       so that PyAny conversion can convert it back to a Julia symbol?
 PyObject(s::Symbol) = PyObject(string(s))
 convert(::Type{Symbol}, po::PyObject) = symbol(convert(String, po))
+
+#########################################################################
+# ByteArray conversions
+
+PyObject(a::Vector{Uint8}) =
+  PyObject(@pycheckn ccall((@pysym :PyByteArray_FromStringAndSize),
+                           PyPtr, (Ptr{Uint8}, Int), a, length(a)))
+
+ispybytearray(po::PyObject) =
+  pyisinstance(po, @pysym :PyByteArray_Type)
+
+function convert(::Type{Vector{Uint8}}, po::PyObject)
+    if !ispybytearray(po)
+        try
+            info = PyArray_Info(po)
+            return copy(PyArray{Uint8, length(info.sz)}(po, info))
+        catch
+            return py2array(Uint8, o)
+        end
+    end
+    p = ccall((@pysym :PyByteArray_AsString), Ptr{Uint8}, (PyPtr,), po)
+    len = ccall((@pysym :PyByteArray_Size), Int, (PyPtr,), po)
+    a = Array(Uint8, len)
+    ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t), a, p, len)
+    return a
+end
+
+# TODO: support zero-copy PyByteArray <: AbstractVector{Uint8} object
 
 #########################################################################
 # Pointer conversions, using ctypes, PyCObject, or PyCapsule
@@ -645,6 +678,8 @@ function pysequence_query(o::PyObject)
                                    PyAny))
     elseif pyisinstance(o, pyxrange::PyObject)
         return Ranges
+    elseif ispybytearray(o)
+        return Vector{Uint8}
     else
         try
             otypestr = PyObject(@pycheckni ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
