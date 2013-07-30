@@ -79,6 +79,52 @@ end
 PyGetSetDef() = PyGetSetDef(NULL_Uint8_Ptr, C_NULL, C_NULL, NULL_Uint8_Ptr, C_NULL)
 
 ################################################################
+# from Python structmember.h:
+
+# declare immutable because we need a C-like array of these
+immutable PyMemberDef
+    name::Ptr{Uint8}
+    typ::Cint
+    offset::Int # warning: was Cint for Python <= 2.4
+    flags::Cint
+    doc::Ptr{Uint8}
+    PyMemberDef(name,typ,offset,flags,doc) =
+        new(convert(Ptr{Uint8},name),
+            convert(Cint,typ),
+            convert(Int,offset),
+            convert(Cint,flags),
+            convert(Ptr{Uint8},doc))
+end
+
+# types:
+const T_SHORT        =0
+const T_INT          =1
+const T_LONG         =2
+const T_FLOAT        =3
+const T_DOUBLE       =4
+const T_STRING       =5
+const T_OBJECT       =6
+const T_CHAR         =7
+const T_BYTE         =8
+const T_UBYTE        =9
+const T_USHORT       =10
+const T_UINT         =11
+const T_ULONG        =12
+const T_STRING_INPLACE       =13
+const T_BOOL         =14
+const T_OBJECT_EX    =16
+const T_LONGLONG     =17 # added in Python 2.5
+const T_ULONGLONG    =18 # added in Python 2.5
+const T_PYSSIZET     =19 # added in Python 2.6
+const T_NONE         =20 # added in Python 3.0
+
+# flags:
+const READONLY = 1
+const READ_RESTRICTED = 2
+const PY_WRITE_RESTRICTED = 4
+const RESTRICTED = (READ_RESTRICTED | PY_WRITE_RESTRICTED)
+
+################################################################
 # type-flag constants, from Python object.h:
 
 # Python 2.7
@@ -172,9 +218,9 @@ type PyTypeObject
     tp_iter::Ptr{Void}
     tp_iternext::Ptr{Void}
 
-    tp_methods::Ptr{Void}
-    tp_members::Ptr{Void}
-    tp_getset::Ptr{Void}
+    tp_methods::Ptr{PyMethodDef}
+    tp_members::Ptr{PyMemberDef}
+    tp_getset::Ptr{PyGetSetDef}
     tp_base::Ptr{Void}
 
     tp_dict::PyPtr
@@ -258,7 +304,10 @@ type PyTypeObject
                 C_NULL, # tp_richcompare
                 0, # tp_weaklistoffset
                 C_NULL,C_NULL, # tp_iter, tp_iternext
-                C_NULL,C_NULL,C_NULL,C_NULL, # tp_methods...
+                convert(Ptr{PyMethodDef}, C_NULL), # tp_methods
+                convert(Ptr{PyMemberDef}, C_NULL), # tp_members
+                convert(Ptr{PyGetSetDef}, C_NULL), # tp_getset
+                C_NULL, # tp_base
                 C_NULL,C_NULL,C_NULL,0, # tp_dict...
                 C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_init ...
                 C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_bases...
@@ -297,53 +346,6 @@ type PyTypeObject
             "")
     end
 end
-
-################################################################
-# from Python structmember.h:
-
-# declare immutable because we need a C-like array of these
-immutable PyMemberDef
-    name::Ptr{Uint8}
-    typ::Cint
-    offset::Int # warning: was Cint for Python <= 2.4
-    flags::Cint
-    doc::Ptr{Uint8}
-    PyMemberDef(name,typ,offset,flags,doc) =
-        new(convert(Ptr{Uint8},name),
-            convert(Cint,typ),
-            convert(Int,offset),
-            convert(Cint,flags),
-            convert(Ptr{Uint8},doc))
-end
-
-# types:
-const T_SHORT        =0
-const T_INT          =1
-const T_LONG         =2
-const T_FLOAT        =3
-const T_DOUBLE       =4
-const T_STRING       =5
-const T_OBJECT       =6
-const T_CHAR         =7
-const T_BYTE         =8
-const T_UBYTE        =9
-const T_USHORT       =10
-const T_UINT         =11
-const T_ULONG        =12
-const T_STRING_INPLACE       =13
-const T_BOOL         =14
-const T_OBJECT_EX    =16
-const T_LONGLONG     =17 # added in Python 2.5
-const T_ULONGLONG    =18 # added in Python 2.5
-const T_PYSSIZET     =19 # added in Python 2.6
-const T_NONE         =20 # added in Python 3.0
-
-# flags:
-const READONLY = 1
-const READ_RESTRICTED = 2
-const PY_WRITE_RESTRICTED = 4
-const RESTRICTED = (READ_RESTRICTED | PY_WRITE_RESTRICTED)
-
 
 ################################################################
 # Wrap a Python type around a Julia Any object
@@ -417,7 +419,7 @@ function pyjlwrap_init()
           PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
                        t::PyTypeObject -> begin
                            t.tp_flags |= Py_TPFLAGS_BASETYPE
-                           t.tp_members = convert(Ptr{Void}, pyjlwrap_members);
+                           t.tp_members = pointer(pyjlwrap_members);
                            t.tp_dealloc = pyjlwrap_dealloc_ptr
                            t.tp_repr = pyjlwrap_repr_ptr
                            t.tp_hash = pyhashlong::Bool && WORD_SIZE == 64 &&
