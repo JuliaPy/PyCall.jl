@@ -1,6 +1,15 @@
 # Defining new Python types from Julia (ugly simulation of C headers)
 
 ################################################################
+# Python expects the PyMethodDef and similar strings to be constants,
+# so we define anonymous globals to hold them, returning the pointer
+function gstring_ptr(name::String, s::String)
+    g = gensym(name)
+    @eval const $g = bytestring($s)
+    convert(Ptr{Uint8}, eval(g))
+end
+
+################################################################
 # mirror of Python API types and constants from methodobject.h
 
 immutable PyMethodDef
@@ -29,22 +38,45 @@ const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
 const NULL_Uint8_Ptr = convert(Ptr{Uint8}, C_NULL)
-function PyMethodDef(name::String, meth::Function, flags::Integer, doc::Ptr{Uint8} = NULL_Uint8_Ptr)
-    # Python expects the PyMethodDef strings to be constants,
-    # so we define anonymous globals to hold them
-    defname = gensym("PyMethodDef_ml_name")
-    @eval const $defname = bytestring($name)
-    PyMethodDef(convert(Ptr{Uint8}, eval(defname)),
+function PyMethodDef(name::String, meth::Function, flags::Integer, doc::String="")
+    PyMethodDef(gstring_ptr(name, name),
                 cfunction(meth, PyPtr, (PyPtr,PyPtr)),
                 convert(Cint, flags),
-                doc)
+                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc))
+end
+    
+# used as sentinel value to end method arrays:
+PyMethodDef() = PyMethodDef(NULL_Uint8_Ptr, C_NULL, 0, NULL_Uint8_Ptr)
+
+################################################################
+# mirror of Python API types and constants from descrobject.h
+
+immutable PyGetSetDef
+    name::Ptr{Uint8}
+    get::Ptr{Void}
+    set::Ptr{Void} # may be NULL for read-only members
+    doc::Ptr{Uint8} # may be NULL
+    closure::Ptr{Void} # pass-through thunk, may be NULL
 end
 
-function PyMethodDef(name::String, meth::Function, flags::Integer, doc::String)
-    defdoc = gensym("PyMethodDef_ml_doc")
-    @eval const $defdoc = bytestring($doc)    
-    PyMethodDef(name, meth, flags, convert(Ptr{Uint8}, eval(defdoc)))
+function PyGetSetDef(name::String, get::Function,set::Function, doc::String="")
+    PyGetSetDef(gstring_ptr(name),
+                cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
+                cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
+                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),
+                C_NULL)
 end
+
+function PyGetSetDef(name::String, get::Function, doc::String="")
+    PyGetSetDef(gstring_ptr(name),
+                cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
+                C_NULL,
+                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),
+                C_NULL)
+end
+
+# used as sentinel value to end attribute arrays:
+PyGetSetDef() = PyGetSetDef(NULL_Uint8_Ptr, C_NULL, C_NULL, NULL_Uint8_Ptr, C_NULL)
 
 ################################################################
 # type-flag constants, from Python object.h:
