@@ -154,6 +154,7 @@ pynothing = convert(PyPtr,C_NULL) # PyPtr, not PyObject, to prevent it from
 # Python 2/3 compatibility: cache dlsym for renamed functions
 pystring_fromstring = C_NULL
 pystring_asstring = C_NULL
+pystring_size = C_NULL
 pystring_type = C_NULL
 pyint_type = C_NULL
 pyint_from_size_t = C_NULL
@@ -219,6 +220,7 @@ function pyinitialize(libpy::Ptr{Void})
     global pyhashlong
     global pystring_fromstring
     global pystring_asstring
+    global pystring_size
     global pystring_type
     global pyint_type
     global pyint_from_size_t
@@ -274,10 +276,12 @@ function pyinitialize(libpy::Ptr{Void})
         if pyhassym(:PyString_FromString)
             pystring_fromstring::Ptr{Void} = pysym(:PyString_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyString_AsString)
+            pystring_size::Ptr{Void} = pysym(:PyString_Size)
             pystring_type::Ptr{Void} = pysym(:PyString_Type)
         else
             pystring_fromstring::Ptr{Void} = pysym(:PyBytes_FromString)
             pystring_asstring::Ptr{Void} = pysym(:PyBytes_AsString)
+            pystring_size::Ptr{Void} = pysym(:PyBytes_Size)
             pystring_type::Ptr{Void} = pysym(:PyBytes_Type)
         end
         if pyhassym(:PyInt_Type)

@@ -98,11 +98,11 @@ ispybytearray(po::PyObject) =
 
 function convert(::Type{Vector{Uint8}}, po::PyObject)
     if !ispybytearray(po)
-        # TODO: support Py_buffer interface?
+        # TODO: support Py_buffer interface? via PyBytes_FromObject?
         try
             p = @pycheckni ccall(pystring_asstring::Ptr{Void},
                                   Ptr{Uint8}, (PyPtr,), po)
-            len = ccall(:strlen, Csize_t, (Ptr{Uint8},), p)
+            len = ccall(pystring_size::Ptr{Void}, Int, (PyPtr,), po)
             a = Array(Uint8, len)
             ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t),
                   a, p, len)
