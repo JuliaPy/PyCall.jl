@@ -573,7 +573,7 @@ macro pyimport(name, optional_varname...)
     Name = pyimport_name(name, optional_varname)
     quote
         if !isdefined($(Expr(:quote, Name)))
-            const $(esc(Name)) = pywrap(pyimport($mname), $(Expr(:quote, Name)))
+            const $(esc(Name)) = pywrap(pyimport($mname), $(Expr(:quote, name)))
         end
         nothing
     end
