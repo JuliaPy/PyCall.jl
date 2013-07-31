@@ -274,7 +274,7 @@ end
 function jl_IO_write(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = convert(Vector{Uint8}, arg_)
+        b = convert(Vector{Uint8}, PyObject(arg_))
         return pyincref(PyObject(write(io, b))).o
     catch e
         ioraise(e)
