@@ -100,10 +100,20 @@ function convert(::Type{Vector{Uint8}}, po::PyObject)
     if !ispybytearray(po)
         # TODO: support Py_buffer interface?
         try
-            info = PyArray_Info(po)
-            return copy(PyArray{Uint8, length(info.sz)}(po, info))
+            p = @pycheckni ccall(pystring_asstring::Ptr{Void},
+                                  Ptr{Uint8}, (PyPtr,), po)
+            len = ccall(:strlen, Csize_t, (Ptr{Uint8},), p)
+            a = Array(Uint8, len)
+            ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t),
+                  a, p, len)
+            return a
         catch
-            return py2array(Uint8, o)
+            try
+                info = PyArray_Info(po)
+                return copy(PyArray{Uint8, length(info.sz)}(po, info))
+            catch
+                return py2array(Uint8, po)
+            end
         end
     end
     p = ccall((@pysym :PyByteArray_AsString), Ptr{Uint8}, (PyPtr,), po)
