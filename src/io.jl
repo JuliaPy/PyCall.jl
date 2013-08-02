@@ -214,7 +214,7 @@ end
 function jl_IO_writelines(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        for s in PyVector{String}(pyincref(PyObject(arg_)))
+        for s in PyVector{String}(pyincref(arg_))
             write(io, s)
         end
         ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
@@ -263,7 +263,7 @@ end
 function jl_IO_readinto(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = convert(Vector{Uint8}, pyincref(PyObject(arg_)))
+        b = convert(Vector{Uint8}, pyincref(arg_))
         return pyincref(PyObject(readbytes!(io, b))).o
     catch e
         ioraise(e)
@@ -274,7 +274,7 @@ end
 function jl_IO_write(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = convert(Vector{Uint8}, pyincref(PyObject(arg_)))
+        b = convert(Vector{Uint8}, pyincref(arg_))
         return pyincref(PyObject(write(io, b))).o
     catch e
         ioraise(e)
