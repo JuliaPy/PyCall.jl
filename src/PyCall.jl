@@ -12,7 +12,7 @@ import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
        Base.summary, Base.convert, Base.show, Base.haskey, Base.keys,
        Base.values, Base.eltype, Base.get, Base.delete!, Base.empty!,
        Base.length, Base.isempty, Base.start, Base.done, Base.next,
-       Base.filter!, Base.hash, Base.delete!, Base.pop!
+       Base.filter!, Base.hash, Base.delete!, Base.pop!, Base.isequal
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -466,6 +466,15 @@ function hash(o::PyObject)
         end
         bitmix(pysalt::Uint, uint(h))
     end
+end
+
+#########################################################################
+# PyObject equality
+
+function isequal(o1::PyObject, o2::PyObject)
+    # TODO: use PyObject_RichCompareBool?  Should
+    #       we also add a __cmp__ method for pyjlwrap objects?
+    return o1.o == o2.o
 end
 
 #########################################################################
