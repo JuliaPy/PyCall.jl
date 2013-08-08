@@ -25,7 +25,7 @@ function pygui()
     if gui::Symbol != :default && pygui_works(gui::Symbol)
         return gui::Symbol
     else
-        for g in (:wx, :gtk, :qt)
+        for g in (:qt, :wx, :gtk)
             if pygui_works(g)
                 gui::Symbol = g
                 return gui::Symbol
@@ -144,46 +144,5 @@ function pygui_stop(gui::Symbol=pygui())
 end
 
 pygui_stop_all() = for gui in keys(eventloops); pygui_stop(gui); end
-
-############################################################################
-# Special support for matplotlib and pylab, to make them a bit easier to use,
-# since you need to jump through some hoops to tell matplotlib which GUI to
-# use and to employ interactive mode.
-
-# map gui to corresponding matplotlib backend
-const gui2matplotlib = [ :wx => "WXAgg", :gtk => "GTKAgg", :qt => "Qt4Agg" ]
-
-function pymatplotlib(gui::Symbol=pygui())
-    pygui_start(gui)
-    m = pyimport("matplotlib")
-    m[:use](gui2matplotlib[gui])
-    m[:interactive](true)
-    return m
-end
-
-# We monkey-patch pylab.show to ensure that it is non-blocking, as
-# matplotlib does not reliably detect that our event-loop is running.
-# (Note that some versions of show accept a "block" keyword or directly
-# as a boolean argument, so we must accept the same arguments.)
-function show_noop(b=false; block=false)
-    nothing # no-op
-end
-
-function pylab()
-    m = pyimport("pylab")
-    m[:show] = show_noop
-    m
-end
-
-macro pylab(optional_varname...)
-    Name = pyimport_name(:pylab, optional_varname)
-    quote
-        if !isdefined($(Expr(:quote, Name)))
-            pymatplotlib()
-            const $(esc(Name)) = pywrap(pylab(), $(Expr(:quote, Name)))
-        end
-        nothing
-    end
-end
 
 ############################################################################
