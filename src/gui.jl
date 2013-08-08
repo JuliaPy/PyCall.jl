@@ -14,7 +14,7 @@ pyexists(mod) = try
     false
   end
 
-pygui_works(gui::Symbol) =
+pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
      (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
@@ -37,7 +37,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if g != :wx && g != :gtk && g != :qt
+        if g != :wx && g != :gtk && g != :qt && g != :default
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
