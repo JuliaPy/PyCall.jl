@@ -48,16 +48,17 @@ copy is made; no-copy conversion of Python to Julia arrays can be achieved
 with the `PyArray` type below.
 
 Keyword arguments can also be passed. For example, matplotlib's
-[pylab](http://matplotlib.org/) uses keyword arguments to specify plot
+[pyplot](http://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
-    @pylab as plt
+    @pyimport matplotlib.pyplot as plt
     x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
-    plt.plot(x, y; color="red", linewidth=2.0, linestyle="--")
+    plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
+    plt.show()
 
-The `@pylab` command is a specialized macro that is like `@pyimport
-pylab` except that it also starts a GUI event loop (see below) so that
-the pylab plots appear interactively and without blocking.
+However, for better integration with Julia graphics backends and to
+avoid the need for the `show` function, we recommend using matplotlib
+via the Julia [PyPlot module](https://github.com/stevengj/PyPlot.jl).
 
 Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
@@ -246,7 +247,7 @@ accomplished using:
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),
-notably plotting packages like pylab (or MayaVi or Chaco), it is
+notably plotting packages like matplotlib (or MayaVi or Chaco), it is
 convenient to start the GUI event loop (which processes things like
 mouse clicks) as an asynchronous task within Julia, so that the GUI is
 responsive without blocking Julia's input prompt.  PyCall includes
@@ -282,14 +283,9 @@ To use these GUI facilities with some Python libraries, it is enough
 to simply start the appropriate toolkit's event-loop before importing
 the library.  However, in other cases it is necessary to explicitly
 tell the library which GUI toolkit to use and that an interactive mode
-is desired.  To make this easier, PyCall may provide a specialized
-importing macro for key Python libraries.  Currently, only
-matplotlib's pylab plotting library is supported in this way:
-
-* `@pylab [as NAME]` imports the `pylab` plotting library, starting it
-in interactive mode with the default GUI toolkit (and starting the
-event loop if needed).  This is otherwise similar to `@pyimport pylab
-[as NAME]`.
+is desired.  To make this even easier, it is convenient to have
+wrapper modules around popular Python libraries, such as the [PyPlot
+module](https://github.com/stevengj/PyPlot.jl) for Julia.
 
 ### Low-level Python API access
 
