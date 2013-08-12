@@ -208,7 +208,8 @@ and also by providing more type information to the Julia compiler.
   equivalent to `name = pywrap(pyimport("module"))`.)  If the Python
   module contains identifiers that are reserved words in Julia
   (e.g. `function`), they cannot be accessed as `w.member`; one must
-  instead use `w.pymember[:member]`.
+  instead use `w.pymember(:member)` (for the `PyAny` conversion) or
+  `w.pymember("member")` (for the raw `PyObject`).
 
 ### Initialization
 
