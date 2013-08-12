@@ -7,19 +7,17 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab 
 
-import Base.size, Base.ndims, Base.similar, Base.copy, Base.getindex,
-       Base.setindex!, Base.stride, Base.convert, Base.pointer,
-       Base.summary, Base.convert, Base.show, Base.haskey, Base.keys,
-       Base.values, Base.eltype, Base.get, Base.delete!, Base.empty!,
-       Base.length, Base.isempty, Base.start, Base.done, Base.next,
-       Base.filter!, Base.hash, Base.delete!, Base.pop!, Base.isequal
+import Base: size, ndims, similar, copy, getindex, setindex!, stride,
+       convert, pointer, summary, convert, show, haskey, keys, values,
+       eltype, get, delete!, empty!, length, isempty, start, done,
+       next, filter!, hash, delete!, pop!, isequal, help
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
 # should really be fixed in Julia (#2622).  However, we will 
 # use the sigatomic_begin/end functions to protect pycall and
 # similar long-running (or potentially long-running) code.
-import Base.sigatomic_begin, Base.sigatomic_end
+import Base: sigatomic_begin, sigatomic_end
 
 #########################################################################
 
@@ -442,6 +440,10 @@ end
 
 function show(io::IO, o::PyObject)
     print(io, "PyObject $(pystring(o))")
+end
+
+function help(o::PyObject)
+    pycall(pybuiltin("help"), PyAny, o)
 end
 
 #########################################################################
