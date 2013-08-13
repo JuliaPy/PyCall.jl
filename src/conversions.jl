@@ -767,3 +767,30 @@ function convert(::Type{PyAny}, o::PyObject)
 end
 
 #########################################################################
+# Iteration
+
+function start(po::PyObject)
+    sigatomic_begin()
+    try
+        o = PyObject(@pycheckn ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), po))
+        nxt = PyObject(ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), o))
+
+        return (nxt,o)
+    finally
+        sigatomic_end()
+    end
+end
+
+function next(po::PyObject, s)
+    sigatomic_begin()
+    try
+        nxt = PyObject(ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), po))
+        return (convert(PyAny, s[1]), (nxt, s[2]))
+    finally
+        sigatomic_end()
+    end
+end
+
+done(po::PyObject, s) = s[1].o == C_NULL
+
+#########################################################################
