@@ -15,12 +15,8 @@ pycall_gc = Dict{PyPtr,Any}()
 
 function weakref_callback(callback::PyPtr, wo::PyPtr)
     global pycall_gc
-    try
-        delete!(pycall_gc::Dict{PyPtr,Any}, wo)
-        # not sure what to do if there is an exception here
-    finally
-        ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
-    end
+    delete!(pycall_gc::Dict{PyPtr,Any}, wo)
+    ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
     ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
     return pynothing::PyPtr
 end

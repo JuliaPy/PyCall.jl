@@ -136,7 +136,7 @@ end
 
 function pygui_stop(gui::Symbol=pygui())
     if haskey(eventloops, gui)
-        Base.stop_timer(delete!(eventloops, gui))
+        Base.stop_timer(pop!(eventloops, gui))
         true
     else
         false

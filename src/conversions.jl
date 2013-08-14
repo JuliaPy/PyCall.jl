@@ -242,13 +242,13 @@ getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckni ccall((
 setindex!(a::PyVector, v) = setindex!(a, v, 1)
 setindex!(a::PyVector, v, i::Integer) = @pycheckzi ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
 
-function delete!(a::PyVector, i::Integer)
+function splice!(a::PyVector, i::Integer)
     v = a[i]
     @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     v
 end
 
-pop!(a::PyVector) = delete!(a, length(a))
+pop!(a::PyVector) = splice!(a, length(a))
 
 summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
                                    string(pyany_toany(T)), " PyVector")
@@ -428,7 +428,7 @@ function get{K,V}(d::PyDict{K,V}, k, default)
     end
 end
 
-function delete!(d::PyDict, k)
+function pop!(d::PyDict, k)
     v = d[k]
     @pycheckzi ccall(d.isdict ? (@pysym :PyDict_DelItem)
                               : (@pysym :PyObject_DelItem),
@@ -436,12 +436,22 @@ function delete!(d::PyDict, k)
     return v
 end
 
-function delete!(d::PyDict, k, default)
+function pop!(d::PyDict, k, default)
     try
-        return delete!(d, k)
+        return pop!(d, k)
     catch
         return default
     end
+end
+
+function delete!(d::PyDict, k)
+    e = ccall(d.isdict ? (@pysym :PyDict_DelItem)
+                       : (@pysym :PyObject_DelItem),
+              Cint, (PyPtr, PyPtr), d, PyObject(k))
+    if e == -1
+        pyerr_clear() # delete! ignores errors in Julia
+    end
+    return d
 end
 
 function empty!(d::PyDict)

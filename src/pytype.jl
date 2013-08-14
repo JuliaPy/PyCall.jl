@@ -371,10 +371,7 @@ end
 # destructor for jlwrap instance, assuming it was created with pyjlwrap_new
 function pyjlwrap_dealloc(o::PyPtr)
     global pycall_gc
-    try
-        delete!(pycall_gc::Dict{PyPtr,Any}, o)
-        # not sure what to do if there is an exception here 
-    end
+    delete!(pycall_gc::Dict{PyPtr,Any}, o)
     return nothing
 end
 const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))

@@ -10,7 +10,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
-       next, filter!, hash, delete!, pop!, isequal, help
+       next, filter!, hash, splice!, pop!, isequal, help
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
