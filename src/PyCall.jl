@@ -524,6 +524,25 @@ end
 haskey(o::PyObject, s::Symbol) = haskey(o, string(s))
 
 #########################################################################
+# keys(o) should return an iterator over the keys (members) of o
+
+type PyObjectMembers
+    members::PyVector{(Symbol,PyObject)}
+end
+
+function show(io::IO, m::PyObjectMembers)
+    print(io, "PyObjectMembers iterator (", length(m), " members)")
+end
+
+keys(o::PyObject) = PyObjectMembers(pycall(inspect["getmembers"],
+                                           PyVector{(Symbol,PyObject)}, o))
+
+start(m::PyObjectMembers) = 1
+done(m::PyObjectMembers, i::Int) = i > length(m.members)
+next(m::PyObjectMembers, i::Int) = (m.members[i][1], i+1)
+length(m::PyObjectMembers) = length(m.members)
+
+#########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
 # and providing access to o's members (converted to PyAny) as w.member.
 
