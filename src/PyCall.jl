@@ -321,10 +321,26 @@ function pyinitialize(libpy::Ptr{Void})
 end
 
 pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
+pysys(python::String, var::String) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
 
 function libpython_name(python::String)
     lib = pyconfigvar(python, "LDLIBRARY")
-    @osx_only if lib[1] != '/'; lib = pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/"*lib end
+    if !isfile(lib)
+        if lib[1] == '/'
+            lib = basename(lib)
+        end                       
+        libpaths = [pyconfigvar(python, "LIBDIR"),
+                    joinpath(dirname(dirname(pysys(python, "executable"))), 
+                             "lib")]
+        @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/")
+        # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
+        for libpath in libpaths
+            if isfile(joinpath(libpath, lib))
+                return joinpath(libpath, lib)
+            end
+        end
+        error("Couldn't find libpython ($lib); try pyinitialize(\"/path/to/$lib\")")
+    end
     lib
 end
 
@@ -338,7 +354,7 @@ function pyinitialize(python::String)
           catch
             dlopen(libpython_name(python), RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
           end
-        pyprogramname::ASCIIString = bytestring(python)
+        pyprogramname::ASCIIString = bytestring(pysys(python, "executable"))
         pyinitialize(libpy)
     end
     return
