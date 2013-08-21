@@ -17,7 +17,8 @@ pyexists(mod) = try
 pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
-     (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
+     (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))) ||
+     (OS_NAME===:Darwin && gui == :macos))
      
 # get or set the default GUI; doesn't affect running GUI
 function pygui()
@@ -37,7 +38,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if g != :wx && g != :gtk && g != :qt && g != :default
+        if g != :macos && g != :wx && g != :gtk && g != :qt && g != :default
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -111,6 +112,17 @@ function wx_eventloop(sec::Real=50e-3)
     install_doevent(doevent, sec)
 end
 
+function macos_eventloop(sec::Real=50e-3)
+    kCFRunLoopDefaultMode =
+       unsafe_load(convert(Ptr{Ptr{Void}}, cglobal(:kCFRunLoopDefaultMode)))
+    function doevent(async, status::Int32)
+        while 4 == ccall(:CFRunLoopRunInMode, Int32, (Ptr{Void}, Float64, Uint8), kCFRunLoopDefaultMode, 0.0, 0)
+#            println("got kCFRunLoopRunHandledSource")
+        end
+    end
+    install_doevent(doevent, sec)
+end
+
 # cache running event loops (so that we don't start any more than once)
 const eventloops = (Symbol=>TimeoutAsyncWork)[]
 
@@ -127,6 +139,8 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
             catch
                 eventloops[gui] = qt_eventloop("PySide", sec)
             end
+        elseif gui == :macos
+            eventloops[gui] = macos_eventloop(sec)
         else
             throw(ArgumentError("unsupported GUI type $gui"))
         end
