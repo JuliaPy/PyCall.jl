@@ -323,45 +323,52 @@ end
 pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 pysys(python::String, var::String) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
 
-function libpython_name(python::String)
+function dlopen_libpython(python::String)
     lib = pyconfigvar(python, "LDLIBRARY")
-    if !isfile(lib)
-        if lib[1] == '/'
-            lib = basename(lib)
-        end                       
-        libpaths = [pyconfigvar(python, "LIBDIR"),
-                    joinpath(dirname(dirname(pysys(python, "executable"))), 
-                             "lib")]
-        @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/")
-        # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
-        for libpath in libpaths
-            if isfile(joinpath(libpath, lib))
-                return joinpath(libpath, lib)
+    libpaths = [pyconfigvar(python, "LIBDIR"),
+                joinpath(dirname(dirname(pysys(python, "executable"))), 
+                         "lib")]
+    @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/")
+    # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
+    for libpath in libpaths
+        if isfile(joinpath(libpath, lib))
+            try
+                return dlopen(joinpath(libpath, lib),
+                              RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
             end
         end
+    end
+    
+    try
+        # We do this *last* because the libpython in the system
+        # library path might be the wrong one if multiple python
+        # versions are installed; we prefer the one in LIBDIR.
+        return dlopen(lib, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+    catch
         error("Couldn't find libpython ($lib); try pyinitialize(\"/path/to/$lib\")")
     end
-    lib
 end
 
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::String)
     global initialized
-    global pyprogramname
     if !initialized::Bool
         libpy = try
-            dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-          catch
-            dlopen(libpython_name(python), RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-          end
-        pyprogramname::ASCIIString = bytestring(pysys(python, "executable"))
+            lib = dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+            global pyprogramname = bytestring(python)
+            lib
+        catch
+            lib = dlopen_libpython(python)
+            global pyprogramname = bytestring(pysys(python, "executable"))
+            lib
+        end
         pyinitialize(libpy)
     end
     return
 end
 
 pyinitialize() = pyinitialize("python") # default Python executable name
-libpython_name() = libpython_name("python") # ditto
+dlopen_libpython() = dlopen_libpython("python") # ditto
 
 # end the Python interpreter and free associated memory
 function pyfinalize()
