@@ -581,7 +581,7 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
-    filter!(m -> !contains(reserved, m[1]), members)
+    filter!(m -> !in(reserved, m[1]), members)
     m = Module(mname)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
