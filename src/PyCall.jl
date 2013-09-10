@@ -354,12 +354,13 @@ function pyinitialize(python::String)
     global initialized
     if !initialized::Bool
         libpy = try
-            lib = dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-            global pyprogramname = bytestring(python)
-            lib
-        catch
             lib = dlopen_libpython(python)
             global pyprogramname = bytestring(pysys(python, "executable"))
+            lib
+        catch
+            # perhaps we were passed library name and not executable?
+            lib = dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+            global pyprogramname = bytestring(python)
             lib
         end
         pyinitialize(libpy)
@@ -367,8 +368,11 @@ function pyinitialize(python::String)
     return
 end
 
-pyinitialize() = pyinitialize("python") # default Python executable name
-dlopen_libpython() = dlopen_libpython("python") # ditto
+# default Python executable name
+# (on OSX, make sure PATH changes in profile are used in detecting python)
+const default_python = @osx ? chomp(readall(`bash -lc "which python"`)) : "python"
+pyinitialize() = pyinitialize(default_python) 
+dlopen_libpython() = dlopen_libpython(default_python)
 
 # end the Python interpreter and free associated memory
 function pyfinalize()
