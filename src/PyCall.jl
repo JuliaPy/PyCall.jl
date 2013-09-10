@@ -322,13 +322,19 @@ end
 
 pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 pysys(python::String, var::String) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
+pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
+    v == "None" ? default : v
+end
 
 function dlopen_libpython(python::String)
     lib = pyconfigvar(python, "LDLIBRARY")
+    if lib == "None"
+        lib = @windows ? "python" * pyconfigvar(python,"VERSION","") * ".dll" : (@osx ? "libpython.dylib" : "libpython.so")
+    end
     libpaths = [pyconfigvar(python, "LIBDIR"),
-                joinpath(dirname(dirname(pysys(python, "executable"))), 
-                         "lib")]
-    @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX")*"/")
+                (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
+    @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
+    @windows_only push!(libpaths, pyconfigvar(python, "exec_prefix"))
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for libpath in libpaths
         if isfile(joinpath(libpath, lib))
