@@ -641,6 +641,8 @@ macro pyimport(name, optional_varname...)
     quote
         if !isdefined($(Expr(:quote, Name)))
             const $(esc(Name)) = pywrap(pyimport($mname))
+        elseif !isa($(esc(Name)), Module)
+            error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
         end
         nothing
     end
