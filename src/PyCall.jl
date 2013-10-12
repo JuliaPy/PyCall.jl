@@ -344,7 +344,7 @@ function dlopen_libpython(python::String)
             end
         end
     end
-    
+    lib = splitext(lib)[1] 
     try
         # We do this *last* because the libpython in the system
         # library path might be the wrong one if multiple python
