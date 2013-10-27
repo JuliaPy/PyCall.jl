@@ -380,11 +380,8 @@ function pyinitialize(python::String)
     return
 end
 
-# default Python executable name
-# (on OSX, make sure PATH changes in profile are used in detecting python)
-const default_python = @osx ? chomp(readall(`bash -lc "which python"`)) : "python"
-pyinitialize() = pyinitialize(default_python) 
-dlopen_libpython() = dlopen_libpython(default_python)
+pyinitialize() = pyinitialize("python") 
+dlopen_libpython() = dlopen_libpython("python")
 
 # end the Python interpreter and free associated memory
 function pyfinalize()
