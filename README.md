@@ -68,12 +68,12 @@ we could call the Newton solver in scipy.optimize via:
     so.newton(x -> cos(x) - x, 1)
 
 The biggest diffence from Python is that object attributes/members are
-accessed with `o[:attribute]` rather than `o.attribute`.  (This is
-because Julia does not permit overloading the `.` operator yet.)  See
-also the section on `PyObject` below, as well as the `pywrap` function
-to create anonymous modules that simulate `.` access (this is
-what `@pyimport` does).  For example, using
-[Biopython](http://biopython.org/wiki/Seq) we can do:
+accessed with `o[:attribute]` rather than `o.attribute`, and you use
+`get(o, key)` rather than `o[key]`.  (This is because Julia does not
+permit overloading the `.` operator yet.)  See also the section on
+`PyObject` below, as well as the `pywrap` function to create anonymous
+modules that simulate `.` access (this is what `@pyimport` does).  For
+example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
 
     @pyimport Bio.Seq as s
     @pyimport Bio.Alphabet as a
@@ -105,9 +105,16 @@ are numbers (integer, real, and complex), booleans, strings, and
 functions, along with tuples and arrays/lists thereof, but more are
 planned.  (Julia symbols are converted to Python strings.)
 
-Given a `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
+Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a
 `PyObject` without type conversion, do `o["attribute"]` instead.
+
+Given `o::PyObject`, `get(o, key)` is equivalent to `o[key]` in
+Python, with automatic type conversion.  To get as a `PyObject`
+without type conversion, do `get(o, PyObject, key)`, or more generally
+`get(o, SomeType, key)`.  You can also supply a default value to use
+if the key is not found by `get(o, key, default)` or `get(o, SomeType,
+key, default)`.
 
 #### PyArray
 
