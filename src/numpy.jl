@@ -214,7 +214,7 @@ type PyArray_Info
         sz = convert(Vector{Int}, ai["shape"])
         local st
         try
-            st = convert(Vector{Int}, ai["strides"])
+            st = isempty(sz) ? Int[] : convert(Vector{Int}, ai["strides"])
         catch
             # default is C-order contiguous 
             st = similar(sz)

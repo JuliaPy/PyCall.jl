@@ -416,15 +416,7 @@ function setindex!(d::PyDict, v, k)
     d
 end
 
-function get{K,V}(d::PyDict{K,V}, k, default)
-    vo = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), d, PyObject(k))
-    if vo == C_NULL
-        pyerr_clear()
-        return default
-    else
-        return convert(V, PyObject(vo))
-    end
-end
+get{K,V}(d::PyDict{K,V}, k, default) = get(d.o, V, k, default)
 
 function pop!(d::PyDict, k)
     v = d[k]
@@ -701,7 +693,7 @@ function pysequence_query(o::PyObject)
         return Vector{Uint8}
     else
         try
-            otypestr = PyObject(@pycheckni ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr,), o["__array_interface__"], PyObject("typestr")))
+            otypestr = get(o["__array_interface__"], PyObject, "typestr")
             typestr = convert(String, otypestr)
             T = npy_typestrs[typestr[2:end]]
             return Array{T}

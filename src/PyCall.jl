@@ -698,6 +698,27 @@ function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
 end
 
 #########################################################################
+# Once Julia lets us overload ".", we will use [] to access items, but
+# for now we can define "get"
+
+function get(o::PyObject, returntype::TypeTuple, k, default) 
+    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
+    if r == C_NULL
+        pyerr_clear()
+        default
+    else
+        convert(returntype, PyObject(r))
+    end
+end
+
+get(o::PyObject, returntype::TypeTuple, k) = 
+    convert(returntype, PyObject(@pycheckni ccall((@pysym :PyObject_GetItem), 
+                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
+
+get(o::PyObject, k, default) = get(o, PyAny, k, default)
+get(o::PyObject, k) = get(o, PyAny, k)
+
+#########################################################################
 
 const Py_eval_input = 258 # from Python.h
 const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
