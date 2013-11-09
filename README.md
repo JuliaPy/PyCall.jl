@@ -114,7 +114,9 @@ Python, with automatic type conversion.  To get as a `PyObject`
 without type conversion, do `get(o, PyObject, key)`, or more generally
 `get(o, SomeType, key)`.  You can also supply a default value to use
 if the key is not found by `get(o, key, default)` or `get(o, SomeType,
-key, default)`.
+key, default)`.  Similarly, `set!(o, key, val)` is equivalent to
+`o[key] = val` in Python, and `delete!(o, key)` is equivalent to `del
+o[key]` in Python.
 
 #### PyArray
 

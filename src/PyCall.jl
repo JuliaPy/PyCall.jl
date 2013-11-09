@@ -5,7 +5,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, pyhassym, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
-       pygui_stop_all, @pylab 
+       pygui_stop_all, @pylab, set!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -717,6 +717,20 @@ get(o::PyObject, returntype::TypeTuple, k) =
 
 get(o::PyObject, k, default) = get(o, PyAny, k, default)
 get(o::PyObject, k) = get(o, PyAny, k)
+
+function delete!(o::PyObject, k)
+    e = ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))
+    if e == -1
+        pyerr_clear() # delete! ignores errors in Julia
+    end
+    return o
+end
+
+function set!(o::PyObject, k, v)
+    @pycheckzi ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
+                     o, PyObject(k), PyObject(v))
+    v
+end
 
 #########################################################################
 

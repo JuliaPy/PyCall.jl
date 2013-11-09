@@ -38,6 +38,12 @@ end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
 @test PyDict(PyObject([1 => "hello", 2 => "goodbye"])) == [1 => "hello", 2 => "goodbye"]
 
+let d = PyDict([1 => "hello", "yes" => 34])
+    @test get(d.o, 1) == "hello"
+    set!(d.o, "yes", "goodbye")
+    @test d["yes"] == "goodbye"
+end
+
 @test roundtripeq({1 2 3; 4 5 6})
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
