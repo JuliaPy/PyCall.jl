@@ -214,8 +214,6 @@ type PyVector{T} <: AbstractVector{T}
     function PyVector(o::PyObject)
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyVector from NULL PyObject"))
-        elseif pysequence_query(o) == None
-            throw(ArgumentError("only List and Sequence objects can be converted to PyVector"))
         end
         new(o)
     end
