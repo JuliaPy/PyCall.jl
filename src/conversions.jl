@@ -223,6 +223,8 @@ PyVector(o::PyObject) = PyVector{PyAny}(o)
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
 convert{T}(::Type{PyVector{T}}, o::PyObject) = PyVector{T}(o)
 convert(::Type{PyPtr}, a::PyVector) = a.o.o
+PyVector(a::PyVector) = a
+PyVector{T}(a::AbstractVector{T}) = PyVector{T}(array2py(a))
 
 # when a PyVector is copied it is converted into an ordinary Julia Vector
 similar(a::PyVector, T, dims::Dims) = Array(T, dims)
@@ -245,11 +247,51 @@ function splice!(a::PyVector, i::Integer)
     @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     v
 end
+function splice!{T,I<:Integer}(a::PyVector{T}, indices::AbstractVector{I})
+    v = pyany_toany(T)[a[i] for i in indices]
+    for i in sort(indices, rev=true)
+        @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    end
+    v
+end
 
 pop!(a::PyVector) = splice!(a, length(a))
+shift!(a::PyVector) = splice!(a, 1)
+
+append!{T}(a::PyVector{T}, items) = PyVector{T}(PyObject(@pycheckni ccall((@pysym :PySequence_InPlaceConcat), PyPtr, (PyPtr, PyPtr), a, PyObject(items))))
+
+function empty!(a::PyVector)
+    for i in length(a):-1:1
+        @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    end
+    a
+end
 
 summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
                                    string(pyany_toany(T)), " PyVector")
+
+# The following operations only work for the list type and subtypes thereof:
+
+function push!(a::PyVector, item)
+    @pycheckzi ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
+                     a, PyObject(item))
+    a
+end
+
+function insert!(a::PyVector, i::Integer, item)
+    @pycheckzi ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
+                     a, i-1, PyObject(item))
+    a
+end
+
+unshift!(a::PyVector, item) = insert!(a, 1, item)
+
+function prepend!(a::PyVector, items)
+    for (i,x) in enumerate(items)
+        insert!(a, i, x)
+    end
+    a
+end
 
 #########################################################################
 # Lists and 1d arrays.
