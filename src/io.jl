@@ -143,7 +143,7 @@ function jl_IO_readlines(self_::PyPtr, args_::PyPtr)
 
         ret = PyObject[]
         nread = 0
-        while nread < nb
+        while nread < nb && !eof(io)
             d = readline(io)
             nread += length(d)
             push!(ret, PyObject(d))
@@ -263,7 +263,7 @@ end
 function jl_IO_readinto(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = convert(Vector{Uint8}, pyincref(arg_))
+        b = PyVector{Uint8}(pyincref(arg_))
         return pyincref(PyObject(readbytes!(io, b))).o
     catch e
         ioraise(e)
