@@ -165,6 +165,25 @@ the key and value types `K` and `V` respectively.
 Currently, passing Julia dictionaries to Python makes a copy of the Julia
 dictionary.
 
+#### PyTextIO
+
+Julia `IO` streams are converted into Python objects implementing the
+[RawIOBase](http://docs.python.org/2/library/io.html#io.RawIOBase)
+interface, so they can be used for binary I/O in Python.  However,
+some Python code (notably unpickling) expects a stream implementing
+the
+[TextIOBase](http://docs.python.org/2/library/io.html#io.TextIOBase)
+interface, which differs from RawIOBase mainly in that `read` an
+`readall` functions return strings rather than byte arrays.  If you
+need to pass an `IO` stream as a text-IO object, just call
+`PyTextIO(io::IO)` to convert it.
+
+(There doesn't seem to be any good way to determine automatically
+whether Python wants a stream argument to return strings or binary
+data.  Also, unlike Python, Julia does not open files separately in
+"text" or "binary" modes, so we cannot determine the conversion simply
+from how the file was opened.)
+
 #### PyAny
 
 The `PyAny` type is used in conversions to tell PyCall to detect the
