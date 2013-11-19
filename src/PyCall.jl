@@ -374,13 +374,22 @@ end
 
 # Python 3.x uses wchar_t arrays for some string arguments
 function wbytestring(s::String)
-    if pyversion.major < 3
+    if pyversion.major < 3 || sizeof(Cwchar_t) == 1 # ASCII (or UTF8)
         bytestring(s)
-    else
+    else # UTF16 or UTF32, presumably
         n = length(s)
         w = Array(Cwchar_t, n + 1)
-        for i = 1:n
-            w[i] = s[i]
+        if sizeof(Cwchar_t) == 4 # UTF32
+            for i = 1:n
+                w[i] = s[i]
+            end
+        else # UTF16, presumably
+            @assert sizeof(Cwchar_t) == 2
+            for i = 1:n
+                # punt on multi-byte encodings
+                s[i] > 0xffff && error("unsupported unicode char in \"$s\"")
+                w[i] = s[i]
+            end
         end
         w[n+1] = 0
         w
