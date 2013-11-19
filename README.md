@@ -14,7 +14,7 @@ call Python functions from the Julia language with type conversions.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.
+install the files.  Julia 0.2 or later is required.
 
 The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
