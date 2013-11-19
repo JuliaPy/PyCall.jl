@@ -244,9 +244,14 @@ function pyinitialize(libpy::Ptr{Void})
         libpython::Ptr{Void} = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
         already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
         if !already_inited
-            if !isempty(pyprogramname::ASCIIString)
-                ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},), 
-                      pyprogramname::ASCIIString)
+            if !isempty(pyprogramname)
+                if pyversion.major < 3
+                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},), 
+                          pyprogramname::ASCIIString)
+                else
+                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Cwchar_t},), 
+                          pyprogramname::Array{Cwchar_t})
+                end
             end
             ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
         end
@@ -367,18 +372,33 @@ function dlopen_libpython(python::String)
     end
 end
 
+# Python 3.x uses wchar_t arrays for some string arguments
+function wbytestring(s::String)
+    if pyversion.major < 3
+        bytestring(s)
+    else
+        n = length(s)
+        w = Array(Cwchar_t, n + 1)
+        for i = 1:n
+            w[i] = s[i]
+        end
+        w[n+1] = 0
+        w
+    end
+end
+
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::String)
     global initialized
     if !initialized::Bool
         libpy = try
             lib = dlopen_libpython(python)
-            global pyprogramname = bytestring(pysys(python, "executable"))
+            global pyprogramname = wbytestring(pysys(python, "executable"))
             lib
         catch
             # perhaps we were passed library name and not executable?
             lib = dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-            global pyprogramname = bytestring(python)
+            global pyprogramname = wbytestring(python)
             lib
         end
         pyinitialize(libpy)
