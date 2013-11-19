@@ -17,4 +17,4 @@ before_install:
   - sudo apt-get install python-numpy python3-numpy -y
 script:
   - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir())/OpenCL`); Pkg.resolve()'
-  - julia -e 'using OpenCL; @assert isdefined(:PyCall); @assert typeof(PyCall) === Module'
+  - julia -e 'using PyCall; @assert isdefined(:PyCall); @assert typeof(PyCall) === Module'
