@@ -312,10 +312,15 @@ function pyinitialize(libpy::Ptr{Void})
         pyexc_initialize()
         if !already_inited
             # some modules (e.g. IPython) expect sys.argv to be set
-            argv_s = bytestring("")
-            argv = convert(Ptr{Uint8}, argv_s)
-            ccall(pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{Uint8}},Cint),
-                  1, &argv, 0)
+            if pyversion.major < 3
+                argv_s = bytestring("")
+                argv = convert(Ptr{Uint8}, argv_s)
+                ccall(pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{Uint8}},Cint), 1, &argv, 0)
+            else
+                argv_s = Cwchar_t[0]
+                argv   = convert(Ptr{Cwchar_t}, argv_s)
+                ccall(pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
+            end
         end
     end
     return
