@@ -1,4 +1,5 @@
 # Calling Python functions from the Julia language
+[![Build Status](https://travis-ci.org/stevengj/PyCall.jl.png)](https://travis-ci.org/stevengj/PyCall.jl)
 
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
