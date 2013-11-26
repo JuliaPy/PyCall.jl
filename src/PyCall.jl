@@ -385,10 +385,17 @@ function wbytestring(s::String)
             end
         else # UTF16, presumably
             @assert sizeof(Cwchar_t) == 2
-            for i = 1:n
-                # punt on multi-byte encodings
-                s[i] > 0xffff && error("unsupported unicode char in \"$s\"")
-                w[i] = s[i]
+            if defined(UTF16String) # Julia 0.3
+                s16 = utf16(s)
+                for i = 1:n
+                    w[i] = s16.data[i]
+                end
+            else
+                for i = 1:n
+                    # punt on multi-byte encodings
+                    s[i] > 0xffff && error("unsupported char in \"$s\"")
+                    w[i] = s[i]
+                end
             end
         end
         w[n+1] = 0
