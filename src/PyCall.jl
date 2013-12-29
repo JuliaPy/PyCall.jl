@@ -345,12 +345,10 @@ function dlopen_libpython(python::String)
     libpaths = [pyconfigvar(python, "LIBDIR"),
                 (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
     @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
-    @windows_only begin
-        exec_prefix = pyconfigvar(python, "exec_prefix")
-        push!(libpaths, exec_prefix)
-        if !haskey(ENV, "PYTHONHOME")
-            ENV["PYTHONHOME"] = exec_prefix
-        end
+    exec_prefix = pyconfigvar(python, "exec_prefix")
+    push!(libpaths, exec_prefix)
+    if !haskey(ENV, "PYTHONHOME")
+        ENV["PYTHONHOME"] = exec_prefix
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for libpath in libpaths
