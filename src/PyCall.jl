@@ -630,13 +630,13 @@ const reserved = Set("while", "if", "for", "try", "return", "break",
                      "global", "const", "abstract", "typealias", "type",
                      "bitstype", "immutable", "ccall", "do", "module",
                      "baremodule", "using", "import", "export", "importall",
-                     "pymember")
+                     "pymember", "false", "true")
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
     members = convert(Vector{(String,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
-    filter!(m -> !in(reserved, m[1]), members)
+    filter!(m -> !(m[1] in reserved), members)
     m = Module(mname)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
