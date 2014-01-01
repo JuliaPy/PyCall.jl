@@ -345,10 +345,18 @@ function dlopen_libpython(python::String)
     libpaths = [pyconfigvar(python, "LIBDIR"),
                 (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
     @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
+
+    # `prefix` and `exec_prefix` are the path prefixes where python should look for python only and compiled libraries, respectively.
+    # These are also changed when run in a virtualenv.
     exec_prefix = pyconfigvar(python, "exec_prefix")
+    # Since we only use `libpaths` to find the python dynamic library, we should only add `exec_prefix` to it.
     push!(libpaths, exec_prefix)
     if !haskey(ENV, "PYTHONHOME")
-        ENV["PYTHONHOME"] = exec_prefix
+        prefix = pyconfigvar(python, "prefix")
+        # PYTHONHOME tells python where to look for both pure python and binary modules.
+        # When it is set, it replaces both `prefix` and `exec_prefix` and we thus need to set it to both
+        # in case they differ. This is also what the documentation recommends.
+        ENV["PYTHONHOME"] = prefix * ":" * exec_prefix
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for libpath in libpaths
