@@ -741,6 +741,9 @@ function pysequence_query(o::PyObject)
             otypestr = get(o["__array_interface__"], PyObject, "typestr")
             typestr = convert(String, otypestr)
             T = npy_typestrs[typestr[2:end]]
+            if T == PyPtr
+                T = PyObject
+            end
             return Array{T}
         catch
             # only handle PyList for now

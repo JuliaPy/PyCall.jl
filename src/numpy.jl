@@ -162,7 +162,7 @@ npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128)
+typealias NPY_TYPES Union(Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128,PyPtr)
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = (String=>Type)[ "i1"=>Int8, "u1"=>Uint8,
@@ -409,6 +409,14 @@ function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
         end
         A
     end
+end
+
+function convert(::Type{Array{PyObject}}, o::PyObject)
+    map(pyincref, convert(Array{PyPtr}, o))
+end
+
+function convert{N}(::Type{Array{PyObject,N}}, o::PyObject)
+    map(pyincref, convert(Array{PyPtr, N}, o))
 end
 
 #########################################################################
