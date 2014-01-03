@@ -412,11 +412,11 @@ function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
 end
 
 function convert(::Type{Array{PyObject}}, o::PyObject)
-    map(PyObject, convert(Array{PyPtr}, o))
+    map(pyincref, convert(Array{PyPtr}, o))
 end
 
 function convert{N}(::Type{Array{PyObject,N}}, o::PyObject)
-    map(PyObject, convert(Array{PyPtr, N}, o))
+    map(pyincref, convert(Array{PyPtr, N}, o))
 end
 
 #########################################################################
