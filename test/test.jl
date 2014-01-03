@@ -62,3 +62,5 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 
 @pyimport math
 @test_approx_eq math.sin(3) sin(3)
+
+@test collect(PyObject([1,3,5])) == [1,3,5]
