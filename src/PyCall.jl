@@ -11,7 +11,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, isequal, help, push!,
-       unshift!, shift!, append!, insert!, prepend!
+       unshift!, shift!, append!, insert!, prepend!, writemime, mimewritable
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -778,6 +778,29 @@ function set!(o::PyObject, k, v)
     @pycheckzi ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      o, PyObject(k), PyObject(v))
     v
+end
+
+#########################################################################
+# support IPython _repr_foo functions for writemime of PyObjects
+
+for (mime, method) in ((MIME"text/html", "_repr_html_"),
+                       (MIME"image/jpeg", "_repr_jpeg_"),
+                       (MIME"image/png", "_repr_png_"),
+                       (MIME"image/svg+xml", "_repr_svg_"),
+                       (MIME"text/latex", "_repr_latex_"))
+    T = istext(mime()) ? String : Vector{Uint8}
+    @eval begin
+        function writemime(io::IO, mime::$mime, o::PyObject)
+            if o.o != C_NULL && haskey(o, $method)
+                r = pycall(o[$method], PyObject)
+                r.o != pynothing::PyPtr && return write(io, convert($T, r))
+            end
+            throw(MethodError(writemime, (io, mime, o)))
+        end
+        mimewritable(::$mime, o::PyObject) =
+            o.o != C_NULL && haskey(o, $method) &&
+            pycall(o[$method], PyObject).o != pynothing::PyPtr
+    end
 end
 
 #########################################################################
