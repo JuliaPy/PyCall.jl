@@ -352,11 +352,14 @@ function dlopen_libpython(python::String)
     # Since we only use `libpaths` to find the python dynamic library, we should only add `exec_prefix` to it.
     push!(libpaths, exec_prefix)
     if !haskey(ENV, "PYTHONHOME")
-        prefix = pyconfigvar(python, "prefix")
-        # PYTHONHOME tells python where to look for both pure python and binary modules.
-        # When it is set, it replaces both `prefix` and `exec_prefix` and we thus need to set it to both
-        # in case they differ. This is also what the documentation recommends.
-        ENV["PYTHONHOME"] = prefix * ":" * exec_prefix
+        # PYTHONHOME tells python where to look for both pure python
+        # and binary modules.  When it is set, it replaces both
+        # `prefix` and `exec_prefix` and we thus need to set it to
+        # both in case they differ. This is also what the
+        # documentation recommends.  However, they are documented
+        # to always be the same on Windows, where it causes
+        # problems if we try to include both.
+        ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for libpath in libpaths
