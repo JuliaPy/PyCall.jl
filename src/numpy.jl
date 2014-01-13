@@ -389,6 +389,16 @@ PyObject(a::PyArray) = a.o
 
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
+function convert{T<:NPY_TYPES}(::Type{Array{T, 1}}, o::PyObject)
+    try
+        copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
+    catch
+        len = @pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        A = Array(pyany_toany(T), len)
+        py2array(T, A, o, 1, 1)
+    end
+end
+
 function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
     try
         info = PyArray_Info(o)
@@ -413,6 +423,10 @@ end
 
 function convert(::Type{Array{PyObject}}, o::PyObject)
     map(pyincref, convert(Array{PyPtr}, o))
+end
+
+function convert(::Type{Array{PyObject,1}}, o::PyObject)
+    map(pyincref, convert(Array{PyPtr, 1}, o))
 end
 
 function convert{N}(::Type{Array{PyObject,N}}, o::PyObject)
