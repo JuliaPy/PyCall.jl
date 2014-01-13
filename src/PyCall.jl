@@ -11,7 +11,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, isequal, help, push!,
-       unshift!, shift!, append!, insert!, prepend!
+       unshift!, shift!, append!, insert!, prepend!, writemime, mimewritable
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -352,11 +352,14 @@ function dlopen_libpython(python::String)
     # Since we only use `libpaths` to find the python dynamic library, we should only add `exec_prefix` to it.
     push!(libpaths, exec_prefix)
     if !haskey(ENV, "PYTHONHOME")
-        prefix = pyconfigvar(python, "prefix")
-        # PYTHONHOME tells python where to look for both pure python and binary modules.
-        # When it is set, it replaces both `prefix` and `exec_prefix` and we thus need to set it to both
-        # in case they differ. This is also what the documentation recommends.
-        ENV["PYTHONHOME"] = prefix * ":" * exec_prefix
+        # PYTHONHOME tells python where to look for both pure python
+        # and binary modules.  When it is set, it replaces both
+        # `prefix` and `exec_prefix` and we thus need to set it to
+        # both in case they differ. This is also what the
+        # documentation recommends.  However, they are documented
+        # to always be the same on Windows, where it causes
+        # problems if we try to include both.
+        ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for libpath in libpaths
@@ -778,6 +781,29 @@ function set!(o::PyObject, k, v)
     @pycheckzi ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      o, PyObject(k), PyObject(v))
     v
+end
+
+#########################################################################
+# support IPython _repr_foo functions for writemime of PyObjects
+
+for (mime, method) in ((MIME"text/html", "_repr_html_"),
+                       (MIME"image/jpeg", "_repr_jpeg_"),
+                       (MIME"image/png", "_repr_png_"),
+                       (MIME"image/svg+xml", "_repr_svg_"),
+                       (MIME"text/latex", "_repr_latex_"))
+    T = istext(mime()) ? String : Vector{Uint8}
+    @eval begin
+        function writemime(io::IO, mime::$mime, o::PyObject)
+            if o.o != C_NULL && haskey(o, $method)
+                r = pycall(o[$method], PyObject)
+                r.o != pynothing::PyPtr && return write(io, convert($T, r))
+            end
+            throw(MethodError(writemime, (io, mime, o)))
+        end
+        mimewritable(::$mime, o::PyObject) =
+            o.o != C_NULL && haskey(o, $method) &&
+            pycall(o[$method], PyObject).o != pynothing::PyPtr
+    end
 end
 
 #########################################################################
