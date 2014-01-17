@@ -431,8 +431,8 @@ function pyinitialize(python::String)
     return
 end
 
-pyinitialize() = pyinitialize("python") 
-dlopen_libpython() = dlopen_libpython("python")
+pyinitialize() = pyinitialize(get(ENV, "PYTHON", "python")) 
+dlopen_libpython() = dlopen_libpython(get(ENV, "PYTHON", "python"))
 
 # end the Python interpreter and free associated memory
 function pyfinalize()

@@ -252,15 +252,24 @@ Python version, to call low-level Python functions directly via
 `ccall`, or to free the memory consumed by Python.  This can be
 accomplished using:
 
+* PyCall uses the Python executable specified by the `PYTHON`
+  environment variable, or `"python"` if the environment variable
+  is not set, in order to determine what Python libraries to use.
+  You can set this environment variable as usual in your operating
+  system (e.g. in the Unix shell before running Julia), or from
+  within Julia via `ENV["PYTHON"] = "..."`.  Alternatively, you
+  can call `pyinitialize` (below) explicitly.
+
 * `pyinitialize(s::String)`: Initialize the Python interpreter using
   the Python libraries corresponding to the `python` shared-library or
   executable name given by the argument `s`.  Calling `pyinitialize()`
-  defaults to `pyinitialize("python")`, but you may need to change
-  this to use a different Python version.  The `pyinitialize` function
-  *must* be called before you can call any low-level Python functions
-  (via `ccall`), but it is called automatically as needed when you use
-  the higher-level functions above.  It is safe to call this function
-  more than once; subsequent calls will do nothing.
+  defaults to `pyinitialize(get(ENV,"PYTHON","python"))` as described
+  above, but you may need to change this in rare cases.  The
+  `pyinitialize` function *must* be called before you can call any
+  low-level Python functions (via `ccall`), but it is called
+  automatically as needed when you use the higher-level functions
+  above.  It is safe to call this function more than once; subsequent
+  calls will do nothing.
 
 * `pyfinalize()`: End the Python interpreter and free all associated
   memory.  After this function is called, you *may no longer restart
