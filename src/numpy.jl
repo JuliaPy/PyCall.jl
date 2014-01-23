@@ -312,6 +312,8 @@ function copy{T,N}(a::PyArray{T,N})
     end
 end
 
+# TODO: need to do bounds-checking of these indices!
+
 getindex{T}(a::PyArray{T,0}) = unsafe_load(a.data)
 getindex{T}(a::PyArray{T,1}, i::Integer) = unsafe_load(a.data, 1 + (i-1)*a.st[1])
 
@@ -328,8 +330,14 @@ end
 
 function getindex(a::PyArray, is::Integer...)
     index = 1
-    for i = 1:length(is)
+    n = min(length(is),length(a.st))
+    for i = 1:n
         index += (is[i]-1)*a.st[i]
+    end
+    for i = n+1:length(is)
+        if is[i] != 1
+            throw(BoundsError())
+        end
     end
     unsafe_load(a.data, index)
 end
@@ -359,8 +367,14 @@ end
 
 function setindex!(a::PyArray, v, is::Integer...)
     index = 1
-    for i = 1:length(is)
+    n = min(length(is),length(a.st))
+    for i = 1:n
         index += (is[i]-1)*a.st[i]
+    end
+    for i = n+1:length(is)
+        if is[i] != 1
+            throw(BoundsError())
+        end
     end
     writeok_assign(a, v, index)
 end
