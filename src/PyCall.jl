@@ -337,11 +337,19 @@ pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
 
+const dlext = isdefined(Sys, :dlext) ? Sys.dlext : Sys.shlib_ext
+const dlprefix = @windows? "" : "lib"
+
 function dlopen_libpython(python::String)
+    # it is ridiculous that it is this hard to find the name of libpython
+    v = pyconfigvar(python,"VERSION","")
+    libs = [ dlprefix*"python"*v*"."*dlext, dlprefix*"python."*dlext ]
+    lib = pyconfigvar(python, "LIBRARY")
+    lib != "None" && unshift!(libs, splitext(lib)[1]*dlext)
     lib = pyconfigvar(python, "LDLIBRARY")
-    if lib == "None"
-        lib = @windows ? "python" * pyconfigvar(python,"VERSION","") * ".dll" : (@osx ? "libpython.dylib" : "libpython.so")
-    end
+    lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
+    libs = unique(libs)
+
     libpaths = [pyconfigvar(python, "LIBDIR"),
                 (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
     @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
@@ -360,25 +368,35 @@ function dlopen_libpython(python::String)
         # to always be the same on Windows, where it causes
         # problems if we try to include both.
         ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
+        # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro
+        try
+	    run(`$python -c "import site"` |> DevNull .> DevNull)
+        catch
+	    pop!(ENV, "PYTHONHOME")
+        end
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
-    for libpath in libpaths
-        if isfile(joinpath(libpath, lib))
-            try
-                return dlopen(joinpath(libpath, lib),
-                              RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+    for lib in libs
+        for libpath in libpaths
+     	    if isfile(joinpath(libpath, lib))
+                try
+                    return dlopen(joinpath(libpath, lib),
+                                  RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+                end
             end
         end
     end
-    lib = splitext(lib)[1] 
-    try
-        # We do this *last* because the libpython in the system
-        # library path might be the wrong one if multiple python
-        # versions are installed; we prefer the one in LIBDIR.
-        return dlopen(lib, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-    catch
-        error("Couldn't find libpython ($lib); try pyinitialize(\"/path/to/$lib\")")
+
+    # We do this *last* because the libpython in the system
+    # library path might be the wrong one if multiple python
+    # versions are installed (we prefer the one in LIBDIR):
+    for lib in libs
+        lib = splitext(lib)[1] 
+        try
+            return dlopen(lib, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+        end
     end
+    error("Couldn't find libpython; try pyinitialize(\"/path/to/libpython\")")
 end
 
 # Python 3.x uses wchar_t arrays for some string arguments
