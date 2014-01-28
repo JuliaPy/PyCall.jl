@@ -680,14 +680,19 @@ end
 
 # separate this function in order to make it easier to write more
 # pyimport-like functions
-pyimport_name(name, optional_varname) =
-    let len = length(optional_varname)
-        len > 0 && (len != 2 || optional_varname[1] != :as) ? 
-        throw(ArgumentError("usage @pyimport module [as name]")) :
-        (len == 2 ? optional_varname[2] :
-         typeof(name) == Symbol ? name :
-         throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>")))
+function pyimport_name(name, optional_varname)
+    len = length(optional_varname)
+    if len > 0 && (len != 2 || optional_varname[1] != :as)
+        throw(ArgumentError("usage @pyimport module [as name]"))
+    elseif len == 2
+        optional_varname[2]
+    elseif typeof(name) == Symbol
+        name
+    else
+        mname = modulename(name)
+        throw(ArgumentError("$mname is not a valid module variable name, use @pyimport $mname as <name>"))
     end
+end
 
 macro pyimport(name, optional_varname...)
     mname = modulename(name)
