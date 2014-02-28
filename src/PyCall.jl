@@ -634,12 +634,12 @@ length(m::PyObjectMembers) = length(m.members)
 # and providing access to o's members (converted to PyAny) as w.member.
 
 # we skip wrapping Julia reserved words (which cannot be type members)
-const reserved = Set("while", "if", "for", "try", "return", "break", 
+const reserved = Set({"while", "if", "for", "try", "return", "break", 
                      "continue", "function", "macro", "quote", "let", "local",
                      "global", "const", "abstract", "typealias", "type",
                      "bitstype", "immutable", "ccall", "do", "module",
                      "baremodule", "using", "import", "export", "importall",
-                     "pymember", "false", "true")
+                     "pymember", "false", "true"})
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
