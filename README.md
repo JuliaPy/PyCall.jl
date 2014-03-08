@@ -157,7 +157,7 @@ Similar to `PyVector`, PyCall also provides a type `PyDict` (a subclass
 of `Association`) that implements a no-copy wrapper around a Python
 dictionary (or any object implementing the mapping protocol).  Just
 use `PyDict` as the return type of a `pycall` returning a dictionary,
-or call `PyDict(o::PyObject)` on a dictionary` object `o`.  By
+or call `PyDict(o::PyObject)` on a dictionary object `o`.  By
 default, a `PyDict` is an `Any => Any` dictionary (or actually `PyAny
 => PyAny`) that performs runtime type inference, but if your Python
 dictionary has known, fixed types you can insteady use `PyDict{K,V}` given
