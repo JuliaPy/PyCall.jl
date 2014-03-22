@@ -515,6 +515,8 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
+include("buffer.jl")
+
 include("conversions.jl")
 
 include("pytype.jl")
