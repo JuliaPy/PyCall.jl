@@ -207,6 +207,7 @@ type PyArray_Info
     readonly::Bool
 
     function PyArray_Info(a::PyObject)
+       # error("could not convert type $T to fmt string")
         ai = PyDict{String,PyObject}(a["__array_interface__"])
         typestr = convert(String, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
@@ -276,7 +277,7 @@ type PyArray{T,N} <: AbstractArray{T,N}
         if !aligned(info)
             throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
         elseif !info.native
-            throw(ArgumentError("only native byte-order arrays are supported"))
+	    throw(ArgumentError("only native byte-order arrays are supported"))
         elseif info.T != T
             throw(ArgumentError("inconsistent type in PyArray constructor"))
         elseif length(info.sz) != N || length(info.st) != N

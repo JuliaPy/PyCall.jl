@@ -32,9 +32,6 @@ testkw(x; y=0) = x + 2*y
 @test roundtrip(testkw)(314157) == 314157
 @test roundtrip(testkw)(314157, y=1) == 314159
 
-if PyCall.npy_initialized
-    @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
-end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
 @test PyDict(PyObject([1 => "hello", 2 => "goodbye"])) == [1 => "hello", 2 => "goodbye"]
 
@@ -47,9 +44,6 @@ end
 @test roundtripeq({1 2 3; 4 5 6})
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
-if PyCall.npy_initialized
-    @test roundtripeq(begin A = Array(Int); A[1] = 3; A; end)
-end
 @test convert(PyAny, PyObject(begin A = Array(Any); A[1] = 3; A; end)) == 3
 
 array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
