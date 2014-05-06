@@ -31,7 +31,6 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test sizeof(view) == sizeof(Float32) * 3
 @test size(view) == (3,)
 @test strides(view) == (1,)
-@test view.suboffsets == C_NULL
 @test PyCall.aligned(view) == true
 # a vector is both c/f contiguous
 @test PyCall.c_contiguous(view) == true

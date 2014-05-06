@@ -2,7 +2,7 @@
 
 # for versions > 3.2 (TODO: obj field not in struct for python versions <= 3.2)
 
-type PyBuffer
+immutable Py_buffer
     buf::Ptr{Void}
     obj::PyPtr
     len::Cssize_t
@@ -15,43 +15,47 @@ type PyBuffer
     strides::Ptr{Cssize_t}
     suboffsets::Ptr{Cssize_t}
     internal::Ptr{Void}
+end
+ 
+type PyBuffer
+    buf::Py_buffer
 
     PyBuffer() = begin
-    	b = new(C_NULL, C_NULL, 0, 0, 
-                0, 0, C_NULL, C_NULL,
-                C_NULL, C_NULL, C_NULL)
+    	b = new(Py_buffer(C_NULL, C_NULL, 0, 0, 
+                          0, 0, C_NULL, C_NULL,
+                          C_NULL, C_NULL, C_NULL))
         finalizer(b, release!)
         return b 
     end
 end
 
 release!(b::PyBuffer) = begin
-    if b.obj != C_NULL
+    if b.buf.obj != C_NULL
         ccall((@pysym :PyBuffer_Release), Void, (Ptr{PyBuffer},), &b)
     end
 end
 
-Base.ndims(b::PyBuffer)  = int(b.ndim)
-Base.length(b::PyBuffer) = b.ndim >= 1 ? div(b.len, b.itemsize) : 0
-Base.sizeof(b::PyBuffer) = b.len
+Base.ndims(b::PyBuffer)  = int(b.buf.ndim)
+Base.length(b::PyBuffer) = b.buf.ndim >= 1 ? div(b.buf.len, b.buf.itemsize) : 0
+Base.sizeof(b::PyBuffer) = b.buf.len
 
 Base.size(b::PyBuffer) = begin
-    if b.ndim == 0
-	return (0,)
+    if b.buf.ndim == 0
+        return (0,)
     end
-    if b.ndim == 1
-        return (div(b.len, b.itemsize),)
+    if b.buf.ndim == 1
+        return (div(b.buf.len, b.buf.itemsize),)
     end
-    @assert b.shape != C_NULL
-    return tuple(Int[unsafe_load(b.shape, i) for i=1:b.ndim]...) 
+    @assert b.buf.shape != C_NULL
+    return tuple(Int[unsafe_load(b.buf.shape, i) for i=1:b.buf.ndim]...) 
 end 
 
 Base.strides(b::PyBuffer) = begin
-    if b.ndim == 0 || b.ndim == 1
+    if b.buf.ndim == 0 || b.buf.ndim == 1
         return (1,)
     end
-    @assert b.strides != C_NULL
-    return tuple(Int[div(unsafe_load(b.strides, i), b.itemsize) for i=1:b.ndim]...)
+    @assert b.buf.strides != C_NULL
+    return tuple(Int[div(unsafe_load(b.buf.strides, i), b.buf.itemsize) for i=1:b.buf.ndim]...)
 end
 
 #########################################################################
@@ -213,7 +217,7 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
     return bytestring(io)
 end
 
-pyfmt(b::PyBuffer) = b.format == C_NULL ? bytestring("") : bytestring(b.format)
+pyfmt(b::PyBuffer) = b.buf.format == C_NULL ? bytestring("") : bytestring(b.buf.format)
 
 sizeof_pyfmt(fmt::ByteString) = ccall((@pysym :PyBuffer_SizeFromFormat), Cint,
                                       (Ptr{Cchar},), &fmt)
@@ -229,11 +233,11 @@ pygetbuffer(o::PyObject, flags::Cint) = begin
 end
 
 aligned(b::PyBuffer) = begin
-    if b.strides == C_NULL
+    if b.buf.strides == C_NULL
         throw(ArgumentError("PyBuffer strides field is NULL"))
     end
-    for i=1:b.ndim
-        if mod(unsafe_load(b.strides, i), b.itemsize) != 0
+    for i=1:b.buf.ndim
+        if mod(unsafe_load(b.buf.strides, i), b.buf.itemsize) != 0
 	        return false
         end
     end
@@ -270,18 +274,18 @@ type PyArray{T, N} <: AbstractArray{T, N}
         elseif ndims(b) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
         end
-        return new(o, b, true, bool(b.readonly),
+        return new(o, b, true, bool(b.buf.readonly),
                    size(b), strides(b), 
                    f_contiguous(b), 
                    c_contiguous(b),
-                   convert(Ptr{T}, b.buf))
+                   convert(Ptr{T}, b.buf.buf))
     end
 end
 
 function PyArray(o::PyObject)
     view = pygetbuffer(o, PyBUF_RECORDS)
-    view.format == C_NULL && error("buffer has no format string")
-    order, tys = parse_pyfmt(bytestring(view.format))
+    view.buf.format == C_NULL && error("buffer has no format string")
+    order, tys = parse_pyfmt(bytestring(view.buf.format))
     length(tys) != 1 && error("PyArray cannot yet handle structure types")
     ty   = tys[1]
     ndim = ndims(view)
