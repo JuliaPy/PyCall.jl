@@ -113,7 +113,7 @@ a[1] = 3
 a[2] = 2
 a[3] = 1
 @test sprint() do io; show(io, npa); end == "PyObject array([3, 2, 1])"
-aa = np.frombuffer(a)
+aa = np.asarray(a)
 @test np.shape(aa) == size(a)
 
 npa = np.ones((10,10), dtype="float32")
@@ -128,9 +128,8 @@ a = PyArray(npa)
 @test sprint() do io; show(io, a); end == sprint() do io
 				              show(io, ones(Float32, (10,10)))
 				      	  end
-#TODO:
-#aa = np.frombuffer(a)
-#@test np.shape(aa) == size(a)
+aa = np.asarray(a)
+@test np.shape(aa) == size(a)
 
 npa = np.ones((10,10,20), dtype="float32")
 a = PyArray(npa)
@@ -140,9 +139,9 @@ a = PyArray(npa)
 @test size(similar(a)) == size(a)
 @test eltype(similar(a)) == eltype(a)
 @test summary(a) == "10x10x20 Float32 PyArray"
-#TODO:
-#aa = np.frombuffer(a)
-#@test np.shape(aa) == size(a)
+
+aa = np.asarray(a)
+@test np.shape(aa) == size(a)
 
 # Test fail because of show uses unimplemented subarray methods 
 #@test sprint() do io; show(io, a); end == sprint() do io
