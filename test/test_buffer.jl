@@ -9,7 +9,6 @@ roundtripeq(x) = roundtrip(x) == x
 @pyimport array
 @pyimport numpy as np 
 
-#=
 @test roundtripeq({1 2 3; 4 5 6})
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
@@ -20,33 +19,32 @@ array2py2arrayeq(x) = PyCall.py2array(Float64, PyCall.array2py(x)) == x
 @test array2py2arrayeq(rand(3))
 @test array2py2arrayeq(rand(3,4))
 @test array2py2arrayeq(rand(3,4,5))
-=#
 
 #############################################################
 # PyBuffer Tests
 
 # Check 1D arrays
 a = array.array("f", [1,2,3])
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 1
 @test length(view) == 3
 @test sizeof(view) == sizeof(Float32) * 3
 @test size(view) == (3,)
 @test strides(view) == (1,)
+@test view.suboffsets == C_NULL
 @test PyCall.aligned(view) == true
 # a vector is both c/f contiguous
 @test PyCall.c_contiguous(view) == true
 @test PyCall.f_contiguous(view) == true
-@show view.format, view.ndim, view.readonly
 @test PyCall.pyfmt(view) == "f"
-error("expected")
+
 # Check 1D numpy arrays
 a = np.array([1.0,2.0,3.0])
 @test a[:dtype] == np.dtype("float64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 1
 @test length(view) == 3
-@test sizeof(view) == sizeof(Float64) * 3
+@test sizeof(view) == a[:nbytes]
 @test size(view) == (3,)
 @test strides(view) == (1,)
 @test PyCall.aligned(view) == true
@@ -57,12 +55,12 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 
 # Check 2D C ordered arrays
 a = np.array([[1 2 3], 
-	      [1 2 3]])
+	          [1 2 3]])
 @test a[:dtype] == np.dtype("int64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 2
 @test length(view) == 6
-@test sizeof(view) == sizeof(Int64) * 6
+@test sizeof(view) == a[:nbytes] 
 @test size(view) == (2,3)
 @test strides(view) == (3,1)
 @test PyCall.aligned(view) == true
@@ -73,10 +71,10 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 # Check Multi-D C ordered arrays
 a = np.ones((10,5,3), dtype="float32", order="C")
 @test a[:dtype] == np.dtype("float32")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
-@test sizeof(view) == sizeof(Float32) * (10 * 5 * 3)
+@test sizeof(view) == a[:nbytes] 
 @test size(view) == (10, 5, 3)
 @test strides(view) == (5 * 3, 3, 1)
 @test PyCall.aligned(view) == true
@@ -87,10 +85,10 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 # Check Multi-D F ordered arrays
 a = np.ones((10,5,3), dtype="uint8", order="F")
 @test a[:dtype] == np.dtype("uint8")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
-@test sizeof(view) == sizeof(Uint8) * (10 * 5 * 3)
+@test sizeof(view) == a[:nbytes] 
 @test size(view) == (10, 5, 3)
 @test strides(view) == (1, 10, 50)
 @test PyCall.aligned(view) == true
@@ -131,8 +129,9 @@ a = PyArray(npa)
 @test sprint() do io; show(io, a); end == sprint() do io
 				              show(io, ones(Float32, (10,10)))
 				      	  end
-aa = np.frombuffer(a)
-@test np.shape(aa) == size(a)
+#TODO:
+#aa = np.frombuffer(a)
+#@test np.shape(aa) == size(a)
 
 npa = np.ones((10,10,20), dtype="float32")
 a = PyArray(npa)
@@ -142,9 +141,9 @@ a = PyArray(npa)
 @test size(similar(a)) == size(a)
 @test eltype(similar(a)) == eltype(a)
 @test summary(a) == "10x10x20 Float32 PyArray"
-
-aa = np.frombuffer(a)
-@test np.shape(aa) == size(a)
+#TODO:
+#aa = np.frombuffer(a)
+#@test np.shape(aa) == size(a)
 
 # Test fail because of show uses unimplemented subarray methods 
 #@test sprint() do io; show(io, a); end == sprint() do io

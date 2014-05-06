@@ -141,7 +141,7 @@ const jltype_pyfmt = Dict{Type, Char}(collect(values(pyfmt_jltype)),
                                       collect(keys(pyfmt_jltype)))
 
 #TODO: this only works for simple struct packing
-function parse_pyfmt(fmt::ASCIIString)
+function parse_pyfmt(fmt::ByteString)
     types = Type[]
     idx = 1
     byteorder = :native
@@ -279,7 +279,7 @@ type PyArray{T, N} <: AbstractArray{T, N}
 end
 
 function PyArray(o::PyObject)
-    view = pygetbuffer(o, PyBUF_FULL)
+    view = pygetbuffer(o, PyBUF_RECORDS)
     view.format == C_NULL && error("buffer has no format string")
     order, tys = parse_pyfmt(bytestring(view.format))
     length(tys) != 1 && error("PyArray cannot yet handle structure types")
@@ -397,7 +397,7 @@ Base.convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
 Base.convert{T<:PyBufType}(::Type{Array{T, 1}}, o::PyObject) = begin
     try
-        view = pygetbuffer(o, PyBUF_FULL)
+        view = pygetbuffer(o, PyBUF_RECORDS)
         view.format == C_NULL && error("buffer has no format string")
         order, tys = parse_pyfmt(bytestring(view.format))
         length(tys) != 1 && error("PyArray cannot yet handle structure types")
