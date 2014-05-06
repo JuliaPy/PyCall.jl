@@ -9,6 +9,7 @@ roundtripeq(x) = roundtrip(x) == x
 @pyimport array
 @pyimport numpy as np 
 
+#=
 @test roundtripeq({1 2 3; 4 5 6})
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
@@ -19,16 +20,14 @@ array2py2arrayeq(x) = PyCall.py2array(Float64, PyCall.array2py(x)) == x
 @test array2py2arrayeq(rand(3))
 @test array2py2arrayeq(rand(3,4))
 @test array2py2arrayeq(rand(3,4,5))
+=#
 
 #############################################################
 # PyBuffer Tests
 
-@test PyCall.pycheckbuffer(array.array("f", [1.0, 2.0, 3.0])) == true
-@test PyCall.pycheckbuffer(np.array([1,2,3])) == true
-
 # Check 1D arrays
 a = array.array("f", [1,2,3])
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 @test ndims(view) == 1
 @test length(view) == 3
 @test sizeof(view) == sizeof(Float32) * 3
@@ -38,12 +37,13 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
 # a vector is both c/f contiguous
 @test PyCall.c_contiguous(view) == true
 @test PyCall.f_contiguous(view) == true
+@show view.format, view.ndim, view.readonly
 @test PyCall.pyfmt(view) == "f"
-
+error("expected")
 # Check 1D numpy arrays
 a = np.array([1.0,2.0,3.0])
 @test a[:dtype] == np.dtype("float64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 @test ndims(view) == 1
 @test length(view) == 3
 @test sizeof(view) == sizeof(Float64) * 3
@@ -59,7 +59,7 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
 a = np.array([[1 2 3], 
 	      [1 2 3]])
 @test a[:dtype] == np.dtype("int64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 @test ndims(view) == 2
 @test length(view) == 6
 @test sizeof(view) == sizeof(Int64) * 6
@@ -73,7 +73,7 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
 # Check Multi-D C ordered arrays
 a = np.ones((10,5,3), dtype="float32", order="C")
 @test a[:dtype] == np.dtype("float32")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
 @test sizeof(view) == sizeof(Float32) * (10 * 5 * 3)
@@ -87,7 +87,7 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
 # Check Multi-D F ordered arrays
 a = np.ones((10,5,3), dtype="uint8", order="F")
 @test a[:dtype] == np.dtype("uint8")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.pygetbuffer(a, PyCall.PyBUF_STRIDED)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
 @test sizeof(view) == sizeof(Uint8) * (10 * 5 * 3)

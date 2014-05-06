@@ -6,14 +6,14 @@ type PyBuffer
     buf::Ptr{Void}
     obj::PyPtr
     len::Cssize_t
-    itemsize::Int
+    itemsize::Cssize_t
     
     readonly::Cint
     ndim::Cint
     format::Ptr{Cchar}
-    shape::Ptr{Int}
-    strides::Ptr{Int}
-    suboffsets::Ptr{Int}
+    shape::Ptr{Cssize_t}
+    strides::Ptr{Cssize_t}
+    suboffsets::Ptr{Cssize_t}
     internal::Ptr{Void}
 
     PyBuffer() = begin
@@ -27,8 +27,7 @@ end
 
 release!(b::PyBuffer) = begin
     if b.obj != C_NULL
-        ccall((@pysym :PyBuffer_Release), Void,
-    	      (Ptr{PyBuffer},), &b)
+        ccall((@pysym :PyBuffer_Release), Void, (Ptr{PyBuffer},), &b)
     end
 end
 
@@ -56,7 +55,7 @@ Base.strides(b::PyBuffer) = begin
 end
 
 #########################################################################
-# hard coded constant values, copied from 
+# hard coded constant values, copied from Cpython's include/object.h
 
 cint(x) = convert(Cint, x)
 
@@ -109,9 +108,9 @@ const PyBUF_WRITE = cint(0x200)
 # X{b:b}->b
 
 const pyfmt_byteorder = (Char => Symbol)['@' => :native,
-				                         '=' => :native,
-					                     '<' => :little,
-					                     '>' => :big,
+                                         '=' => :native,
+                                         '<' => :little,
+                                         '>' => :big,
 					                     '!' => :big]
 
 const pyfmt_jltype = (Char => Type)['x' => Uint8,
@@ -220,10 +219,6 @@ sizeof_pyfmt(fmt::ByteString) = ccall((@pysym :PyBuffer_SizeFromFormat), Cint,
                                       (Ptr{Cchar},), &fmt)
 
 #########################################################################
-# TODO: this is the old interface, the new PyObject_CheckBuffer
-# is a macro so we cannot link to it
-pycheckbuffer(o::PyObject) = ccall((@pysym :PyObject_CheckReadBuffer), Cint, 
-                                   (PyPtr,), o.o) == cint(1)
 
 pygetbuffer(o::PyObject, flags::Cint) = begin
     view = PyBuffer()  
@@ -354,7 +349,7 @@ Base.pointer{T}(a::PyArray{T}, is::(Int...)) = begin
     for i = 1:length(is)
         offset += (is[i] - 1) * a.strides[i]
     end
-    return a.data + (offset * sizeof(T))
+    return a.data + offset * sizeof(T)
 end
 
 function writeok_assign(a::PyArray, v, i::Integer)
