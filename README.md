@@ -31,9 +31,9 @@ compare it to the built-in Julia `sin`:
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
 Type conversions are automatically performed for numeric, boolean,
-string, and function types, along with tuples, arrays/lists, and
-dictionaries of these types.  Python functions can be converted to
-Julia functions but not vice-versa.  Other types are supported via the
+string, IO stream, and function types, along with tuples, arrays/lists, and
+dictionaries of these types. (Python functions can be converted/passed to
+Julia functions and vice versa!)  Other types are supported via the
 generic PyObject type, below.
 
 Python submodules must be imported by a separate `@pyimport` call, and
