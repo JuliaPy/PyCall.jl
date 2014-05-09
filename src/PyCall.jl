@@ -10,7 +10,7 @@ export pyinitialize, pyfinalize, pycall, pyimport, pybuiltin, PyObject,
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
-       next, filter!, hash, splice!, pop!, ==, help, push!,
+       next, filter!, hash, splice!, pop!, ==, isequal, help, push!,
        unshift!, shift!, append!, insert!, prepend!, writemime, mimewritable
 
 # Python C API is not interrupt-save.  In principle, we should
@@ -583,6 +583,8 @@ function ==(o1::PyObject, o2::PyObject)
     #       we also add a __cmp__ method for pyjlwrap objects?
     return o1.o == o2.o
 end
+
+isequal(o1::PyObject, o2::PyObject) = o1 == o2 # Julia 0.2 compatibility
 
 #########################################################################
 # For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python,
