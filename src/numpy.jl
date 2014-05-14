@@ -182,8 +182,8 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
         p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
               npy_api[:PyArray_Type], 
-              ndims(a), [size(a)...], npy_type(T),
-              [strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
+              ndims(a), Int[size(a)...], npy_type(T),
+              Int[strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
               NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
               C_NULL)
         return PyObject(p, a)
