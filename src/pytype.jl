@@ -400,7 +400,7 @@ function pyjlwrap_hash32(o::PyPtr)
     h = ccall(:int64to32hash, Uint32, (Uint64,), 
               hash(unsafe_pyjlwrap_to_objref(o)))
     # Python hashes are not permitted to return -1!!
-    return h == uint32(-1) ? uint32(pysalt::Uint) : h::Uint32
+    return h == uint32(-1) ? uint32(pysalt)::Uint32 : h::Uint32
 end
 const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, Uint32, (PyPtr,))
 

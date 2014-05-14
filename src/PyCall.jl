@@ -554,34 +554,54 @@ end
 #########################################################################
 # computing hashes of PyObjects
 
-pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
+const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
+
+# backwards compatibility with Julia 0.2
+if VERSION < v"0.3-"
+    hashsalt(x) = bitmix(pysalt, hash(x))
+else
+    hashsalt(x) = hash(x, pysalt)
+end
 
 function hash(o::PyObject)
     if o.o == C_NULL
-        bitmix(pysalt::Uint, hash(C_NULL))
+        hashsalt(C_NULL)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        bitmix(pysalt::Uint, hash(unsafe_pyjlwrap_to_objref(o.o)))
+        hashsalt(unsafe_pyjlwrap_to_objref(o.o))
     else
         h = pyhashlong::Bool ? # changed to Py_hash_t in Python 3.2
                ccall((@pysym :PyObject_Hash), Clong, (PyPtr,), o) :
                ccall((@pysym :PyObject_Hash), Int, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
-            return bitmix(pysalt::Uint, hash(o.o))
+            return hashsalt(o.o)
         end
-        bitmix(pysalt::Uint, uint(h))
+        hashsalt(h)
     end
 end
 
 #########################################################################
 # PyObject equality
 
+const Py_EQ = convert(Cint, 2) # from Python's object.h
+
 function ==(o1::PyObject, o2::PyObject)
-    # TODO: use PyObject_RichCompareBool?  Should
-    #       we also add a __cmp__ method for pyjlwrap objects?
-    return o1.o == o2.o
+    if o1.o == C_NULL || o2.o == C_NULL
+        return o1.o == o2.o
+    elseif is_pyjlwrap(o1)
+        if is_pyjlwrap(o2)
+            return unsafe_pyjlwrap_to_objref(o1.o) == 
+                   unsafe_pyjlwrap_to_objref(o2.o)
+        else
+            return false
+        end
+    else
+        val = ccall((@pysym :PyObject_RichCompareBool), Cint,
+                    (PyPtr, PyPtr, Cint), o1, o2, Py_EQ)
+        return val == -1 ? o1.o == o2.o : bool(val)
+    end
 end
 
 isequal(o1::PyObject, o2::PyObject) = o1 == o2 # Julia 0.2 compatibility

@@ -66,3 +66,14 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test collect(PyObject([1,3,5])) == [1,3,5]
 
 @test try @eval (@pyimport os.path) catch ex isa(ex, ArgumentError) end
+
+@test PyObject("hello") == PyObject("hello")
+@test PyObject("hello") != PyObject("hellö")
+@test PyObject(hash) == PyObject(hash)
+@test PyObject(hash) != PyObject(bitmix)
+@test hash(PyObject("hello")) == hash(PyObject("hello"))
+@test hash(PyObject("hello")) != hash(PyObject("hellö"))
+@test hash(PyObject("hello")) != hash("hellö")
+@test hash(PyObject(hash)) == hash(PyObject(hash))
+@test hash(PyObject(hash)) != hash(PyObject(bitmix))
+@test hash(PyObject(hash)) != hash(hash)
