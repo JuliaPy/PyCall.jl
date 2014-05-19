@@ -17,4 +17,6 @@ before_install:
 script:
   - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir())/PyCall`); Pkg.resolve()'
   - julia -e 'using PyCall; @assert isdefined(:PyCall); @assert typeof(PyCall) === Module'
-  - julia test/test.jl
+  - julia --code-coverage test/runtests.jl
+after_success:
+  - julia -e 'cd(Pkg.dir("PyCall")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
