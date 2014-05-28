@@ -404,28 +404,31 @@ function wbytestring(s::String)
     if pyversion.major < 3 || sizeof(Cwchar_t) == 1 # ASCII (or UTF8)
         bytestring(s)
     else # UTF16 or UTF32, presumably
-        n = length(s)
-        w = Array(Cwchar_t, n + 1)
         if sizeof(Cwchar_t) == 4 # UTF32
-            for i = 1:n
-                w[i] = s[i]
+            n = length(s)
+            w = Array(Cwchar_t, n + 1)
+            i = 0
+            for c in s
+                w[i += 1] = c
             end
         else # UTF16, presumably
             @assert sizeof(Cwchar_t) == 2
             if defined(UTF16String) # Julia 0.3
                 s16 = utf16(s)
-                for i = 1:n
-                    w[i] = s16.data[i]
-                end
+                w = Array(Cwchar_t, length(s.data)+1)
+                copy!(w,1, s16.data,1, length(s.data))
             else
-                for i = 1:n
+                n = length(s)
+                w = Array(Cwchar_t, n + 1)
+                i = 0
+                for c in s
                     # punt on multi-byte encodings
-                    s[i] > 0xffff && error("unsupported char in \"$s\"")
-                    w[i] = s[i]
+                    c > 0xffff && error("unsupported char $c in \"$s\"")
+                    w[i += 1] = c
                 end
             end
         end
-        w[n+1] = 0
+        w[end] = 0
         w
     end
 end
