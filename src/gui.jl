@@ -57,12 +57,24 @@ function install_doevent(doevent::Function, sec::Real)
     return timeout
 end
 
+# work around API change in Julia 0.3 (issue #76)
+if VERSION >= v"0.3-"
+    macro doevent(body)
+        Expr(:function, :(doevent(async)), body)
+    end
+else
+    macro doevent(body)
+        Expr(:function, :(doevent(async, status::Int32)), body)
+    end
+end
+
 # GTK:
 function gtk_eventloop(sec::Real=50e-3)
     gtk = pyimport("gtk")
     events_pending = gtk["events_pending"]
     main_iteration = gtk["main_iteration"]
-    function doevent(async, status::Int32) # handle all pending
+    @doevent begin
+        # handle all pending
         while pycall(events_pending, Bool)
             pycall(main_iteration, PyObject)
         end
@@ -77,7 +89,7 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
     maxtime = PyObject(50)
-    function doevent(async, status::Int32)
+    @doevent begin
         app = pycall(instance, PyObject)
         if app.o != pynothing::PyPtr
             app["_in_event_loop"] = true
@@ -93,7 +105,7 @@ function wx_eventloop(sec::Real=50e-3)
     GetApp = wx["GetApp"]
     EventLoop = wx["EventLoop"]
     EventLoopActivator = wx["EventLoopActivator"]
-    function doevent(async, status::Int32)
+    @doevent begin
         app = pycall(GetApp, PyObject)
         if app.o != pynothing::PyPtr
             app["_in_event_loop"] = true
