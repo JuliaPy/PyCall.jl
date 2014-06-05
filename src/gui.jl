@@ -60,11 +60,11 @@ end
 # work around API change in Julia 0.3 (issue #76)
 if VERSION >= v"0.3-"
     macro doevent(body)
-        Expr(:function, :(doevent(async)), body)
+        Expr(:function, :($(esc(:doevent))(async)), body)
     end
 else
     macro doevent(body)
-        Expr(:function, :(doevent(async, status::Int32)), body)
+        Expr(:function, :($(esc(:doevent))(async, status::Int32)), body)
     end
 end
 
