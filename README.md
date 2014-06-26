@@ -1,7 +1,6 @@
 # Calling Python functions from the Julia language
 [![Build Status](https://travis-ci.org/stevengj/PyCall.jl.png)](https://travis-ci.org/stevengj/PyCall.jl) [![Coverage Status](https://coveralls.io/repos/stevengj/PyCall.jl/badge.png)](https://coveralls.io/r/stevengj/PyCall.jl)
 
-
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
 wrappers for all of the functions and constants therein, including
@@ -83,6 +82,18 @@ example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
     my_dna[:find]("ACT")
 
 whereas in Python the last step would have been `my_dna.find("ACT")`.
+
+## Troubleshooting
+
+Here are solutions to some common problems:
+
+* As mentioned above, use `foo[:bar]` rather than `foo.bar` to access fields and methods of Python objects.
+
+* Sometimes calling a Python function fails because PyCall doesn't realize it is a callable object (since so many types of objects can be callable in Python).   The workaround is to use `pycall(foo, PyAny, args...)` instead of `foo(args...)`.   If you want to call `foo.bar(args...)` in Python, it is good to use `pycall(foo["bar"], PyAny, args...)`, where using `foo["bar"]` instead of `foo[:bar]` prevents any automatic conversion of the `bar` field.
+
+* If PyCall can't find the version of Python you want, try setting the `PYTHON` environment variable to the full pathname of the `python` executable.   Note that PyCall doesn't work properly with [Canopy/EPD Python](https://github.com/stevengj/PyCall.jl/issues/42) yet, and we recommend [Anaconda](https://store.continuum.io/cshop/anaconda/) instead.
+
+* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/stevengj/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `unshift!(PyVector(pyimport("sys")["path"]), "")`.
 
 ## Python object interfaces
 
