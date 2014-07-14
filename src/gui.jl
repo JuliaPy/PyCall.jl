@@ -52,7 +52,7 @@ end
 
 # call doevent(status) every sec seconds
 function install_doevent(doevent::Function, sec::Real)
-    timeout = Base.TimeoutAsyncWork(doevent)
+    timeout = Base.Timer(doevent)
     Base.start_timer(timeout,sec,sec)
     return timeout
 end
@@ -124,7 +124,7 @@ function wx_eventloop(sec::Real=50e-3)
 end
 
 # cache running event loops (so that we don't start any more than once)
-const eventloops = (Symbol=>TimeoutAsyncWork)[]
+const eventloops = (Symbol=>Timer)[]
 
 function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
     pygui(gui)
