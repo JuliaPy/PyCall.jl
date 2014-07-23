@@ -60,15 +60,16 @@ end
 
 # Macro version of pysym to cache dlsym lookup (thanks to vtjnash)
 macro pysym(func)
-    z = gensym(string(func))
-    @eval global $z = C_NULL
-    quote begin
-        global $z
-        if $z::Ptr{Void} == C_NULL
-            $z::Ptr{Void} = dlsym(libpython::Ptr{Void}, $(esc(func)))
+    z, zlocal = gensym(string(func)), gensym()
+    eval(current_module(),:(global $z = C_NULL))
+    quote
+        let $zlocal::Ptr{Void} = $z::Ptr{Void}
+            if $zlocal == C_NULL
+               global $z = $zlocal = dlsym(libpython::Ptr{Void}, $(esc(func)))
+            end
+            $zlocal
         end
-        $z::Ptr{Void}
-    end end
+    end
 end
 
 # Macro version of pyinitialize() to inline initialized? check
