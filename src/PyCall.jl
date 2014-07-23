@@ -62,6 +62,7 @@ end
 macro pysym(func)
     z, zlocal = gensym(string(func)), gensym()
     eval(current_module(),:(global $z = C_NULL))
+    z = esc(z)
     quote
         let $zlocal::Ptr{Void} = $z::Ptr{Void}
             if $zlocal == C_NULL
