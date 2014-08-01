@@ -175,21 +175,47 @@ const npy_typestrs = Dict( "b1"=>Bool,
 #########################################################################
 # no-copy conversion of Julia arrays to NumPy arrays.
 
+# Julia arrays are in column-major order, but in some cases it is useful
+# to pass them to Python as row-major arrays simply by reversing the
+# dimensions. For example, although NumPy works with both row-major and
+# column-major data, some Python libraries like OpenCV seem to require
+# row-major data (the default in NumPy). In such cases, use PyReverseDims(array)
+function NpyArray{T<:NPY_TYPES}(a::StridedArray{T}, revdims::Bool)
+    @npyinitialize
+    size_a = revdims ? reverse(size(a)) : size(a)
+    strides_a = revdims ? reverse(strides(a)) : strides(a)
+    p = @pycheck ccall(npy_api[:PyArray_New], PyPtr,
+          (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
+          npy_api[:PyArray_Type],
+          ndims(a), Int[size_a...], npy_type(T),
+          Int[strides_a...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
+          NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
+          C_NULL)
+    return PyObject(p, a)
+end
+
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     try
-        @npyinitialize
-        p = @pycheck ccall(npy_api[:PyArray_New], PyPtr,
-              (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
-              npy_api[:PyArray_Type],
-              ndims(a), Int[size(a)...], npy_type(T),
-              Int[strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
-              NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
-              C_NULL)
-        return PyObject(p, a)
-    catch e
+        return NpyArray(a, false)
+    catch
         array2py(a) # fallback to non-NumPy version
     end
 end
+
+function PyReverseDims{T<:NPY_TYPES}(a::StridedArray{T})
+    return NpyArray(a, true)
+end
+
+"""
+    PyReverseDims(array)
+
+Passes a Julia `array` to Python as a NumPy row-major array
+(rather than Julia's native column-major order) with the
+dimensions reversed (e.g. a 2×3×4 Julia array is passed as
+a 4×3×2 NumPy row-major array).  This is useful for Python
+libraries that expect row-major data.
+"""
+PyReverseDims(a::AbstractArray)
 
 #########################################################################
 # Extract shape and other information about a NumPy array.  We need
@@ -267,9 +293,9 @@ c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,
 
 This converts an `ndarray` object `o` to a PyArray.
 
-This implements a nocopy wrapper to a NumPy array (currently of only numeric types only). 
+This implements a nocopy wrapper to a NumPy array (currently of only numeric types only).
 
-If you are using `pycall` and the function returns an `ndarray`, you can use `PyArray` as the return type to directly receive a `PyArray`. 
+If you are using `pycall` and the function returns an `ndarray`, you can use `PyArray` as the return type to directly receive a `PyArray`.
 """
 type PyArray{T,N} <: AbstractArray{T,N}
     o::PyObject

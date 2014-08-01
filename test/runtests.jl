@@ -54,6 +54,9 @@ testkw(x; y=0) = x + 2*y
 
 if PyCall.npy_initialized
     @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
+    let A = rand(Int, 2,3,4)
+        @test convert(PyAny, PyReverseDims(A)) == permutedims(A, [3,2,1])
+    end
 end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
 @test PyDict(PyObject(Dict(1 => "hello", 2 => "goodbye"))) == Dict(1 => "hello", 2 => "goodbye")
