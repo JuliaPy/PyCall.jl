@@ -328,6 +328,17 @@ function pyinitialize(libpy::Ptr{Void})
                 argv   = convert(Ptr{Cwchar_t}, argv_s)
                 ccall(pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
             end
+            
+            # Some Python code checks sys.ps1 to see if it is running
+            # interactively, and refuses to be interactive otherwise.
+            # (e.g. Matplotlib: see PyPlot#79)
+            if Base.is_interactive
+                let sys = pyimport("sys")
+                    if !haskey(sys, "ps1")
+                        sys["ps1"] = ">>> "
+                    end
+                end
+            end
         end
     end
     return
