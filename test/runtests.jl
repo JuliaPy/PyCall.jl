@@ -77,3 +77,9 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test hash(PyObject(hash)) == hash(PyObject(hash))
 @test hash(PyObject(hash)) != hash(PyObject(bitmix))
 @test hash(PyObject(hash)) != hash(hash)
+
+# issue #92:
+let x = PyVector(PyAny[])
+    pyeval("lambda x: x.append(\"bar\")")(x)
+    @test x == ["bar"]
+end
