@@ -220,6 +220,7 @@ type PyVector{T} <: AbstractVector{T}
 end
 
 PyVector(o::PyObject) = PyVector{PyAny}(o)
+PyObject(a::PyVector) = a.o
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
 convert{T}(::Type{PyVector{T}}, o::PyObject) = PyVector{T}(o)
 convert(::Type{PyPtr}, a::PyVector) = a.o.o
@@ -433,6 +434,7 @@ type PyDict{K,V} <: Associative{K,V}
 end
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
+PyObject(d::PyDict) = d.o
 PyDict() = PyDict{PyAny,PyAny}()
 PyDict{K,V}(d::Associative{K,V}) = PyDict{K,V}(PyObject(d))
 PyDict{V}(d::Associative{Any,V}) = PyDict{PyAny,V}(PyObject(d))
