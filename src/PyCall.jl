@@ -20,6 +20,10 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
 # similar long-running (or potentially long-running) code.
 import Base: sigatomic_begin, sigatomic_end
 
+## Compatibility import for v0.3, v0.4
+
+import Compat
+
 #########################################################################
 
 # Mirror of C PyObject struct (for non-debugging Python builds).  
