@@ -22,7 +22,7 @@ import Base: sigatomic_begin, sigatomic_end
 
 ## Compatibility import for v0.3, v0.4
 
-import Compat
+using Compat
 
 #########################################################################
 

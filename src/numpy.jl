@@ -166,7 +166,7 @@ npy_type(::Type{PyPtr}) = NPY_OBJECT
 typealias NPY_TYPES Union(Bool,Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128,PyPtr)
 
 # conversions from __array_interface__ type strings to supported Julia types
-const npy_typestrs = @Compat.Dict( "b1"=>Bool,
+const npy_typestrs = @compat Dict( "b1"=>Bool,
                                    "i1"=>Int8,      "u1"=>Uint8,
                                    "i2"=>Int16,     "u2"=>Uint16,
                                    "i4"=>Int32,     "u4"=>Uint32,
