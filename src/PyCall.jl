@@ -336,7 +336,7 @@ function pyinitialize(libpy::Ptr{Void})
             # Some Python code checks sys.ps1 to see if it is running
             # interactively, and refuses to be interactive otherwise.
             # (e.g. Matplotlib: see PyPlot#79)
-            if Base.is_interactive
+            if isinteractive()
                 let sys = pyimport("sys")
                     if !haskey(sys, "ps1")
                         sys["ps1"] = ">>> "
