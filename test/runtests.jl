@@ -44,9 +44,9 @@ let d = PyDict([1 => "hello", "yes" => 34])
     @test d["yes"] == "goodbye"
 end
 
-@test roundtripeq({1 2 3; 4 5 6})
+@test roundtripeq(Any[1 2 3; 4 5 6])
 @test roundtripeq([])
-@test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
+@test convert(Array{PyAny,1}, PyObject(Any[1 2 3; 4 5 6])) == Any[Any[1,2,3],Any[4,5,6]]
 if PyCall.npy_initialized
     @test roundtripeq(begin A = Array(Int); A[1] = 3; A; end)
 end
