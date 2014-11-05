@@ -315,7 +315,7 @@ function pyinitialize(libpy::Ptr{Void})
             py_void_p::Function = p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL))
         end
         pyversion::VersionNumber = 
-          VersionNumber(convert((Int,Int,Int,String,Int), 
+          VersionNumber(convert((Int,Int,Int,AbstractString,Int), 
                                 pyimport("sys")["version_info"])[1:3]...)
         pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
@@ -348,8 +348,8 @@ function pyinitialize(libpy::Ptr{Void})
     return
 end
 
-pyconfigvar(python::String, var::String) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
-pysys(python::String, var::String) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
+pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
+pysys(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
@@ -357,7 +357,7 @@ end
 const dlext = isdefined(Sys, :dlext) ? Sys.dlext : Sys.shlib_ext
 const dlprefix = @windows? "" : "lib"
 
-function dlopen_libpython(python::String)
+function dlopen_libpython(python::AbstractString)
     # it is ridiculous that it is this hard to find the name of libpython
     v = pyconfigvar(python,"VERSION","")
     libs = [ dlprefix*"python"*v*"."*dlext, dlprefix*"python."*dlext ]
@@ -417,7 +417,7 @@ function dlopen_libpython(python::String)
 end
 
 # Python 3.x uses wchar_t arrays for some string arguments
-function wbytestring(s::String)
+function wbytestring(s::AbstractString)
     if pyversion.major < 3 || sizeof(Cwchar_t) == 1 # ASCII (or UTF8)
         bytestring(s)
     else # UTF16 or UTF32, presumably
@@ -451,7 +451,7 @@ function wbytestring(s::String)
 end
 
 # initialize the Python interpreter (no-op on subsequent calls)
-function pyinitialize(python::String)
+function pyinitialize(python::AbstractString)
     global initialized
     if !initialized::Bool
         libpy = try
@@ -559,7 +559,7 @@ function pystring(o::PyObject)
                 return string(o.o)
             end
         end
-        return convert(String, PyObject(s))
+        return convert(AbstractString, PyObject(s))
     end
 end    
 
@@ -631,7 +631,7 @@ isequal(o1::PyObject, o2::PyObject) = o1 == o2 # Julia 0.2 compatibility
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function getindex(o::PyObject, s::String)
+function getindex(o::PyObject, s::AbstractString)
     if (o.o == C_NULL)
         throw(ArgumentError("ref of NULL PyObject"))
     end
@@ -646,7 +646,7 @@ end
 
 getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
-function setindex!(o::PyObject, v, s::String)
+function setindex!(o::PyObject, v, s::AbstractString)
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
@@ -660,7 +660,7 @@ end
 
 setindex!(o::PyObject, v, s::Symbol) = setindex!(o, v, string(s))
 
-function haskey(o::PyObject, s::String)
+function haskey(o::PyObject, s::AbstractString)
     if (o.o == C_NULL)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
@@ -706,7 +706,7 @@ end
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
-    members = convert(Vector{(String,PyObject)}, 
+    members = convert(Vector{(AbstractString,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     m = Module(mname)
@@ -723,7 +723,7 @@ end
 
 #########################################################################
 
-pyimport(name::String) =
+pyimport(name::AbstractString) =
     PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
                              (Ptr{Uint8},), bytestring(name)))
 
@@ -805,7 +805,7 @@ function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
             ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
                                           (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
         else
-            kw = PyObject((String=>Any)[string(k) => v for (k, v) in kwargs])
+            kw = PyObject((AbstractString=>Any)[string(k) => v for (k, v) in kwargs])
             ret = PyObject(@pycheckni ccall((@pysym :PyObject_Call), PyPtr,
                                             (PyPtr,PyPtr,PyPtr), o, arg, kw))
         end
@@ -859,7 +859,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/png", "_repr_png_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
-    T = istext(mime()) ? String : Vector{Uint8}
+    T = istext(mime()) ? AbstractString : Vector{Uint8}
     @eval begin
         function writemime(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
@@ -881,7 +881,7 @@ const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
 
 # evaluate a python string, returning PyObject, given a dictionary
 # (string/symbol => value) of local variables to use in the expression
-function pyeval_(s::String, locals::PyDict) 
+function pyeval_(s::AbstractString, locals::PyDict) 
     sb = bytestring(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
@@ -901,8 +901,8 @@ function pyeval_(s::String, locals::PyDict)
     end
 end
 
-function pyeval(s::String, returntype::TypeTuple=PyAny; kwargs...)
-    locals = PyDict{String,PyObject}()
+function pyeval(s::AbstractString, returntype::TypeTuple=PyAny; kwargs...)
+    locals = PyDict{AbstractString,PyObject}()
     for (k, v) in kwargs
         locals[string(k)] = v
     end

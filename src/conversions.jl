@@ -57,7 +57,7 @@ PyObject(s::UTF8String) =
                            PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
                            bytestring(s), sizeof(s), C_NULL))
 
-function PyObject(s::String)
+function PyObject(s::AbstractString)
     @pyinitialize
     if pyunicode_literals::Bool
         sb = bytestring(s)
@@ -70,7 +70,7 @@ function PyObject(s::String)
     end
 end
 
-function convert{T<:String}(::Type{T}, po::PyObject)
+function convert{T<:AbstractString}(::Type{T}, po::PyObject)
     @pyinitialize
     if pyisinstance(po, @pysym :PyUnicode_Type)
         convert(T, PyObject(@pycheckni ccall(PyUnicode_AsUTF8String::Ptr{Void},
@@ -84,7 +84,7 @@ end
 # TODO: should symbols be converted to a subclass of Python strings/bytes,
 #       so that PyAny conversion can convert it back to a Julia symbol?
 PyObject(s::Symbol) = PyObject(string(s))
-convert(::Type{Symbol}, po::PyObject) = symbol(convert(String, po))
+convert(::Type{Symbol}, po::PyObject) = symbol(convert(AbstractString, po))
 
 #########################################################################
 # ByteArray conversions
@@ -158,7 +158,7 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type::PyObject) || pyisins
 
 # I want to use a union, but this seems to confuse Julia's method
 # dispatch for the convert function in some circumstances
-# typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, String, Function, Dict, Tuple, Array)
+# typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array)
 abstract PyAny
 
 # I originally implemented this via multiple dispatch, with
@@ -168,7 +168,7 @@ pyany_toany(x) = isa(x, Type{PyAny}) ? Any : (isa(x, Tuple) ?
                                               map(pyany_toany, x) : x)
 
 # no-op conversions
-for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :String, 
+for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :AbstractString, 
           :Function, :Dict, :Tuple, :Array)
     @eval convert(::Type{PyAny}, x::$T) = x
 end
@@ -448,7 +448,7 @@ haskey(d::PyDict, key) = 1 == ccall(d.isdict ? (@pysym :PyDict_Contains)
                                           : (@pysym :PyMapping_HasKey),
                                   Cint, (PyPtr, PyPtr), d, PyObject(key))
 
-pyobject_call(d::PyDict, vec::String) = PyObject(@pycheckni ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
+pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckni ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
 
 keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckni ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
 
@@ -663,7 +663,7 @@ function PyObject(x::Complex{BigFloat})
 end
 
 function convert(::Type{BigFloat}, o::PyObject)
-    BigFloat(convert(String, PyObject(ccall((@pysym :PyObject_Str), 
+    BigFloat(convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str), 
                                             PyPtr, (PyPtr,), o))))
 end
 
@@ -688,7 +688,7 @@ function PyObject(i::BigInt)
 end
 
 function convert(::Type{BigInt}, o::PyObject)
-    BigInt(convert(String, PyObject(ccall((@pysym :PyObject_Str), 
+    BigInt(convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str), 
                                           PyPtr, (PyPtr,), o))))
 end
 
@@ -712,7 +712,7 @@ pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : N
 pycomplex_query(o::PyObject) = 
   pyisinstance(o, @pysym :PyComplex_Type) ? Complex128 : None
 
-pystring_query(o::PyObject) = pyisinstance(o, pystring_type::Ptr{Void}) ? String : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
+pystring_query(o::PyObject) = pyisinstance(o, pystring_type::Ptr{Void}) ? AbstractString : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
 
 pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
 
@@ -741,7 +741,7 @@ function pysequence_query(o::PyObject)
     else
         try
             otypestr = get(o["__array_interface__"], PyObject, "typestr")
-            typestr = convert(String, otypestr)
+            typestr = convert(AbstractString, otypestr)
             T = npy_typestrs[typestr[2:end]]
             if T == PyPtr
                 T = PyObject

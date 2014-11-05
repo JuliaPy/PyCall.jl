@@ -214,7 +214,7 @@ end
 function jl_IO_writelines(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        for s in PyVector{String}(pyincref(arg_))
+        for s in PyVector{AbstractString}(pyincref(arg_))
             write(io, s)
         end
         ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)

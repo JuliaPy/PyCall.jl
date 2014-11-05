@@ -3,7 +3,7 @@
 ################################################################
 # Python expects the PyMethodDef and similar strings to be constants,
 # so we define anonymous globals to hold them, returning the pointer
-function gstring_ptr(name::String, s::String)
+function gstring_ptr(name::AbstractString, s::AbstractString)
     g = gensym(name)
     @eval const $g = bytestring($s)
     convert(Ptr{Uint8}, eval(g))
@@ -38,7 +38,7 @@ const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
 const NULL_Uint8_Ptr = convert(Ptr{Uint8}, C_NULL)
-function PyMethodDef(name::String, meth::Function, flags::Integer, doc::String="")
+function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
                 cfunction(meth, PyPtr, (PyPtr,PyPtr)),
                 convert(Cint, flags),
@@ -60,7 +60,7 @@ immutable PyGetSetDef
     closure::Ptr{Void} # pass-through thunk, may be NULL
 end
 
-function PyGetSetDef(name::String, get::Function,set::Function, doc::String="")
+function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
@@ -68,7 +68,7 @@ function PyGetSetDef(name::String, get::Function,set::Function, doc::String="")
                 C_NULL)
 end
 
-function PyGetSetDef(name::String, get::Function, doc::String="")
+function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 C_NULL,
@@ -257,7 +257,7 @@ type PyTypeObject
     # save the tp_name Julia string so that it is not garbage-collected
     tp_name_save::ASCIIString
 
-    function PyTypeObject(name::String, basicsize::Integer, init::Function)
+    function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
         @pyinitialize
         if WORD_SIZE == 64 && pyversion::VersionNumber <= v"2.4"
             error("requires Python 2.5 or later on 64-bit systems")
@@ -429,7 +429,7 @@ function pyjlwrap_init()
 end
 
 # use this to create a new jlwrap type, with init to set up custom members
-function pyjlwrap_type(name::String, init::Function)
+function pyjlwrap_type(name::AbstractString, init::Function)
     pyjlwrap_init()
     PyTypeObject(name, 
                  sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type

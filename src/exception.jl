@@ -2,7 +2,7 @@
 # Wrapper around Python exceptions
 
 type PyError <: Exception
-    msg::String # message string from Julia context, or "" if none
+    msg::AbstractString # message string from Julia context, or "" if none
 
     # info returned by PyErr_Fetch/PyErr_Normalize
     T::PyObject
@@ -12,7 +12,7 @@ type PyError <: Exception
     # generate a PyError object.  Should normally only be called when
     # PyErr_Occurred returns non-NULL, and clears the Python error
     # indicator.  Assumes Python is initialized!
-    function PyError(msg::String)
+    function PyError(msg::AbstractString)
         exc = Array(PyPtr, 3)
         pexc = convert(Uint, pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
@@ -38,7 +38,7 @@ function show(io::IO, e::PyError)
     if e.traceback.o != C_NULL
         o = pycall(format_traceback::PyObject, PyObject, e.traceback)
         if o.o != C_NULL
-            for s in PyVector{String}(o)
+            for s in PyVector{AbstractString}(o)
                 print(io, s)
             end
         end
@@ -51,7 +51,7 @@ end
 # call to discard Python exceptions
 pyerr_clear() = ccall((@pysym :PyErr_Clear), Void, ())
 
-function pyerr_check(msg::String, val::Any)
+function pyerr_check(msg::AbstractString, val::Any)
     # note: don't call pyinitialize here since we will
     # only use this in contexts where initialization was already done
     if ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
@@ -60,7 +60,7 @@ function pyerr_check(msg::String, val::Any)
     val # the val argument is there just to pass through to the return value
 end
 
-pyerr_check(msg::String) = pyerr_check(msg, nothing)
+pyerr_check(msg::AbstractString) = pyerr_check(msg, nothing)
 pyerr_check() = pyerr_check("")
 
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
@@ -121,26 +121,26 @@ type PyIOError <: Exception end
 
 function pyexc_initialize()
     global pyexc
-    exc = [Exception => :PyExc_RuntimeError,
-           ErrorException => :PyExc_RuntimeError,
-           SystemError => :PyExc_SystemError,
-           TypeError => :PyExc_TypeError,
-           ParseError => :PyExc_SyntaxError,
-           ArgumentError => :PyExc_ValueError,
-           KeyError => :PyExc_KeyError,
-           LoadError => :PyExc_ImportError,
-           MethodError => :PyExc_RuntimeError,
-           EOFError => :PyExc_EOFError,
-           BoundsError => :PyExc_IndexError,
-           DivideError => :PyExc_ZeroDivisionError,
-           DomainError => :PyExc_RuntimeError,
-           OverflowError => :PyExc_OverflowError,
-           InexactError => :PyExc_ArithmeticError,
-           MemoryError => :PyExc_MemoryError,
-           StackOverflowError => :PyExc_MemoryError,
-           UndefRefError => :PyExc_RuntimeError,
-           InterruptException => :PyExc_KeyboardInterrupt,
-           PyIOError => :PyExc_IOError]
+    exc = @compat Dict(Exception => :PyExc_RuntimeError,
+                       ErrorException => :PyExc_RuntimeError,
+                       SystemError => :PyExc_SystemError,
+                       TypeError => :PyExc_TypeError,
+                       ParseError => :PyExc_SyntaxError,
+                       ArgumentError => :PyExc_ValueError,
+                       KeyError => :PyExc_KeyError,
+                       LoadError => :PyExc_ImportError,
+                       MethodError => :PyExc_RuntimeError,
+                       EOFError => :PyExc_EOFError,
+                       BoundsError => :PyExc_IndexError,
+                       DivideError => :PyExc_ZeroDivisionError,
+                       DomainError => :PyExc_RuntimeError,
+                       OverflowError => :PyExc_OverflowError,
+                       InexactError => :PyExc_ArithmeticError,
+                       MemoryError => :PyExc_MemoryError,
+                       StackOverflowError => :PyExc_MemoryError,
+                       UndefRefError => :PyExc_RuntimeError,
+                       InterruptException => :PyExc_KeyboardInterrupt,
+                       PyIOError => :PyExc_IOError)
     for (k,v) in exc
         p = convert(Ptr{PyPtr}, pysym_e(v))
         if p != C_NULL

@@ -9,7 +9,7 @@
 
 # Define a Python method/function object from f(PyPtr,PyPtr)::PyPtr.
 # Requires f to be a top-level function.
-function pymethod(f::Function, name::String, flags::Integer)
+function pymethod(f::Function, name::AbstractString, flags::Integer)
     # Python expects the PyMethodDef structure to be a *constant*,
     # so we define an anonymous global to hold it.
     def = gensym("PyMethodDef")

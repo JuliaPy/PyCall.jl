@@ -58,7 +58,7 @@ function npyinitialize()
     end
 
     # directory for numpy include files to parse
-    inc = pycall(pyimport("numpy")["get_include"], String)
+    inc = pycall(pyimport("numpy")["get_include"], AbstractString)
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try
@@ -209,8 +209,8 @@ type PyArray_Info
     readonly::Bool
 
     function PyArray_Info(a::PyObject)
-        ai = PyDict{String,PyObject}(a["__array_interface__"])
-        typestr = convert(String, ai["typestr"])
+        ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
+        typestr = convert(AbstractString, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
         datatuple = convert((Int,Bool), ai["data"])
         sz = convert(Vector{Int}, ai["shape"])
