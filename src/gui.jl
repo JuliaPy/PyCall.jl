@@ -17,6 +17,8 @@ pyexists(mod) = try
 pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
+     (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
+     (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
      
 # get or set the default GUI; doesn't affect running GUI
@@ -37,7 +39,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if g != :wx && g != :gtk && g != :qt && g != :default
+        if !(g in (:wx,:gtk,:qt,:qt_pyqt4,:qt_pyside,:default))
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -133,6 +135,10 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
             eventloops[gui] = wx_eventloop(sec)
         elseif gui == :gtk
             eventloops[gui] = gtk_eventloop(sec)
+        elseif gui == :qt_pyqt4
+            eventloops[gui] = qt_eventloop("PyQt4", sec)
+        elseif gui == :qt_pyside
+            eventloops[gui] = qt_eventloop("PySide", sec)
         elseif gui == :qt
             try
                 eventloops[gui] = qt_eventloop("PyQt4", sec)

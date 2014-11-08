@@ -312,7 +312,7 @@ Python modules).
 You can set a GUI event loop via:
 
 * `pygui_start(gui::Symbol=pygui())`.  Here, `gui` is either `:wx`,
-  `:gtk`, or `:qt` to start the respective toolkit's event loop.  It
+  `:gtk`, or `:qt` to start the respective toolkit's event loop.  (`:qt` will use PyQt4 or PySide, preferring the former; if you need to require one or the other you can instead use `:qt_pyqt4` or `:qt_pyside`, respectively.) It
   defaults to the return value of `pygui()`, which returns a current
   default GUI (see below).  Passing a `gui` argument also changes the
   default GUI, equivalent to calling `pygui(gui)` below.  You may
