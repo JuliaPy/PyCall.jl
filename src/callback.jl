@@ -13,10 +13,10 @@ function pymethod(f::Function, name::AbstractString, flags::Integer)
     # Python expects the PyMethodDef structure to be a *constant*,
     # so we define an anonymous global to hold it.
     def = gensym("PyMethodDef")
-    @eval const $def = PyMethodDef($name, $f, $flags)
+    @eval const $def = PyMethodDef[PyMethodDef($name, $f, $flags)]
     PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
                              (Ptr{PyMethodDef}, Ptr{Void}, Ptr{Void}),
-                             &eval(def), C_NULL, C_NULL))
+                             eval(def), C_NULL, C_NULL))
 end
 
 ################################################################
