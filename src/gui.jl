@@ -5,7 +5,7 @@
 ############################################################################
 
 # global variable to specify default GUI toolkit to use
-gui = :default # one of :default, :wx, :qt, or :gtk
+gui = :default # one of :default, :wx, :qt, :tk, or :gtk
 
 pyexists(mod) = try
     pyimport(mod)
@@ -14,9 +14,16 @@ pyexists(mod) = try
     false
   end
 
+# Tkinter was renamed to tkinter in Python 3
+function tkinter_name()
+    pyinitialize()
+    return  pyversion < v"3" ? "Tkinter" : "tkinter"
+end
+
 pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
+     (gui == :tk && pyexists(tkinter_name())) ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
      (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
@@ -27,7 +34,7 @@ function pygui()
     if gui::Symbol != :default && pygui_works(gui::Symbol)
         return gui::Symbol
     else
-        for g in (:qt, :wx, :gtk)
+        for g in (:tk, :qt, :wx, :gtk)
             if pygui_works(g)
                 gui::Symbol = g
                 return gui::Symbol
@@ -39,7 +46,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if !(g in (:wx,:gtk,:qt,:qt_pyqt4,:qt_pyside,:default))
+        if !(g in (:wx,:gtk,:tk,:qt,:qt_pyqt4,:qt_pyside,:default))
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -125,6 +132,17 @@ function wx_eventloop(sec::Real=50e-3)
     install_doevent(doevent, sec)
 end
 
+# Tk: (Tkinter/tkinter module)
+function Tk_eventloop(sec::Real=50e-3)
+    Tk = pyimport(tkinter_name())
+    @doevent begin
+        root = Tk["_default_root"]
+        if root.o != pynothing::PyPtr
+            pycall(root["update"], PyObject)
+        end
+    end
+    install_doevent(doevent, sec)
+end
 # cache running event loops (so that we don't start any more than once)
 const eventloops = Dict{Symbol,Timer}()
 
@@ -135,6 +153,8 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
             eventloops[gui] = wx_eventloop(sec)
         elseif gui == :gtk
             eventloops[gui] = gtk_eventloop(sec)
+        elseif gui == :tk
+            eventloops[gui] = Tk_eventloop(sec)
         elseif gui == :qt_pyqt4
             eventloops[gui] = qt_eventloop("PyQt4", sec)
         elseif gui == :qt_pyside
