@@ -418,7 +418,11 @@ end
 function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
     try
         info = PyArray_Info(o)
-        copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+        try
+            copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+        catch
+            return py2array(T, Array(pyany_toany(T), info.sz...), o, 1, 1)
+        end
     catch
         py2array(T, o)
     end
@@ -427,7 +431,15 @@ end
 function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
     try
         info = PyArray_Info(o)
-        copy(PyArray{T,N}(o, info)) # will check T == info.T and N == length(info.sz)
+        try
+            copy(PyArray{T,N}(o, info)) # will check T == info.T and N == length(info.sz)
+        catch
+            nd = length(info.sz)
+            if nd != N
+                throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
+            end
+            return py2array(T, Array(pyany_toany(T), info.sz...), o, 1, 1)
+        end
     catch
         A = py2array(T, o)
         if ndims(A) != N
