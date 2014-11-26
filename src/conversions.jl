@@ -693,6 +693,11 @@ function convert(::Type{BigInt}, o::PyObject)
 end
 
 #########################################################################
+# Dates (Calendar time)
+
+include("pydates.jl")
+
+#########################################################################
 # Inferring Julia types at runtime from Python objects:
 #
 # [Note that we sometimes use the PyFoo_Check API and sometimes we use
@@ -784,6 +789,7 @@ function pytype_query(o::PyObject, default::Type)
     @return_not_None pycomplex_query(o)
     @return_not_None pystring_query(o)
     @return_not_None pyfunction_query(o)
+    @return_not_None pydate_query(o)
     @return_not_None pydict_query(o)
     @return_not_None pysequence_query(o)
     @return_not_None pyptr_query(o)

@@ -31,10 +31,10 @@ compare it to the built-in Julia `sin`:
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
 Type conversions are automatically performed for numeric, boolean,
-string, IO stream, and function types, along with tuples, arrays/lists, and
-dictionaries of these types. (Python functions can be converted/passed to
-Julia functions and vice versa!)  Other types are supported via the
-generic PyObject type, below.
+string, IO stream, date/period, and function types, along with tuples,
+arrays/lists, and dictionaries of these types. (Python functions can
+be converted/passed to Julia functions and vice versa!)  Other types
+are supported via the generic PyObject type, below.
 
 Python submodules must be imported by a separate `@pyimport` call, and
 in this case you must supply an identifier to to use in Julia.  For example
@@ -114,9 +114,10 @@ The PyCall module also provides a new type `PyObject` (a wrapper around
 Constructors `PyObject(o)` are provided for a number of Julia types,
 and PyCall also supplies `convert(T, o::PyObject)` to convert
 PyObjects back into Julia types `T`.  Currently, the types supported
-are numbers (integer, real, and complex), booleans, strings, and
-functions, along with tuples and arrays/lists thereof, but more are
-planned.  (Julia symbols are converted to Python strings.)
+are numbers (integer, real, and complex), booleans, strings, IO streams,
+dates/periods, and functions, along with tuples and arrays/lists
+thereof, but more are planned.  (Julia symbols are converted to Python
+strings.)
 
 Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a

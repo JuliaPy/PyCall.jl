@@ -120,7 +120,7 @@ end
 pyisinstance(o::PyObject, t::PyObject) = 
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-pyisinstance(o::PyObject, t::Ptr{Void}) = 
+pyisinstance(o::PyObject, t::Union(Ptr{Void},PyPtr)) = 
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Void}, o::PyObject) =
@@ -197,9 +197,6 @@ pyunicode_literals = false
 # traceback.format_tb function, for show(PyError)
 format_traceback = PyObject()
 
-# cache whether Python hash values are Clong (Python < 3.2) or Int (>= 3.2)
-pyhashlong = false
-
 # Return the Python version as a Julia VersionNumber
 pyversion = v"0"
 
@@ -222,7 +219,6 @@ function pyinitialize(libpy::Ptr{Void})
     global pyunicode_literals
     global pynothing
     global pyxrange
-    global pyhashlong
     global pystring_fromstring
     global pystring_asstring
     global pystring_size
@@ -317,10 +313,11 @@ function pyinitialize(libpy::Ptr{Void})
         pyversion::VersionNumber = 
           VersionNumber(convert((Int,Int,Int,AbstractString,Int), 
                                 pyimport("sys")["version_info"])[1:3]...)
-        pyhashlong::Bool = pyversion::VersionNumber < v"3.2"
+        global const Py_hash_t = pyversion::VersionNumber < v"3.2" ? Clong:Int
         pyunicode_literals::Bool = pyversion::VersionNumber >= v"3.0"
         format_traceback::PyObject = pyimport("traceback")["format_tb"]
         pyexc_initialize()
+        init_datetime()
         if !already_inited
             # some modules (e.g. IPython) expect sys.argv to be set
             if pyversion.major < 3
@@ -591,9 +588,7 @@ function hash(o::PyObject)
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
         hashsalt(unsafe_pyjlwrap_to_objref(o.o))
     else
-        h = pyhashlong::Bool ? # changed to Py_hash_t in Python 3.2
-               ccall((@pysym :PyObject_Hash), Clong, (PyPtr,), o) :
-               ccall((@pysym :PyObject_Hash), Int, (PyPtr,), o)
+        h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
             return hashsalt(o.o)
