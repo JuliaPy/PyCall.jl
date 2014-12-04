@@ -96,3 +96,6 @@ end
 @test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
 @test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
 @test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
+
+# fixme: is there any nontrivial mimewritable test we can do?
+@test !mimewritable("text/html", PyObject(1))
