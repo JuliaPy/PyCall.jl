@@ -864,7 +864,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
             throw(MethodError(writemime, (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
-            o.o != C_NULL && haskey(o, $method) &&
+            o.o != C_NULL && haskey(o, $method) && o[$method].o != pynothing::PyPtr &&
             pycall(o[$method], PyObject).o != pynothing::PyPtr
     end
 end
