@@ -5,9 +5,9 @@
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyint_from_size_t::Ptr{Void},
+PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyint_from_size_t,
                                                  PyPtr, (Uint,), i))
-PyObject(i::Integer) = PyObject(@pycheckn ccall(pyint_from_ssize_t::Ptr{Void},
+PyObject(i::Integer) = PyObject(@pycheckn ccall(pyint_from_ssize_t,
                                                 PyPtr, (Int,), i))
 
 PyObject(b::Bool) = PyObject(@pycheckn ccall((@pysym :PyBool_FromLong), 
@@ -20,12 +20,12 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble), 
                                                 real(c), imag(c)))
 
-PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(pynothing::PyPtr)); end
+PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(pynothing)); end
 
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) = 
-  convert(T, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
+  convert(T, @pycheck ccall(pyint_as_ssize_t, Int, (PyPtr,), po))
 
 if WORD_SIZE == 32
   convert{T<:Union(Int64,Uint64)}(::Type{T}, po::PyObject) = 
@@ -33,7 +33,7 @@ if WORD_SIZE == 32
 end
 
 convert(::Type{Bool}, po::PyObject) = 
-  convert(Bool, @pycheck ccall(pyint_as_ssize_t::Ptr{Void}, Int, (PyPtr,), po))
+  convert(Bool, @pycheck ccall(pyint_as_ssize_t, Int, (PyPtr,), po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) = 
   convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), po))
@@ -53,19 +53,19 @@ convert(::Type{Nothing}, po::PyObject) = nothing
 # String conversions (both bytes arrays and unicode strings)
 
 PyObject(s::UTF8String) =
-  PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
+  PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8,
                            PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
                            bytestring(s), sizeof(s), C_NULL))
 
 function PyObject(s::AbstractString)
     @pyinitialize
-    if pyunicode_literals::Bool
+    if pyunicode_literals
         sb = bytestring(s)
-        PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8::Ptr{Void},
+        PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8,
                                  PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
                                  sb, sizeof(sb), C_NULL))
     else
-        PyObject(@pycheckn ccall(pystring_fromstring::Ptr{Void},
+        PyObject(@pycheckn ccall(pystring_fromstring,
                                  PyPtr, (Ptr{Uint8},), bytestring(s)))
     end
 end
@@ -73,10 +73,10 @@ end
 function convert{T<:AbstractString}(::Type{T}, po::PyObject)
     @pyinitialize
     if pyisinstance(po, @pysym :PyUnicode_Type)
-        convert(T, PyObject(@pycheckni ccall(PyUnicode_AsUTF8String::Ptr{Void},
+        convert(T, PyObject(@pycheckni ccall(PyUnicode_AsUTF8String,
                                              PyPtr, (PyPtr,), po)))
     else
-        convert(T, bytestring(@pycheckni ccall(pystring_asstring::Ptr{Void},
+        convert(T, bytestring(@pycheckni ccall(pystring_asstring,
                                                Ptr{Uint8}, (PyPtr,), po)))
     end
 end
@@ -100,9 +100,9 @@ function convert(::Type{Vector{Uint8}}, po::PyObject)
     if !ispybytearray(po)
         # TODO: support Py_buffer interface? via PyBytes_FromObject?
         try
-            p = @pycheckni ccall(pystring_asstring::Ptr{Void},
+            p = @pycheckni ccall(pystring_asstring,
                                   Ptr{Uint8}, (PyPtr,), po)
-            len = ccall(pystring_size::Ptr{Void}, Int, (PyPtr,), po)
+            len = ccall(pystring_size, Int, (PyPtr,), po)
             a = Array(Uint8, len)
             ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t),
                   a, p, len)
@@ -128,18 +128,18 @@ end
 #########################################################################
 # Pointer conversions, using ctypes, PyCObject, or PyCapsule
 
-PyObject(p::Ptr) = begin @pyinitialize; (py_void_p::Function)(p); end
+PyObject(p::Ptr) = begin @pyinitialize; py_void_p(p); end
 
 function convert(::Type{Ptr{Void}}, po::PyObject)
     @pyinitialize
-    if pyisinstance(po, c_void_p_Type::PyObject)
+    if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL : 
           convert(Ptr{Void}, convert(Uint, po["value"]))
-    elseif pyisinstance(po, PyCObject_Type::Ptr{Void})
+    elseif pyisinstance(po, PyCObject_Type)
         @pychecki ccall((@pysym :PyCObject_AsVoidPtr), Ptr{Void}, (PyPtr,), po)
-    elseif pyisinstance(po, PyCapsule_Type::Ptr{Void})
+    elseif pyisinstance(po, PyCapsule_Type)
         @pychecki ccall((@pysym :PyCapsule_GetPointer), 
                         Ptr{Void}, (PyPtr,Ptr{Uint8}),
                         po, ccall((@pysym :PyCapsule_GetName), 
@@ -149,7 +149,7 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
     end
 end
 
-pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type::PyObject) || pyisinstance(po, PyCObject_Type::Ptr{Void}) || pyisinstance(po, PyCapsule_Type::Ptr{Void}) ? Ptr{Void} : None
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, PyCObject_Type) || pyisinstance(po, PyCapsule_Type) ? Ptr{Void} : None
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{PyAny}, etc.,
@@ -589,7 +589,7 @@ end
 # Ranges: integer ranges are converted to xrange,
 #         while other ranges (<: AbstractVector) are converted to lists
 
-xrange(start, stop, step) = pycall(pyxrange::PyObject, PyObject,
+xrange(start, stop, step) = pycall(pyxrange, PyObject,
                                    start, stop, step)
 
 function PyObject{T<:Integer}(r::Ranges{T})
@@ -630,20 +630,20 @@ end
 # at the cost of slowing down initialization in the common case where
 # BigFloat conversion is not needed.
 prec = 0
+mpmath_initialized = false
 function mpmath_init()
-    global mpmath
-    global mpf
-    global mpc
+    global mpmath_initialized
     global prec
-    if (mpmath::PyObject).o == C_NULL
-        mpmath::PyObject = pyimport("mpmath")
-        mpf = (mpmath::PyObject)["mpf"]
-        mpc = (mpmath::PyObject)["mpc"]
+    if !(mpmath_initialized::Bool)
+        global const mpmath = pyimport("mpmath")
+        global const mpf = mpmath["mpf"]
+        global const mpc = mpmath["mpc"]
+        mpmath_initialized::Bool = true
     end
     curprec = get_bigfloat_precision()
     if prec::Int != curprec
         prec::Int = curprec
-        (mpmath::PyObject)["mp"]["prec"] = curprec
+        mpmath["mp"]["prec"] = curprec
     end
 end
 
@@ -654,12 +654,12 @@ end
 
 function PyObject(x::BigFloat)
     mpmath_init()
-    pycall(mpf::PyObject, PyObject, string(x))
+    pycall(mpf, PyObject, string(x))
 end
 
 function PyObject(x::Complex{BigFloat})
     mpmath_init()
-    pycall(mpc::PyObject, PyObject, string(real(x)), string(imag(x)))
+    pycall(mpc, PyObject, string(real(x)), string(imag(x)))
 end
 
 function convert(::Type{BigFloat}, o::PyObject)
@@ -676,7 +676,7 @@ function convert(::Type{Complex{BigFloat}}, o::PyObject)
     end
 end
 
-pymp_query(o::PyObject) = pyisinstance(o, mpf::PyObject) ? BigFloat : pyisinstance(o, mpc::PyObject) ? Complex{BigFloat} : None
+pymp_query(o::PyObject) = mpmath_initialized::Bool ? (pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc::PyObject) ? Complex{BigFloat} : None) : None
 
 #########################################################################
 # BigInt conversion to Python "long" integers
@@ -708,7 +708,7 @@ include("pydates.jl")
 # for use with the convert function, or None if there isn't one.
 
 # TODO: In Python 3.x, the BigInt check here won't work since int == long.
-pyint_query(o::PyObject) = pyisinstance(o, pyint_type::Ptr{Void}) ? 
+pyint_query(o::PyObject) = pyisinstance(o, pyint_type) ? 
   (pyisinstance(o, @pysym :PyBool_Type) ? Bool : Int) : 
   pyisinstance(o, @pysym :PyLong_Type) ? BigInt : None
 
@@ -717,11 +717,11 @@ pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : N
 pycomplex_query(o::PyObject) = 
   pyisinstance(o, @pysym :PyComplex_Type) ? Complex128 : None
 
-pystring_query(o::PyObject) = pyisinstance(o, pystring_type::Ptr{Void}) ? AbstractString : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
+pystring_query(o::PyObject) = pyisinstance(o, pystring_type) ? AbstractString : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
 
 pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
 
-pynothing_query(o::PyObject) = o.o == pynothing::PyPtr ? Nothing : None
+pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some 
@@ -739,7 +739,7 @@ function pysequence_query(o::PyObject)
                       pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), 
                                                   PyPtr, (PyPtr,Int), o,i-1)),
                                    PyAny))
-    elseif pyisinstance(o, pyxrange::PyObject)
+    elseif pyisinstance(o, pyxrange)
         return Ranges
     elseif ispybytearray(o)
         return Vector{Uint8}

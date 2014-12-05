@@ -11,36 +11,31 @@
 #      when po is deallocated, and this callback function removes
 #      jo from pycall_gc so that Julia can garbage-collect it.
 
-pycall_gc = Dict{PyPtr,Any}()
+const pycall_gc = Dict{PyPtr,Any}()
 
 function weakref_callback(callback::PyPtr, wo::PyPtr)
-    global pycall_gc
-    delete!(pycall_gc::Dict{PyPtr,Any}, wo)
+    delete!(pycall_gc, wo)
     ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
-    ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
-    return pynothing::PyPtr
+    ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
+    return pynothing
 end
 
-weakref_callback_obj = PyObject() # weakref_callback Python method
+const weakref_callback_obj = PyObject() # weakref_callback Python method
 
 function pygc_finalize()
-    global pycall_gc
-    global weakref_callback_obj
     pydecref(weakref_callback_obj)
-    pycall_gc::Dict{PyPtr,Any} = Dict{PyPtr,Any}()
+    empty!(pycall_gc)
 end
 
 # "embed" a reference to jo in po, using the weak-reference mechanism
 function pyembed(po::PyObject, jo::Any)
-    global pycall_gc
-    global weakref_callback_obj
-    if (weakref_callback_obj::PyObject).o == C_NULL
-        weakref_callback_obj::PyObject = pymethod(weakref_callback,
-                                                  "weakref_callback",
-                                                  METH_O)
+    if weakref_callback_obj.o == C_NULL
+        weakref_callback_obj.o = pyincref(pymethod(weakref_callback,
+                                                   "weakref_callback",
+                                                   METH_O)).o
     end
     wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr), 
                          po, weakref_callback_obj)
-    (pycall_gc::Dict{PyPtr,Any})[wo] = jo
+    pycall_gc[wo] = jo
     return po
 end

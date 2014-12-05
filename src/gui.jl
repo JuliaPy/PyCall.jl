@@ -100,7 +100,7 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
     maxtime = PyObject(50)
     @doevent begin
         app = pycall(instance, PyObject)
-        if app.o != pynothing::PyPtr
+        if app.o != pynothing
             app["_in_event_loop"] = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
@@ -116,7 +116,7 @@ function wx_eventloop(sec::Real=50e-3)
     EventLoopActivator = wx["EventLoopActivator"]
     @doevent begin
         app = pycall(GetApp, PyObject)
-        if app.o != pynothing::PyPtr
+        if app.o != pynothing
             app["_in_event_loop"] = true
             evtloop = pycall(EventLoop, PyObject)
             ea = pycall(EventLoopActivator, PyObject, evtloop)
@@ -137,7 +137,7 @@ function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
     @doevent begin
         root = Tk["_default_root"]
-        if root.o != pynothing::PyPtr
+        if root.o != pynothing
             pycall(root["update"], PyObject)
         end
     end

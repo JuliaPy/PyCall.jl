@@ -259,7 +259,7 @@ type PyTypeObject
 
     function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
         @pyinitialize
-        if WORD_SIZE == 64 && pyversion::VersionNumber <= v"2.4"
+        if WORD_SIZE == 64 && pyversion <= v"2.4"
             error("requires Python 2.5 or later on 64-bit systems")
         end
         if pyhassym(:_Py_NewReference)
@@ -276,10 +276,10 @@ type PyTypeObject
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch 0; end
         Py_TPFLAGS_DEFAULT = 
-          pyversion::VersionNumber >= v"3.0" ?
+          pyversion >= v"3.0" ?
             (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
              Py_TPFLAGS_HAVE_VERSION_TAG) :
-          pyversion::VersionNumber >= v"2.5" ?
+          pyversion >= v"2.5" ?
             (Py_TPFLAGS_HAVE_GETCHARBUFFER |
              Py_TPFLAGS_HAVE_SEQUENCE_IN |
              Py_TPFLAGS_HAVE_INPLACEOPS |
@@ -352,8 +352,8 @@ end
 # Wrap a Python type around a Julia Any object
 
 # the PyMemberDef array must not be garbage-collected
-const pyjlwrap_membername = bytestring("jl_value")
-const pyjlwrap_doc = bytestring("Julia jl_value_t* (Any object)")
+const pyjlwrap_membername = "jl_value"
+const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
 const pyjlwrap_members = 
   PyMemberDef[ PyMemberDef(pyjlwrap_membername,
                            T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
@@ -370,11 +370,9 @@ end
 
 # destructor for jlwrap instance, assuming it was created with pyjlwrap_new
 function pyjlwrap_dealloc(o::PyPtr)
-    global pycall_gc
-    delete!(pycall_gc::Dict{PyPtr,Any}, o)
+    delete!(pycall_gc, o)
     return nothing
 end
-const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
 
 unsafe_pyjlwrap_to_objref(o::PyPtr) = 
   unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Void}}, o), 3))
@@ -386,14 +384,12 @@ function pyjlwrap_repr(o::PyPtr)
     o.o = convert(PyPtr, C_NULL) # don't decref
     return oret
 end
-const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
 
 function pyjlwrap_hash(o::PyPtr) 
     h = hash(unsafe_pyjlwrap_to_objref(o))
     # Python hashes are not permitted to return -1!!
     return h == uint(-1) ? pysalt::Uint : h::Uint
 end
-const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, Uint, (PyPtr,))
 
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
 function pyjlwrap_hash32(o::PyPtr)
@@ -402,40 +398,33 @@ function pyjlwrap_hash32(o::PyPtr)
     # Python hashes are not permitted to return -1!!
     return h == uint32(-1) ? uint32(pysalt)::Uint32 : h::Uint32
 end
-const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, Uint32, (PyPtr,))
 
-jlWrapType = PyTypeObject()
-
+# called in pyinitialize
 function pyjlwrap_init()
-    @pyinitialize
-    if pyversion::VersionNumber < v"2.6"
+    if pyversion < v"2.6"
         error("Python version 2.6 or later required for T_PYSSIZET")
     end
-    global jlWrapType
-    if (jlWrapType::PyTypeObject).tp_name == C_NULL
-        jlWrapType::PyTypeObject =
-          PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
-                       t::PyTypeObject -> begin
-                           t.tp_flags |= Py_TPFLAGS_BASETYPE
-                           t.tp_members = pointer(pyjlwrap_members);
-                           t.tp_dealloc = pyjlwrap_dealloc_ptr
-                           t.tp_repr = pyjlwrap_repr_ptr
-                           t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
-                              pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
-                       end)
-    end
-
+    global const jlWrapType =
+        PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
+                     t::PyTypeObject -> begin
+                         t.tp_flags |= Py_TPFLAGS_BASETYPE
+                         t.tp_members = pointer(pyjlwrap_members);
+                         t.tp_dealloc = pyjlwrap_dealloc_ptr
+                         t.tp_repr = pyjlwrap_repr_ptr
+                         t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
+                         pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+                     end)
 end
 
 # use this to create a new jlwrap type, with init to set up custom members
 function pyjlwrap_type(name::AbstractString, init::Function)
-    pyjlwrap_init()
+    @pyinitialize
     PyTypeObject(name, 
                  sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
                  t::PyTypeObject -> begin
                      t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, 
                                        (Ptr{PyTypeObject},),
-                                       &(jlWrapType::PyTypeObject))
+                                       &jlWrapType)
                      init(t)
                  end)
 end
@@ -445,18 +434,20 @@ end
 #  since, the jl_value_t* may be to a temporary copy.  But don't need
 #  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
-    global pycall_gc
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
                                  PyPtr, (Ptr{PyTypeObject},), &pyT))
-    (pycall_gc::Dict{PyPtr,Any})[o.o] = value
+    pycall_gc[o.o] = value
     p = convert(Ptr{Ptr{Void}}, o.o)
     unsafe_store!(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
     return o
 end
 
-pyjlwrap_new(x::Any) = begin pyjlwrap_init(); pyjlwrap_new(jlWrapType::PyTypeObject, x); end
+function pyjlwrap_new(x::Any)
+    @pyinitialize
+    pyjlwrap_new(jlWrapType, x)
+end
 
-is_pyjlwrap(o::PyObject) = (jlWrapType::PyTypeObject).tp_name != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &(jlWrapType::PyTypeObject)) == 1
+is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,

@@ -36,7 +36,7 @@ function show(io::IO, e::PyError)
     end
     
     if e.traceback.o != C_NULL
-        o = pycall(format_traceback::PyObject, PyObject, e.traceback)
+        o = pycall(format_traceback, PyObject, e.traceback)
         if o.o != C_NULL
             for s in PyVector{AbstractString}(o)
                 print(io, s)
@@ -63,10 +63,16 @@ end
 pyerr_check(msg::AbstractString) = pyerr_check(msg, nothing)
 pyerr_check() = pyerr_check("")
 
+# extract function name from ccall((@pysym :Foo)...) or ccall(:Foo,...) exprs
+callsym(s::Symbol) = s
+callsym(s::QuoteNode) = s.value
+import Base.Meta.isexpr
+callsym(ex::Expr) = isexpr(ex,:macrocall,2) ? callsym(ex.args[2]) : isexpr(ex,:ccall) ? callsym(ex.args[1]) : ex
+
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
 # (The "i" variant assumes Python is initialized.)
 macro pychecki(ex)
-    :(pyerr_check($(string(ex.args[1].args[2].args[1])), $ex))
+    :(pyerr_check($(string(callsym(ex))), $ex))
 end
 macro pycheck(ex)
     quote
@@ -82,8 +88,8 @@ macro pycheckvi(ex, bad)
         val = $ex
         if val == $bad
             # throw a PyError if available, otherwise throw ErrorException
-            pyerr_check($(string(ex.args[1].args[2].args[1])))
-            error($(string(ex.args[1].args[2].args[1])), " failed")
+            pyerr_check($(string(callsym(ex))))
+            error($(string(callsym(ex))), " failed")
         end
         val
     end
@@ -116,11 +122,10 @@ end
 #########################################################################
 # Mapping of Julia Exception types to Python exceptions
 
-pyexc = Dict{DataType, PyPtr}()
+const pyexc = Dict{DataType, PyPtr}()
 type PyIOError <: Exception end
 
 function pyexc_initialize()
-    global pyexc
     exc = @compat Dict(Exception => :PyExc_RuntimeError,
                        ErrorException => :PyExc_RuntimeError,
                        SystemError => :PyExc_SystemError,
@@ -144,20 +149,18 @@ function pyexc_initialize()
     for (k,v) in exc
         p = convert(Ptr{PyPtr}, pysym_e(v))
         if p != C_NULL
-            (pyexc::Dict)[k] = unsafe_load(p)
+            pyexc[k] = unsafe_load(p)
         end
     end
 end
 
 function pyexc_finalize()
-    global pyexc
-    pyexc::Dict = Dict{DataType, PyPtr}()
+    empty!(pyexc)
 end
 
 function pyraise(e)
-    global pyexc
     eT = typeof(e)
-    pyeT = haskey(pyexc::Dict, eT) ? (pyexc::Dict)[eT] : (pyexc::Dict)[Exception]
+    pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
     ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
           pyeT, bytestring(string("Julia exception: ", e)))
 end
