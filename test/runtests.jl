@@ -84,18 +84,20 @@ let x = PyVector(PyAny[])
     @test x == ["bar"]
 end
 
-# Dates is built-in in Julia 0.4
-if !isdefined(Base, :Dates)
-    import Dates
+if pyversion >= v"2.7"
+    # Dates is built-in in Julia 0.4
+    if !isdefined(Base, :Dates)
+        import Dates
+    end
+    @test roundtripeq(Dates.Date(2012,3,4))
+    @test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
+    @test roundtripeq(Dates.Millisecond(typemax(Int32)))
+    @test roundtripeq(Dates.Millisecond(typemin(Int32)))
+    @test roundtripeq(Dates.Second, Dates.Second(typemax(Int32)))
+    @test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
+    @test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
+    @test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
 end
-@test roundtripeq(Dates.Date(2012,3,4))
-@test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
-@test roundtripeq(Dates.Millisecond(typemax(Int32)))
-@test roundtripeq(Dates.Millisecond(typemin(Int32)))
-@test roundtripeq(Dates.Second, Dates.Second(typemax(Int32)))
-@test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
-@test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
-@test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
 
 # fixme: is there any nontrivial mimewritable test we can do?
 @test !mimewritable("text/html", PyObject(1))

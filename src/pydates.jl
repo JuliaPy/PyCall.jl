@@ -40,12 +40,18 @@ immutable PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
     microseconds::Cint
 end
 
+# called from pyinitialize
 function init_datetime()
+    if pyversion < v"2.7"
+        warn("date conversions are not supported in Python $pyversion")
+        return
+    end
+
     # emulate PyDateTime_IMPORT:
     global const PyDateTimeAPI =
-        unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
-                                    Ptr{PyDateTime_CAPI}, (Ptr{Uint8}, Cint),
-                                    "datetime.datetime_CAPI", 0))
+        unsafe_load(@pycheckni ccall((@pysym :PyCapsule_Import),
+                                     Ptr{PyDateTime_CAPI}, (Ptr{Uint8}, Cint),
+                                     "datetime.datetime_CAPI", 0))
 
     # the DateTime, Date, and Time objects are a struct with fields:
     #     ob_refcnt::Int
