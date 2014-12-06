@@ -18,7 +18,7 @@ function dlopen_libpython(python::AbstractString)
     v = pyconfigvar(python,"VERSION","")
     libs = [ dlprefix*"python"*v*"."*dlext, dlprefix*"python."*dlext ]
     lib = pyconfigvar(python, "LIBRARY")
-    lib != "None" && unshift!(libs, splitext(lib)[1]*dlext)
+    lib != "None" && unshift!(libs, splitext(lib)[1]*"."*dlext)
     lib = pyconfigvar(python, "LDLIBRARY")
     lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
     libs = unique(libs)
