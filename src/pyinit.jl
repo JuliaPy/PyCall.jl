@@ -290,7 +290,7 @@ end
 
 # need to be able to get the version before Python is initialized
 Py_GetVersion(libpy=libpython) = bytestring(ccall(dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
-getversion(libpy) = VersionNumber(split(Py_GetVersion(libpy))[1])
+getversion(libpy) = convert(VersionNumber, split(Py_GetVersion(libpy))[1])
 
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::AbstractString)
