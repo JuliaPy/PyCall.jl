@@ -114,6 +114,7 @@ for T in (:Date, :DateTime, :Delta)
 end
 
 function pydate_query(o::PyObject)
+    pyversion.major == 2 && pyversion.minor < 7 && return None
     if PyDate_Check(o)
         return PyDateTime_Check(o) ? Dates.DateTime : Dates.Date
     elseif PyDelta_Check(o)
