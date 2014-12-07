@@ -87,7 +87,7 @@ function wbytestring(s::AbstractString)
             end
         else # UTF16, presumably
             @assert sizeof(Cwchar_t) == 2
-            if defined(UTF16String) # Julia 0.3
+            if isdefined(Base, :UTF16String) # Julia 0.3
                 s16 = utf16(s)
                 w = Array(Cwchar_t, length(s.data)+1)
                 copy!(w,1, s16.data,1, length(s.data))
