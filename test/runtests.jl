@@ -101,3 +101,48 @@ end
 
 # fixme: is there any nontrivial mimewritable test we can do?
 @test !mimewritable("text/html", PyObject(1))
+
+# IO (issue #107)
+@test roundtripeq(STDOUT)
+let buf = IOBuffer(false, true), obuf = PyObject(buf)
+    @test !obuf[:isatty]()
+    @test obuf[:writable]()
+    @test !obuf[:readable]()
+    @test obuf[:seekable]()
+    obuf[:write]("hello")
+    @test position(buf) == obuf[:tell]() == 5
+    @test obuf[:seek](-2, 1) == position(buf) == 3
+    @test obuf[:seek](0, 0) == position(buf) == 0
+    @test takebuf_string(buf) == "hello"
+    obuf[:writelines](["first\n", "second\n", "third"])
+    @test takebuf_string(buf) == "first\nsecond\nthird"
+    obuf[:write](convert(Vector{Uint8}, "möre stuff"))
+    @test takebuf_string(buf) == "möre stuff"
+    @test isopen(buf) == !obuf[:closed] == true
+    obuf[:close]()
+    @test isopen(buf) == !obuf[:closed] == false
+end
+let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
+    @test !obuf[:writable]()
+    @test obuf[:readable]()  
+    @test obuf[:readlines]() == ["hello\n","again"]
+end
+let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
+    @test obuf[:readall]() == convert(Vector{Uint8}, "hello\nagain")
+end
+let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
+    @test obuf[:encoding] == "UTF-8"
+    @test obuf[:readall]() == "hello\nagain"
+end
+let nm = tempname()
+    open(nm, "w") do f
+        @test roundtripeq(f)
+        pf = PyObject(f)
+        @test pf[:fileno]() == fd(f)
+        @test pf[:writable]()
+        @test !pf[:readable]()
+        pf[:write](nm)
+        pf[:flush]()
+    end
+    @test readall(nm) == nm
+end

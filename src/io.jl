@@ -338,7 +338,7 @@ end
 pyio_initialized = false
 function pyio_initialize()
     global pyio_initialized
-    if pyio_initialized::Bool
+    if !pyio_initialized::Bool
         global const jl_IOType =
             pyjlwrap_type("PyCall.jl_IO",
                           t -> begin
