@@ -112,6 +112,9 @@ end
 initialized = false # whether Python is initialized
 finalized = false # whether Python has been finalized
 
+# need to be able to get the version before Python is initialized
+Py_GetVersion(libpy=libpython) = bytestring(ccall(dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
+
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
 # initialize the Python interpreter (no-op on subsequent calls)
@@ -129,13 +132,14 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
             error("Calling pyinitialize after pyfinalize is not supported")
         end
 
+        global const libpython = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
+
         # cache the Python version as a Julia VersionNumber
-        global const pyversion = getversion(libpy)
+        global const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
 
         # Py_SetProgramName needs its argument to persist as long as Python
         global const pyprogramname = wbytestring(programname)
 
-        global const libpython = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
         already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
         if !already_inited
             if !isempty(pyprogramname)
@@ -287,10 +291,6 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         end
     end
 end
-
-# need to be able to get the version before Python is initialized
-Py_GetVersion(libpy=libpython) = bytestring(ccall(dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
-getversion(libpy) = convert(VersionNumber, split(Py_GetVersion(libpy))[1])
 
 # initialize the Python interpreter (no-op on subsequent calls)
 function pyinitialize(python::AbstractString)
