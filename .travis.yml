@@ -1,22 +1,9 @@
-language: python
+language: julia
+julia:
+    - release
+    - nightly
 python:
     - 2.6
     - 2.7
     - 3.2
     - 3.3
-compiler:
-  - clang
-notifications:
-  email: false
-before_install:
-  - sudo add-apt-repository ppa:staticfloat/julia-deps -y
-  - sudo add-apt-repository ppa:staticfloat/julianightlies -y
-  - sudo apt-get update -qq -y
-  - sudo apt-get install libpcre3-dev julia -y
-  - sudo apt-get install python-numpy python3-numpy -y
-script:
-  - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir())/PyCall`); Pkg.resolve()'
-  - julia -e 'using PyCall; @assert isdefined(:PyCall); @assert typeof(PyCall) === Module'
-  - julia --code-coverage test/runtests.jl
-after_success:
-  - julia -e 'cd(Pkg.dir("PyCall")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
