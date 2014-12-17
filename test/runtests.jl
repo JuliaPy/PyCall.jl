@@ -111,8 +111,12 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test obuf[:seekable]()
     obuf[:write]("hello")
     @test position(buf) == obuf[:tell]() == 5
-    @test obuf[:seek](-2, 1) == position(buf) == 3
-    @test obuf[:seek](0, 0) == position(buf) == 0
+    let p = obuf[:seek](-2, 1)
+        @test p == position(buf) == 3
+    end
+    let p = obuf[:seek](0, 0)
+        @test p == position(buf) == 0
+    end
     @test takebuf_string(buf) == "hello"
     obuf[:writelines](["first\n", "second\n", "third"])
     @test takebuf_string(buf) == "first\nsecond\nthird"
