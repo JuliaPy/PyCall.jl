@@ -1,9 +1,29 @@
-language: julia
-julia:
-    - release
-    - nightly
+language: python
 python:
     - 2.6
     - 2.7
     - 3.2
     - 3.3
+compiler:
+  - clang
+env:
+  matrix:
+    - JULIAVERSION="juliareleases"
+    - JULIAVERSION="julianightlies"
+notifications:
+  email: false
+before_install:
+  - sudo add-apt-repository ppa:staticfloat/julia-deps -y
+  - sudo add-apt-repository ppa:staticfloat/${JULIAVERSION} -y
+  - sudo apt-get update -qq -y
+  - sudo apt-get install libpcre3-dev julia -y
+  - sudo apt-get install python-numpy python3-numpy -y
+  - git config --global user.name "Travis User"
+  - git config --global user.email "travis@example.net"
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+script:
+  - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd())'
+  - if [ $JULIAVERSION = "julianightlies" ]; then julia --code-coverage test/runtests.jl; fi
+  - if [ $JULIAVERSION = "juliareleases" ]; then julia test/runtests.jl; fi
+after_success:
+  - julia -e 'cd(Pkg.dir("PyCall")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
