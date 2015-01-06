@@ -366,8 +366,8 @@ end
 
 # figure out if we can treat o as a multidimensional array, and return
 # the dimensions
-function pyarray_dims(o::PyObject)
-    if !pyisinstance(o, @pysym :PyList_Type)
+function pyarray_dims(o::PyObject, forcelist=true)
+    if !(forcelist || pyisinstance(o, @pysym :PyList_Type))
         return () # too many non-List types can pretend to be sequences
     end
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
@@ -375,13 +375,15 @@ function pyarray_dims(o::PyObject)
         return (0,)
     end
     dims0 = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
-                                        PyPtr, (PyPtr, Int), o, 0)))
+                                        PyPtr, (PyPtr, Int), o, 0)),
+                         false)
     if isempty(dims0) # not a nested sequence
         return (len,)
     end
     for j = 1:len-1
         dims = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
-                                           PyPtr, (PyPtr, Int), o, j)))
+                                           PyPtr, (PyPtr, Int), o, j)),
+                            false)
         if dims != dims0
             # elements don't have equal lengths, cannot
             # treat as multidimensional array
@@ -408,6 +410,7 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
 end
 
 convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
+convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
 
 # NumPy conversions (multidimensional arrays)
 include("numpy.jl")

@@ -150,3 +150,7 @@ let nm = tempname()
     end
     @test readall(nm) == nm
 end
+
+# issue #112
+@test roundtripeq(Array, [1,2,3,4])
+@test roundtripeq(Array{Int8}, [1,2,3,4])
