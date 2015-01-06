@@ -316,14 +316,16 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
     members = convert(Vector{(AbstractString,PyObject)}, 
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
-    m = Module(mname)
+    # Hack to create an anonymous bare module
+    m = Module(:pyimport)
+    m = eval(m, Expr(:toplevel, Expr(:module, false, mname, Expr(:block)), mname))
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
                   convert(Vector{Symbol}, o["__all__"])
               catch
                   [symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
-    eval(m, Expr(:toplevel, consts..., :(pymember(s) = getindex($(o), s)),
+    eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
                  Expr(:export, exports...)))
     m
 end
