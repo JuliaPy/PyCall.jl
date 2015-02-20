@@ -132,7 +132,11 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
             error("Calling pyinitialize after pyfinalize is not supported")
         end
 
-        global const libpython = libpy == C_NULL ? ccall(:jl_load_dynamic_library, Ptr{Void}, (Ptr{Uint8},Cuint), C_NULL, 0) : libpy
+        # If libpy==NULL, assume that libpython is linked into the global
+        # namespace.  On windows, jl_exe_handle stores this, whereas on
+        # other systems jl_dl_handle is equivalent to dlopen(NULL) and stores
+        # this.  (These are internal vars present in Julia 0.2/0.3/0.4.)
+        global const libpython = libpy == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : libpy
 
         # cache the Python version as a Julia VersionNumber
         global const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
