@@ -58,7 +58,7 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test array2py2arrayeq(rand(3,4,5))
 
 @test roundtripeq(2:10) && roundtripeq(10:-1:2)
-@test roundtrip(2:2.0:10) == [2:2.0:10]
+@test roundtrip(2:2.0:10) == convert(Vector{Float64}, 2:2.0:10)
 
 @pyimport math
 @test_approx_eq math.sin(3) sin(3)
@@ -154,3 +154,11 @@ end
 # issue #112
 @test roundtripeq(Array, [1,2,3,4])
 @test roundtripeq(Array{Int8}, [1,2,3,4])
+
+# buffers
+let b = PyCall.PyBuffer(PyObject("test string"))
+    @test ndims(b) == 1
+    @test (length(b),) == (length("test string"),) == (size(b, 1),) == size(b)
+    @test stride(b, 1) == 1
+    @test PyCall.iscontiguous(b) == true
+end
