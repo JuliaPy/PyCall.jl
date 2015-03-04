@@ -1,5 +1,8 @@
 # Calling Python functions from the Julia language
-[![Build Status](https://travis-ci.org/stevengj/PyCall.jl.png)](https://travis-ci.org/stevengj/PyCall.jl) [![Coverage Status](https://coveralls.io/repos/stevengj/PyCall.jl/badge.png)](https://coveralls.io/r/stevengj/PyCall.jl)
+
+[![Build Status](https://travis-ci.org/stevengj/PyCall.jl.svg?branch=master)](https://travis-ci.org/stevengj/PyCall.jl)
+[![Coverage Status](https://coveralls.io/repos/stevengj/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/stevengj/PyCall.jl?branch=master)
+[![PyCall](http://pkg.julialang.org/badges/PyCall_release.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=release)
 
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
@@ -18,8 +21,7 @@ install the files.  Julia 0.2 or later is required.
 
 The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
-this after installing the package, `cd ~/.julia/PyCall` and `git pull
-git://github.com/stevengj/PyCall.jl master`.
+this after installing the package, run `Pkg.checkout("PyCall")`.
 
 ## Usage
 
