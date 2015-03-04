@@ -102,6 +102,11 @@ end
 # fixme: is there any nontrivial mimewritable test we can do?
 @test !mimewritable("text/html", PyObject(1))
 
+# in Python 3, we need a specific encoding to write strings or bufferize them
+# (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
+pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
+pyutf8(s::ByteString) = pyutf8(PyObject(s))
+
 # IO (issue #107)
 @test roundtripeq(STDOUT)
 let buf = IOBuffer(false, true), obuf = PyObject(buf)
@@ -109,7 +114,7 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test obuf[:writable]()
     @test !obuf[:readable]()
     @test obuf[:seekable]()
-    obuf[:write]("hello")
+    obuf[:write](pyutf8("hello"))
     @test position(buf) == obuf[:tell]() == 5
     let p = obuf[:seek](-2, 1)
         @test p == position(buf) == 3
@@ -145,7 +150,7 @@ let nm = tempname()
         @test pf[:fileno]() == fd(f)
         @test pf[:writable]()
         @test !pf[:readable]()
-        pf[:write](nm)
+        pf[:write](pyutf8(nm))
         pf[:flush]()
     end
     @test readall(nm) == nm
@@ -156,7 +161,7 @@ end
 @test roundtripeq(Array{Int8}, [1,2,3,4])
 
 # buffers
-let b = PyCall.PyBuffer(PyObject("test string"))
+let b = PyCall.PyBuffer(pyutf8("test string"))
     @test ndims(b) == 1
     @test (length(b),) == (length("test string"),) == (size(b, 1),) == size(b)
     @test stride(b, 1) == 1
