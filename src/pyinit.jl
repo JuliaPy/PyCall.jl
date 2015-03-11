@@ -43,7 +43,7 @@ function dlopen_libpython(python::AbstractString)
         ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
         # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro
         try
-	    run(`$python -c "import site"` |> DevNull .> DevNull)
+	    run(pipe(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
         catch
 	    pop!(ENV, "PYTHONHOME")
         end
