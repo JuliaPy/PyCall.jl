@@ -144,6 +144,15 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         # Py_SetProgramName needs its argument to persist as long as Python
         global const pyprogramname = wbytestring(programname)
 
+        # the PyMemberDef array must not be garbage-collected
+        global const pyjlwrap_membername = "jl_value"
+        global const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
+        global const pyjlwrap_members = 
+          PyMemberDef[ PyMemberDef(pyjlwrap_membername,
+                                   T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
+                                   pyjlwrap_doc),
+                       PyMemberDef(C_NULL,0,0,0,C_NULL) ]
+
         already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
         if !already_inited
             if !isempty(pyprogramname)
@@ -228,7 +237,7 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         # cache ctypes.c_void_p type and function if available
         vpt, pvp = try
             (pyimport("ctypes")["c_void_p"],
-             p::Ptr -> pycall(c_void_p_Type::PyObject, PyObject, uint(p)))
+             p::Ptr -> pycall(c_void_p_Type::PyObject, PyObject, @compat UInt(p)))
         catch # fallback to CObject
             (pysym(:PyCObject_FromVoidPtr),
              p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL)))
@@ -274,11 +283,11 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
             # some modules (e.g. IPython) expect sys.argv to be set
             if pyversion.major < 3
                 argv_s = bytestring("")
-                argv = convert(Ptr{Uint8}, argv_s)
+                argv = unsafe_convert(Ptr{Uint8}, argv_s)
                 ccall(pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{Uint8}},Cint), 1, &argv, 0)
             else
                 argv_s = Cwchar_t[0]
-                argv   = convert(Ptr{Cwchar_t}, argv_s)
+                argv   = unsafe_convert(Ptr{Cwchar_t}, argv_s)
                 ccall(pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
             end
             

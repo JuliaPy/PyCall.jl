@@ -43,8 +43,8 @@ convert{T<:Complex}(::Type{T}, po::PyObject) =
     begin
         re = @pycheck ccall((@pysym :PyComplex_RealAsDouble),
                             Cdouble, (PyPtr,), po)
-        complex128(re, ccall((@pysym :PyComplex_ImagAsDouble), 
-                             Cdouble, (PyPtr,), po))
+        complex(re, ccall((@pysym :PyComplex_ImagAsDouble),
+                    Cdouble, (PyPtr,), po))
     end)
 
 convert(::Type{Nothing}, po::PyObject) = nothing
@@ -223,7 +223,7 @@ PyVector(o::PyObject) = PyVector{PyAny}(o)
 PyObject(a::PyVector) = a.o
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
 convert{T}(::Type{PyVector{T}}, o::PyObject) = PyVector{T}(o)
-convert(::Type{PyPtr}, a::PyVector) = a.o.o
+unsafe_convert(::Type{PyPtr}, a::PyVector) = a.o.o
 PyVector(a::PyVector) = a
 PyVector{T}(a::AbstractVector{T}) = PyVector{T}(array2py(a))
 
@@ -445,7 +445,7 @@ PyDict{K}(d::Associative{K,Any}) = PyDict{K,PyAny}(PyObject(d))
 PyDict(d::Associative{Any,Any}) = PyDict{PyAny,PyAny}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
-convert(::Type{PyPtr}, d::PyDict) = d.o.o
+unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
 haskey(d::PyDict, key) = 1 == ccall(d.isdict ? (@pysym :PyDict_Contains)
                                           : (@pysym :PyMapping_HasKey),
