@@ -23,6 +23,11 @@ The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
 this after installing the package, run `Pkg.checkout("PyCall")`.
 
+You must, of course, have Python and its `libpython` shared-library
+installed, and a `python` executable must be in your `PATH` (or be
+specified manually as described below).  Usually, the necessary
+libraries are installed along with Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.4.3`.
+
 ## Usage
 
 Here is a simple example to call Python's `math.sin` function and
