@@ -23,6 +23,11 @@ import Base: sigatomic_begin, sigatomic_end
 ## Compatibility import for v0.3, v0.4
 
 using Compat
+if VERSION >= v"0.4.0-dev+3710"
+    import Base.unsafe_convert
+else
+    const unsafe_convert = Base.convert
+end
 
 #########################################################################
 
@@ -122,7 +127,7 @@ pyquery(q::Ptr{Void}, o::PyObject) =
 pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(TypeType, PyObject, o)
 
 # conversion to pass PyObject as ccall arguments:
-convert(::Type{PyPtr}, po::PyObject) = po.o
+unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
 
 # use constructor for generic conversions to PyObject
 convert(::Type{PyObject}, o) = PyObject(o)
@@ -225,7 +230,7 @@ function ==(o1::PyObject, o2::PyObject)
     else
         val = ccall((@pysym :PyObject_RichCompareBool), Cint,
                     (PyPtr, PyPtr, Cint), o1, o2, Py_EQ)
-        return val == -1 ? o1.o == o2.o : bool(val)
+        return val == -1 ? o1.o == o2.o : @compat Bool(val)
     end
 end
 

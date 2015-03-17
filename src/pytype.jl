@@ -3,10 +3,11 @@
 ################################################################
 # Python expects the PyMethodDef and similar strings to be constants,
 # so we define anonymous globals to hold them, returning the pointer
+const prevent_gc = Any[]
 function gstring_ptr(name::AbstractString, s::AbstractString)
-    g = gensym(name)
-    @eval const $g = bytestring($s)
-    convert(Ptr{Uint8}, eval(g))
+    g = bytestring(s)
+    push!(prevent_gc, g)
+    unsafe_convert(Ptr{Uint8}, g)
 end
 
 ################################################################
@@ -90,11 +91,11 @@ immutable PyMemberDef
     flags::Cint
     doc::Ptr{Uint8}
     PyMemberDef(name,typ,offset,flags,doc) =
-        new(convert(Ptr{Uint8},name),
+        new(unsafe_convert(Ptr{Uint8},name),
             convert(Cint,typ),
             convert(Int,offset),
             convert(Cint,flags),
-            convert(Ptr{Uint8},doc))
+            unsafe_convert(Ptr{Uint8},doc))
 end
 
 # types:
@@ -292,7 +293,7 @@ type PyTypeObject
           error("Python < 2.5 not supported")
         name_save = bytestring(name)
         t = new(0,C_NULL,0,
-                convert(Ptr{Uint8}, name_save),
+                unsafe_convert(Ptr{Uint8}, name_save),
                 convert(Int, basicsize), 0,
                 C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_dealloc ...
                 C_NULL,C_NULL,C_NULL, # tp_as_number...
@@ -351,15 +352,6 @@ end
 ################################################################
 # Wrap a Python type around a Julia Any object
 
-# the PyMemberDef array must not be garbage-collected
-const pyjlwrap_membername = "jl_value"
-const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
-const pyjlwrap_members = 
-  PyMemberDef[ PyMemberDef(pyjlwrap_membername,
-                           T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
-                           pyjlwrap_doc),
-               PyMemberDef(C_NULL,0,0,0,C_NULL) ]
-
 immutable Py_jlWrap
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
     ob_refcnt::Int
@@ -388,7 +380,7 @@ end
 function pyjlwrap_hash(o::PyPtr) 
     h = hash(unsafe_pyjlwrap_to_objref(o))
     # Python hashes are not permitted to return -1!!
-    return h == uint(-1) ? pysalt::Uint : h::Uint
+    return h == reinterpret(UInt, -1) ? pysalt::Uint : h::Uint
 end
 
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
@@ -396,7 +388,7 @@ function pyjlwrap_hash32(o::PyPtr)
     h = ccall(:int64to32hash, Uint32, (Uint64,), 
               hash(unsafe_pyjlwrap_to_objref(o)))
     # Python hashes are not permitted to return -1!!
-    return h == uint32(-1) ? uint32(pysalt)::Uint32 : h::Uint32
+    return h == reinterpret(UInt32, @compat Int32(-1)) ? uint32(pysalt)::Uint32 : h::Uint32
 end
 
 # called in pyinitialize

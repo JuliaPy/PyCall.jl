@@ -1,5 +1,4 @@
-using Base.Test
-using PyCall
+using Base.Test, PyCall, Compat
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
@@ -20,7 +19,7 @@ roundtripeq(x) = roundtrip(x) == x
 @test roundtripeq([1 2 3;4 5 6]) && roundtripeq([1. 2 3;4 5 6])
 @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
 @test roundtripeq(Int32)
-@test roundtripeq([1 => "hello", 2 => "goodbye"]) && roundtripeq(Dict())
+@test roundtripeq(@compat Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
 @test roundtripeq(Uint8[1,3,4,5])
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
@@ -36,9 +35,9 @@ if PyCall.npy_initialized
     @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
 end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
-@test PyDict(PyObject([1 => "hello", 2 => "goodbye"])) == [1 => "hello", 2 => "goodbye"]
+@test PyDict(PyObject(@compat Dict(1 => "hello", 2 => "goodbye"))) == @compat Dict(1 => "hello", 2 => "goodbye")
 
-let d = PyDict([1 => "hello", "yes" => 34])
+let d = PyDict(@compat Dict(1 => "hello", "yes" => 34))
     @test get(d.o, 1) == "hello"
     set!(d.o, "yes", "goodbye")
     @test d["yes"] == "goodbye"

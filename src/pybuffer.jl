@@ -49,14 +49,14 @@ end
 #############################################################################
 # Array-like accessors for PyBuffer.
 
-Base.ndims(b::PyBuffer)  = int(b.buf.ndim)
+Base.ndims(b::PyBuffer)  = @compat UInt(b.buf.ndim)
 
 # from the Python docs: If shape is NULL as a result of a PyBUF_SIMPLE
 # or a PyBUF_WRITABLE request, the consumer must disregard itemsize
 # and assume itemsize == 1.
-Base.length(b::PyBuffer) = b.buf.shape == C_NULL ? int(b.buf.len) : int(div(b.buf.len, b.buf.itemsize))
+@compat Base.length(b::PyBuffer) = b.buf.shape == C_NULL ? Int(b.buf.len) : Int(div(b.buf.len, b.buf.itemsize))
 
-Base.sizeof(b::PyBuffer) = int(b.buf.len)
+@compat Base.sizeof(b::PyBuffer) = Int(b.buf.len)
 Base.pointer(b::PyBuffer) = b.buf.buf
 
 function Base.size(b::PyBuffer)
@@ -70,7 +70,7 @@ function Base.size(b::PyBuffer, d::Integer)
     d < 0 && throw(BoundsError())
     b.buf.ndim <= 1 && return length(b)
     @assert b.buf.shape != C_NULL
-    return int(unsafe_load(b.buf.shape, d))
+    return @compat Int(unsafe_load(b.buf.shape, d))
 end
 
 # stride in bytes for i-th dimension
@@ -79,12 +79,12 @@ function Base.stride(b::PyBuffer, d::Integer)
     d < 0 && throw(BoundsError())
     if b.buf.strides == C_NULL
         if b.buf.ndim == 1
-            return b.buf.shape == C_NULL ? 1 : int(b.buf.itemsize)
+            return b.buf.shape == C_NULL ? 1 : @compat Int(b.buf.itemsize)
         else
             error("unknown buffer strides")
         end
     end
-    return int(unsafe_load(b.buf.strides, d))
+    return @compat Int(unsafe_load(b.buf.strides, d))
 end
 
 iscontiguous(b::PyBuffer) = 

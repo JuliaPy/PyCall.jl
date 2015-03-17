@@ -72,11 +72,11 @@ function npyinitialize()
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
     for m in eachmatch(r, hdr) # search for max index into PyArray_API 
-        PyArray_API_length = max(PyArray_API_length, int(m.captures[2])+1)
+        PyArray_API_length = max(PyArray_API_length, @compat Int(m.captures[2])+1)
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
     for m in eachmatch(r, hdr) # build npy_api table
-        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[int(m.captures[2])+1]
+        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[@compat Int(m.captures[2])+1]
     end
     if !haskey(npy_api::Tnpy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
@@ -105,45 +105,48 @@ end
 # the NumPy developers seem to have some awareness of binary compatibility
 
 # NPY_TYPES:
-const NPY_BOOL = int32(0)
-const NPY_BYTE = int32(1)
-const NPY_UBYTE = int32(2)
-const NPY_SHORT = int32(3)
-const NPY_USHORT = int32(4)
-const NPY_INT = int32(5)
-const NPY_UINT = int32(6)
-const NPY_LONG = int32(7)
-const NPY_ULONG = int32(8)
-const NPY_LONGLONG = int32(9)
-const NPY_ULONGLONG = int32(10)
-const NPY_FLOAT = int32(11)
-const NPY_DOUBLE = int32(12)
-const NPY_LONGDOUBLE = int32(13)
-const NPY_CFLOAT = int32(14)
-const NPY_CDOUBLE = int32(15)
-const NPY_CLONGDOUBLE = int32(16)
-const NPY_OBJECT = int32(17)
-const NPY_STRING = int32(18)
-const NPY_UNICODE = int32(19)
-const NPY_VOID = int32(20)
+
+@compat begin
+const NPY_BOOL = Int32(0)
+const NPY_BYTE = Int32(1)
+const NPY_UBYTE = Int32(2)
+const NPY_SHORT = Int32(3)
+const NPY_USHORT = Int32(4)
+const NPY_INT = Int32(5)
+const NPY_UINT = Int32(6)
+const NPY_LONG = Int32(7)
+const NPY_ULONG = Int32(8)
+const NPY_LONGLONG = Int32(9)
+const NPY_ULONGLONG = Int32(10)
+const NPY_FLOAT = Int32(11)
+const NPY_DOUBLE = Int32(12)
+const NPY_LONGDOUBLE = Int32(13)
+const NPY_CFLOAT = Int32(14)
+const NPY_CDOUBLE = Int32(15)
+const NPY_CLONGDOUBLE = Int32(16)
+const NPY_OBJECT = Int32(17)
+const NPY_STRING = Int32(18)
+const NPY_UNICODE = Int32(19)
+const NPY_VOID = Int32(20)
 
 # NPY_ORDER:
-const NPY_ANYORDER=int32(-1)
-const NPY_CORDER=int32(0)
-const NPY_FORTRANORDER=int32(1)
+const NPY_ANYORDER = Int32(-1)
+const NPY_CORDER = Int32(0)
+const NPY_FORTRANORDER = Int32(1)
 
 # flags:
-const NPY_ARRAY_C_CONTIGUOUS = int32(1)
-const NPY_ARRAY_F_CONTIGUOUS = int32(2)
-const NPY_ARRAY_ALIGNED = int32(0x0100)
-const NPY_ARRAY_WRITEABLE = int32(0x0400)
-const NPY_ARRAY_OWNDATA = int32(0x0004)
-const NPY_ARRAY_ENSURECOPY = int32(0x0020)
-const NPY_ARRAY_ENSUREARRAY = int32(0x0040)
-const NPY_ARRAY_FORCECAST = int32(0x0010)
-const NPY_ARRAY_UPDATEIFCOPY = int32(0x1000)
-const NPY_ARRAY_NOTSWAPPED = int32(0x0200)
-const NPY_ARRAY_ELEMENTSTRIDES = int32(0x0080)
+const NPY_ARRAY_C_CONTIGUOUS = Int32(1)
+const NPY_ARRAY_F_CONTIGUOUS = Int32(2)
+const NPY_ARRAY_ALIGNED = Int32(0x0100)
+const NPY_ARRAY_WRITEABLE = Int32(0x0400)
+const NPY_ARRAY_OWNDATA = Int32(0x0004)
+const NPY_ARRAY_ENSURECOPY = Int32(0x0020)
+const NPY_ARRAY_ENSUREARRAY = Int32(0x0040)
+const NPY_ARRAY_FORCECAST = Int32(0x0010)
+const NPY_ARRAY_UPDATEIFCOPY = Int32(0x1000)
+const NPY_ARRAY_NOTSWAPPED = Int32(0x0200)
+const NPY_ARRAY_ELEMENTSTRIDES = Int32(0x0080)
+end
 
 #########################################################################
 # conversion from Julia types to NPY_TYPES constant
