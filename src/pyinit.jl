@@ -13,7 +13,7 @@ end
 if VERSION >= v"0.4.0-dev+3844"
     using Base.Libdl
 else
-    const dlext = isdefined(Sys, :dlext) ? Sys.dlext : Sys.shlib_ext
+    const dlext = Sys.dlext
 end
 const dlprefix = @windows? "" : "lib"
 
