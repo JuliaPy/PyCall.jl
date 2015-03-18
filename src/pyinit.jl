@@ -10,7 +10,11 @@ end
 
 #########################################################################
 
-const dlext = isdefined(Sys, :dlext) ? Sys.dlext : Sys.shlib_ext
+if VERSION >= v"0.4.0-dev+3844"
+    using Base.Libdl
+else
+    const dlext = Sys.dlext
+end
 const dlprefix = @windows? "" : "lib"
 
 function dlopen_libpython(python::AbstractString)
