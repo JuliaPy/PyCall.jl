@@ -384,11 +384,12 @@ function pyjlwrap_hash(o::PyPtr)
 end
 
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
+const pysalt32 = VERSION < v"0.4.0-dev+3732" ? uint32(hash("PyCall")) : hash("PyCall") % UInt32
 function pyjlwrap_hash32(o::PyPtr)
     h = ccall(:int64to32hash, Uint32, (Uint64,), 
               hash(unsafe_pyjlwrap_to_objref(o)))
     # Python hashes are not permitted to return -1!!
-    return h == reinterpret(UInt32, @compat Int32(-1)) ? uint32(pysalt)::Uint32 : h::Uint32
+    return h == reinterpret(UInt32, @compat Int32(-1)) ? pysalt32 : h::Uint32
 end
 
 # called in pyinitialize
