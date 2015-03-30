@@ -72,11 +72,11 @@ function npyinitialize()
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
     for m in eachmatch(r, hdr) # search for max index into PyArray_API 
-        PyArray_API_length = max(PyArray_API_length, @compat Int(m.captures[2])+1)
+        PyArray_API_length = max(PyArray_API_length, parse(Int, m.captures[2])+1)
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
     for m in eachmatch(r, hdr) # build npy_api table
-        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[@compat Int(m.captures[2])+1]
+        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
     end
     if !haskey(npy_api::Tnpy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
