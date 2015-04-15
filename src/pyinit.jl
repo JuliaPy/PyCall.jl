@@ -2,8 +2,12 @@
 
 #########################################################################
 
-pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
-pysys(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
+pyconfigvar(python::AbstractString, var::AbstractString) = Base.with_env("PYTHONIOENCODING", "UTF-8") do
+    chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
+end
+pysys(python::AbstractString, var::AbstractString) = Base.with_env("PYTHONIOENCODING", "UTF-8") do
+    chomp(readall(`$python -c "import sys; print(sys.$var)"`))
+end
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
