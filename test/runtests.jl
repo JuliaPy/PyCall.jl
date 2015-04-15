@@ -83,7 +83,7 @@ let x = PyVector(PyAny[])
     @test x == ["bar"]
 end
 
-if pyversion >= v"2.7"
+if pyversion >= v"2.7" && isdefined(PyCall, :PyDateTime_CAPI)
     # Dates is built-in in Julia 0.4
     if !isdefined(Base, :Dates)
         import Dates

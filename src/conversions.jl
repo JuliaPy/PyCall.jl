@@ -699,6 +699,8 @@ end
 # Dates (Calendar time)
 
 include("pydates.jl")
+#init_datetime() = nothing
+#pydate_query(o) = None
 
 #########################################################################
 # Inferring Julia types at runtime from Python objects:
