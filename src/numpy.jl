@@ -258,7 +258,7 @@ function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
 end
 
 f_contiguous(i::PyArray_Info) = f_contiguous(i.T, i.sz, i.st)
-c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipud(i.sz), flipud(i.st))
+c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,1))
 
 #########################################################################
 # PyArray: no-copy wrapper around NumPy ndarray
@@ -386,7 +386,11 @@ end
 
 stride(a::PyArray, i::Integer) = a.st[i]
 
-convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+if VERSION < v"0.4.0-dev+3710"
+    convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+else
+    Base.unsafe_convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+end
 
 pointer(a::PyArray, i::Int) = pointer(a, ind2sub(a.dims, i))
 
