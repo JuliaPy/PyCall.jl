@@ -284,7 +284,7 @@ haskey(o::PyObject, s::Symbol) = haskey(o, string(s))
 # keys(o) should return an iterator over the keys (members) of o
 
 type PyObjectMembers
-    members::PyVector{(Symbol,PyObject)}
+    members::PyVector{@compat Tuple{Symbol,PyObject}}
 end
 
 function show(io::IO, m::PyObjectMembers)
@@ -316,7 +316,7 @@ end
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
-    members = convert(Vector{(AbstractString,PyObject)}, 
+    members = convert(Vector{@compat Tuple{AbstractString,PyObject}}, 
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     # Hack to create an anonymous bare module

@@ -161,11 +161,18 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 # typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array)
 abstract PyAny
 
-# I originally implemented this via multiple dispatch, with
-#   pyany_toany(::Type{PyAny}), pyany_toany(x::Tuple), and pyany_toany(x),
-# but Julia seemed to get easily confused about which one to call.
-pyany_toany(x) = isa(x, Type{PyAny}) ? Any : (isa(x, Tuple) ? 
-                                              map(pyany_toany, x) : x)
+if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
+    # I originally implemented this via multiple dispatch, with
+    #   pyany_toany(::Type{PyAny}), pyany_toany(x::Tuple), and pyany_toany(x),
+    # but Julia seemed to get easily confused about which one to call.
+    pyany_toany(x) = isa(x, Type{PyAny}) ? Any : (isa(x, Tuple) ? 
+                                                  map(pyany_toany, x) : x)
+else
+    pyany_toany(T::Type) = T
+    pyany_toany(T::Type{PyAny}) = Any
+    pyany_toany(T::Type{Vararg{PyAny}}) = Vararg{Any}
+    pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
+end
 
 # no-op conversions
 for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :AbstractString, 
@@ -196,14 +203,27 @@ function PyObject(t::Tuple)
     return o
 end
 
-function convert(tt::NTuple{Type}, o::PyObject)
-    len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    if len != length(tt)
-        throw(BoundsError())
+if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
+    function convert(tt::NTuple{Type}, o::PyObject)
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        if len != length(tt)
+            throw(BoundsError())
+        end
+        ntuple(len, i ->
+               convert(tt[i], PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, 
+                                             (PyPtr, Int), o, i-1))))
     end
-    ntuple(len, i ->
-           convert(tt[i], PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, 
-                                         (PyPtr, Int), o, i-1))))
+else
+    function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        if len != length(tt.types)
+            throw(BoundsError())
+        end
+        ntuple(len, i ->
+               convert(tt.types[i], 
+                       PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, 
+                                      (PyPtr, Int), o, i-1))))
+    end
 end
 
 #########################################################################
@@ -330,7 +350,7 @@ end
 array2py(A::AbstractArray) = array2py(A, 1, 1)
 
 PyObject(A::AbstractArray) = 
-   ndims(A) <= 1 || method_exists(stride,(typeof(A),Int)) ? array2py(A) :
+   ndims(A) <= 1 || method_exists(stride, @compat Tuple{typeof(A),Int}) ? array2py(A) :
    pyjlwrap_new(A)
 
 function py2array{TA,N}(T, A::Array{TA,N}, o::PyObject,
@@ -552,7 +572,7 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     else
         # generic Mapping object, use items list
-        (convert((K,V), PyObject(@pycheckni ccall((@pysym :PySequence_GetItem),
+        (convert(@compat(Tuple{K,V}), PyObject(@pycheckni ccall((@pysym :PySequence_GetItem),
                                                   PyPtr, (PyPtr,Int), 
                                                   itr.items, itr.i))),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
@@ -733,6 +753,12 @@ pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
 # scipy scalar array members, grrr.
 pydict_query(o::PyObject) = pyisinstance(o, @pysym :PyDict_Type) || (pyquery((@pysym :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
 
+if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
+    typetuple(Ts) = tuple(Ts...)
+else
+    typetuple(Ts) = Tuple{Ts...}
+end
+
 function pysequence_query(o::PyObject)
     # pyquery(:PySequence_Check, o) always succeeds according to the docs,
     # but it seems we need to be careful; I've noticed that things like
@@ -740,10 +766,7 @@ function pysequence_query(o::PyObject)
     # problems
     if pyisinstance(o, @pysym :PyTuple_Type)
         len = @pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        return ntuple(len, i ->
-                      pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), 
-                                                  PyPtr, (PyPtr,Int), o,i-1)),
-                                   PyAny))
+        return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
     elseif pyisinstance(o, pyxrange)
         return Ranges
     elseif ispybytearray(o)
@@ -774,7 +797,7 @@ macro return_not_None(ex)
 end
 
 let
-pytype_queries = Array((PyObject,Type),0)
+pytype_queries = Array(@compat(Tuple{PyObject,Type}),0)
 global pytype_mapping, pytype_query
 function pytype_mapping(py::PyObject, jl::Type)
     for (i,(p,j)) in enumerate(pytype_queries)

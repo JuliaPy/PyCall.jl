@@ -57,7 +57,7 @@ end
 function jl_IO_flush(self_::PyPtr, noarg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        if method_exists(flush, (typeof(io),))
+        if method_exists(flush, @compat Tuple{typeof(io)})
             flush(io)
         end
         ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
@@ -188,7 +188,7 @@ function jl_IO_seek(self_::PyPtr, args_::PyPtr)
     return convert(PyPtr, C_NULL)
 end
 
-isseekable(io) = method_exists(seek, (typeof(io), FileOffset))
+isseekable(io) = method_exists(seek, @compat Tuple{typeof(io), FileOffset})
 isseekable(io::IOBuffer) = io.seekable
 
 function jl_IO_seekable(self_::PyPtr, noarg_::PyPtr)

@@ -5,6 +5,16 @@ roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
 roundtripeq(x) = roundtrip(x) == x
 
+# test handling of type-tuple changes in Julia 0.4
+import PyCall.pyany_toany
+@test pyany_toany(Int) == Int
+@test pyany_toany(PyAny) == Any
+@test pyany_toany(@compat Tuple{Int,PyAny}) == @compat Tuple{Int,Any}
+@test pyany_toany(@compat Tuple{Int,Tuple{PyAny,Int8}}) == @compat Tuple{Int,Tuple{Any,Int8}}
+if VERSION >= v"0.4.0-dev+4319"
+    @test pyany_toany(@compat Tuple{PyAny,Int,Vararg{PyAny}}) == @compat Tuple{Any,Int,Vararg{Any}}
+end
+
 @test roundtripeq(17)
 @test roundtripeq(0x39)
 @test roundtripeq(true) && roundtripeq(false)

@@ -215,7 +215,7 @@ type PyArray_Info
         ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
         typestr = convert(AbstractString, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
-        datatuple = convert((Int,Bool), ai["data"])
+        datatuple = convert(@compat(Tuple{Int,Bool}), ai["data"])
         sz = convert(Vector{Int}, ai["shape"])
         local st
         try
@@ -394,7 +394,7 @@ end
 
 pointer(a::PyArray, i::Int) = pointer(a, ind2sub(a.dims, i))
 
-function pointer{T}(a::PyArray{T}, is::(Int...))
+function pointer{T}(a::PyArray{T}, is::@compat Tuple{Vararg{Int}})
     offset = 0
     for i = 1:length(is)
         offset += (is[i]-1)*a.st[i]
