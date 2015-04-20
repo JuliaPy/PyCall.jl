@@ -187,13 +187,7 @@ end
 # computing hashes of PyObjects
 
 const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
-
-# backwards compatibility with Julia 0.2
-if VERSION < v"0.3-"
-    hashsalt(x) = bitmix(pysalt, hash(x))
-else
-    hashsalt(x) = hash(x, pysalt)
-end
+hashsalt(x) = hash(x, pysalt)
 
 function hash(o::PyObject)
     if o.o == C_NULL
@@ -304,15 +298,7 @@ length(m::PyObjectMembers) = length(m.members)
 # and providing access to o's members (converted to PyAny) as w.member.
 
 # we skip wrapping Julia reserved words (which cannot be type members)
-const reserved = Set{ASCIIString}()
-for w in ("while", "if", "for", "try", "return", "break", 
-          "continue", "function", "macro", "quote", "let", "local",
-          "global", "const", "abstract", "typealias", "type",
-          "bitstype", "immutable", "ccall", "do", "module",
-          "baremodule", "using", "import", "export", "importall",
-          "pymember", "false", "true")
-    push!(reserved, w) # construct Set this way for compat with Julia 0.2/0.3
-end
+const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
