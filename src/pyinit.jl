@@ -2,10 +2,18 @@
 
 #########################################################################
 
-pyconfigvar(python::AbstractString, var::AbstractString) = Base.with_env("PYTHONIOENCODING", "UTF-8") do
+# set PYTHONIOENCODING when running python executable, so that
+# we get UTF-8 encoded text as output (this is not the default on Windows).
+if VERSION < v"0.4.0-dev+4392"
+    pyenv(f::Function) = Base.with_env(f, "PYTHONIOENCODING", "UTF-8")
+else # after Julia #10914
+    pyenv(f::Function) = Base.withenv(f, "PYTHONIOENCODING"=>"UTF-8")
+end
+
+pyconfigvar(python::AbstractString, var::AbstractString) = pyenv() do
     chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 end
-pysys(python::AbstractString, var::AbstractString) = Base.with_env("PYTHONIOENCODING", "UTF-8") do
+pysys(python::AbstractString, var::AbstractString) = pyenv() do
     chomp(readall(`$python -c "import sys; print(sys.$var)"`))
 end
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
