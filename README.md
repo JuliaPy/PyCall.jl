@@ -313,26 +313,29 @@ responsive without blocking Julia's input prompt.  PyCall includes
 functions to implement these event loops for some of the most common
 cross-platform [GUI
 toolkits](http://en.wikipedia.org/wiki/Widget_toolkit):
-[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/),
+[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/) version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via [PyGObject](https://wiki.gnome.org/action/show/Projects/PyGObject)),
 and [Qt](http://qt-project.org/) (via the [PyQt4](http://wiki.python.org/moin/PyQt4) or [PySide](http://qt-project.org/wiki/PySide)
 Python modules).
 
 You can set a GUI event loop via:
 
 * `pygui_start(gui::Symbol=pygui())`.  Here, `gui` is either `:wx`,
-  `:gtk`, `:tk`, or `:qt` to start the respective toolkit's event loop.  (`:qt` will use PyQt4 or PySide, preferring the former; if you need to require one or the other you can instead use `:qt_pyqt4` or `:qt_pyside`, respectively.) It
-  defaults to the return value of `pygui()`, which returns a current
-  default GUI (see below).  Passing a `gui` argument also changes the
-  default GUI, equivalent to calling `pygui(gui)` below.  You may
-  start event loops for more than one GUI toolkit (to run simultaneously).
-  Calling `pygui_start` more than once for a given toolkit does nothing
+  `:gtk`, `:gtk3`, `:tk`, or `:qt` to start the respective toolkit's
+  event loop.  (`:qt` will use PyQt4 or PySide, preferring the former;
+  if you need to require one or the other you can instead use
+  `:qt_pyqt4` or `:qt_pyside`, respectively.) It defaults to the
+  return value of `pygui()`, which returns a current default GUI (see
+  below).  Passing a `gui` argument also changes the default GUI,
+  equivalent to calling `pygui(gui)` below.  You may start event loops
+  for more than one GUI toolkit (to run simultaneously).  Calling
+  `pygui_start` more than once for a given toolkit does nothing
   (except to change the current `pygui` default).
 
 * `pygui()`: return the current default GUI toolkit (`Symbol`).  If
   the default GUI has not been set already, this is the first of
-  `:tk`, `:qt`, `:wx`, or `:gtk` for which the corresponding Python package
-  is installed.  `pygui(gui::Symbol)` changes the default GUI to
-  `gui`.
+  `:tk`, `:qt`, `:wx`, `:gtk`, or `:gtk3` for which the corresponding
+  Python package is installed.  `pygui(gui::Symbol)` changes the
+  default GUI to `gui`.
 
 * `pygui_stop(gui::Symbol=pygui())`: Stop any running event loop for `gui`
   (which defaults to the current return value of `pygui`).  Returns

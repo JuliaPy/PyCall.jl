@@ -23,6 +23,7 @@ end
 pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
+     (gui == :gtk3 && pyexists("gi.repository.Gtk")) ||
      (gui == :tk && pyexists(tkinter_name())) ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
      (gui == :qt_pyside && pyexists("PySide")) ||
@@ -34,7 +35,7 @@ function pygui()
     if gui::Symbol != :default && pygui_works(gui::Symbol)
         return gui::Symbol
     else
-        for g in (:tk, :qt, :wx, :gtk)
+        for g in (:tk, :qt, :wx, :gtk, :gtk3)
             if pygui_works(g)
                 gui::Symbol = g
                 return gui::Symbol
@@ -46,7 +47,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if !(g in (:wx,:gtk,:tk,:qt,:qt_pyqt4,:qt_pyside,:default))
+        if !(g in (:wx,:gtk,:gtk3,:tk,:qt,:qt_pyqt4,:qt_pyside,:default))
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -77,9 +78,9 @@ else
     end
 end
 
-# GTK:
-function gtk_eventloop(sec::Real=50e-3)
-    gtk = pyimport("gtk")
+# GTK (either GTK2 or GTK3, depending on gtkmodule):
+function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
+    gtk = pyimport(gtkmodule)
     events_pending = gtk["events_pending"]
     main_iteration = gtk["main_iteration"]
     @doevent begin
@@ -152,7 +153,9 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
         if gui == :wx
             eventloops[gui] = wx_eventloop(sec)
         elseif gui == :gtk
-            eventloops[gui] = gtk_eventloop(sec)
+            eventloops[gui] = gtk_eventloop("gtk", sec)
+        elseif gui == :gtk3
+            eventloops[gui] = gtk_eventloop("gi.repository.Gtk", sec)
         elseif gui == :tk
             eventloops[gui] = Tk_eventloop(sec)
         elseif gui == :qt_pyqt4
