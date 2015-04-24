@@ -45,8 +45,8 @@ typealias PyPtr Ptr{PyObject_struct} # type for PythonObject* in ccall
 
 #########################################################################
 
-pysym(func::Symbol) = dlsym(libpython, func)
-pysym_e(func::Symbol) = dlsym_e(libpython, func)
+pysym(func::Symbol) = Libdl.dlsym(libpython, func)
+pysym_e(func::Symbol) = Libdl.dlsym_e(libpython, func)
 pyhassym(func::Symbol) = pysym_e(func) != C_NULL
 
 # call pysym_e on the arguments and return the first non-NULL result
@@ -68,7 +68,7 @@ macro pysym(func)
     quote
         let $zlocal::Ptr{Void} = $z::Ptr{Void}
             if $zlocal == C_NULL
-               global $z = $zlocal = dlsym(libpython::Ptr{Void}, $(esc(func)))
+               global $z = $zlocal = Libdl.dlsym(libpython::Ptr{Void}, $(esc(func)))
             end
             $zlocal
         end
