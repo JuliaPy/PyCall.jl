@@ -22,19 +22,14 @@ end
 
 #########################################################################
 
-if VERSION >= v"0.4.0-dev+3844"
-    using Base.Libdl
-else
-    const dlext = Sys.dlext
-end
 const dlprefix = @windows? "" : "lib"
 
 function dlopen_libpython(python::AbstractString)
     # it is ridiculous that it is this hard to find the name of libpython
     v = pyconfigvar(python,"VERSION","")
-    libs = [ dlprefix*"python"*v*"."*dlext, dlprefix*"python."*dlext ]
+    libs = [ dlprefix*"python"*v*"."*Libdl.dlext, dlprefix*"python."*Libdl.dlext ]
     lib = pyconfigvar(python, "LIBRARY")
-    lib != "None" && unshift!(libs, splitext(lib)[1]*"."*dlext)
+    lib != "None" && unshift!(libs, splitext(lib)[1]*"."*Libdl.dlext)
     lib = pyconfigvar(python, "LDLIBRARY")
     lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
     libs = unique(libs)
@@ -69,8 +64,8 @@ function dlopen_libpython(python::AbstractString)
         for libpath in libpaths
      	    if isfile(joinpath(libpath, lib))
                 try
-                    return dlopen(joinpath(libpath, lib),
-                                  RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+                    return Libdl.dlopen(joinpath(libpath, lib),
+                                  Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
                 end
             end
         end
@@ -82,7 +77,7 @@ function dlopen_libpython(python::AbstractString)
     for lib in libs
         lib = splitext(lib)[1] 
         try
-            return dlopen(lib, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+            return Libdl.dlopen(lib, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
         end
     end
     error("Couldn't find libpython; try pyinitialize(\"/path/to/libpython\")")
@@ -129,7 +124,7 @@ initialized = false # whether Python is initialized
 finalized = false # whether Python has been finalized
 
 # need to be able to get the version before Python is initialized
-Py_GetVersion(libpy=libpython) = bytestring(ccall(dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
+Py_GetVersion(libpy=libpython) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
 
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
@@ -329,7 +324,7 @@ function pyinitialize(python::AbstractString)
             dlopen_libpython(python), pysys(python, "executable")
         catch
             # perhaps we were passed library name and not executable?
-            (dlopen(python, RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL), python)
+            (Libdl.dlopen(python, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL), python)
         end
         pyinitialize(libpy, programname)
     end
