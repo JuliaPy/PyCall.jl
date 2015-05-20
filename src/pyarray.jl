@@ -63,7 +63,7 @@ function parse_pyfmt(fmt::ByteString)
     len = length(fmt)
     while idx <= len
         c = fmt[idx]
-        if isblank(c)
+        if c == ' ' || c == '\t'
             idx += 1
             continue
         end
@@ -101,11 +101,10 @@ end
 jltype_to_pyfmt{T}(::Type{T}) = jltype_to_pyfmt(IOBuffer(), T)
 
 function jltype_to_pyfmt{T}(io::IO, ::Type{T})
-    length(T.names) == 0 && error("no fields for structure type $T")
+    nfields(T) == 0 && error("no fields for structure type $T")
     write(io, "T{")
-    idx = 1
-    for n in T.names
-        ty = T.types[idx]
+    for n in fieldnames(T)
+        ty = fieldtype(T, n)
         if isbits(ty)
             if haskey(jltype_pyfmt, ty)
                 fty = jltype_pyfmt[ty]
@@ -118,7 +117,6 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
         else
             error("pyfmt can only encode bits types")
         end
-        idx += 1
     end
     write(io, "}")
     return bytestring(io)
@@ -143,11 +141,11 @@ end
 
 f_contiguous(view::PyBuffer) =
     ccall((@pysym :PyBuffer_IsContiguous), Cint,
-    	  (Ptr{PyBuffer}, Cchar), &view, 'F') == cint(1)
+    	  (Ptr{PyBuffer}, Cchar), &view, 'F') == 1
 
 c_contiguous(view::PyBuffer) =
     ccall((@pysym :PyBuffer_IsContiguous), Cint,
-    	  (Ptr{PyBuffer}, Cchar), &view, 'C') == cint(1)
+    	  (Ptr{PyBuffer}, Cchar), &view, 'C') == 1
 
 #TODO: PUT READ / WRITE / INDIRECT INTO TYPE PARAMS
 type PyArray{T, N} <: DenseArray{T, N}
@@ -164,13 +162,16 @@ type PyArray{T, N} <: DenseArray{T, N}
     function PyArray(o::PyObject, b::PyBuffer)
         if !aligned(b)
 	        throw(ArgumentError("only aligned buffer objects are supported"))
-        elseif eltype(b) != T
-	        throw(ArgumentError("inconsistent type in PyArray constructor"))
+        # TODO
+        #elseif eltype(b) != T
+	    #    throw(ArgumentError("inconsistent type in PyArray constructor"))
         elseif ndims(b) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
         end
-        return new(o, b, true, bool(b.buf.readonly),
-                   size(b), strides(b),
+        return new(o, b, true,
+                   Bool(b.buf.readonly),
+                   size(b),
+                   tuple(Int[div(s,sizeof(T)) for s in strides(b)]...),
                    f_contiguous(b),
                    c_contiguous(b),
                    convert(Ptr{T}, b.buf.buf))
@@ -179,7 +180,7 @@ end
 
 function PyArray(o::PyObject)
     #TODO: PyBUF_INDIRECT, READONLY
-    view = PyBuffer(o, PyBUF_STRIDES | PyBUF_WRITEABLE | PyBUF_FORMAT)
+    view = PyBuffer(o, PyBUF_RECORDS)
     if view.buf.format == C_NULL
         throw(ArgumentError("Python buffer has no format string"))
     end
@@ -304,7 +305,7 @@ Base.convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
 function Base.convert{T<:PyBufType}(::Type{Array{T,1}}, o::PyObject)
     try
-        view = PyBuffer(o, PyBUF_STRIDES | PyBUF_WRITEABLE | PyBUF_FORMAT)
+        view = PyBuffer(o, PyBUF_RECORDS)
         order, tys = parse_pyfmt(bytestring(view.format))
         if length(tys) != 1
             throw(ArgumentError("PyArray cannot yet handle structure types"))

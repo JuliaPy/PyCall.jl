@@ -433,6 +433,8 @@ convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
 convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
 
 # NumPy conversions (multidimensional arrays)
+npy_initialized = false
+
 #include("numpy.jl")
 
 #########################################################################

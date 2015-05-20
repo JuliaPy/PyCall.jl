@@ -11,7 +11,7 @@ immutable Py_buffer
     obj::PyPtr
     len::Cssize_t
     itemsize::Cssize_t
-    
+
     readonly::Cint
     ndim::Cint
     format::Ptr{Cchar}
@@ -29,11 +29,11 @@ end
 type PyBuffer
     buf::Py_buffer
     PyBuffer() = begin
-        b = new(Py_buffer(C_NULL, C_NULL, 0, 0, 
+        b = new(Py_buffer(C_NULL, C_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
         finalizer(b, pydecref)
-        return b 
+        return b
     end
 end
 
@@ -49,7 +49,7 @@ end
 #############################################################################
 # Array-like accessors for PyBuffer.
 
-Base.ndims(b::PyBuffer)  = @compat UInt(b.buf.ndim)
+Base.ndims(b::PyBuffer)  = @compat Int(b.buf.ndim)
 
 # from the Python docs: If shape is NULL as a result of a PyBUF_SIMPLE
 # or a PyBUF_WRITABLE request, the consumer must disregard itemsize
@@ -62,7 +62,7 @@ Base.pointer(b::PyBuffer) = b.buf.buf
 function Base.size(b::PyBuffer)
     b.buf.ndim <= 1 && return (length(b),)
     @assert b.buf.shape != C_NULL
-    return tuple(Int[unsafe_load(b.buf.shape, i) for i=1:b.buf.ndim]...) 
+    return tuple(Int[unsafe_load(b.buf.shape, i) for i=1:b.buf.ndim]...)
 end
 # specialize size(b, d) for efficiency (avoid tuple construction)
 function Base.size(b::PyBuffer, d::Integer)
@@ -87,7 +87,10 @@ function Base.stride(b::PyBuffer, d::Integer)
     return @compat Int(unsafe_load(b.buf.strides, d))
 end
 
-iscontiguous(b::PyBuffer) = 
+Base.strides(b::PyBuffer) =
+    tuple(Int[stride(b, d) for d in 1:ndims(b)]...)
+
+iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
                (Ptr{PyBuffer}, Cchar), &b, 'A')
 
@@ -104,6 +107,18 @@ const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 
+const PyBUF_CONTIG    = Cint(PyBUF_ND | PyBUF_WRITABLE)
+const PyBUF_CONTIG_RO = Cint(PyBUF_ND)
+
+const PyBUF_STRIDED    = Cint(PyBUF_STRIDES | PyBUF_WRITABLE)
+const PyBUF_STRIDED_RO = Cint(PyBUF_STRIDES)
+
+const PyBUF_RECORDS    = Cint(PyBUF_STRIDES | PyBUF_WRITABLE | PyBUF_FORMAT)
+const PyBUF_RECORDS_RO = Cint(PyBUF_STRIDES | PyBUF_FORMAT)
+
+const PyBUF_FULL    = Cint(PyBUF_INDIRECT | PyBUF_WRITABLE | PyBUF_FORMAT)
+const PyBUF_FULL_RO = Cint(PyBUF_INDIRECT | PyBUF_FORMAT)
+
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union(PyObject,PyPtr), flags=PyBUF_SIMPLE)
     b = PyBuffer()
@@ -112,7 +127,7 @@ function PyBuffer(o::Union(PyObject,PyPtr), flags=PyBUF_SIMPLE)
     return b
 end
 
-#############################################################################  
+#############################################################################
 
 # recursive function to write buffer dimension by dimension, starting at
 # dimension d with the given pointer offset (in bytes).
@@ -153,4 +168,4 @@ function Base.write(io::IO, b::PyBuffer)
     end
 end
 
-#############################################################################  
+#############################################################################

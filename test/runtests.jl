@@ -174,9 +174,9 @@ end
 @pyimport array
 @pyimport numpy as np
 
-@test roundtripeq({1 2 3; 4 5 6})
-@test roundtripeq([])
-@test convert(Array{PyAny,1}, PyObject({1 2 3; 4 5 6})) == {{1,2,3},{4,5,6}}
+@test roundtripeq(Any[1 2 3; 4 5 6])
+@test roundtripeq(Any[])
+@test convert(Array{PyAny,1}, PyObject(Any[1 2 3; 4 5 6])) == Any[Any[1,2,3],Any[4,5,6]]
 @test roundtripeq(begin A = Array(Int, 3); A[1] = 1; A[2] = 2; A[3] = 3; A; end)
 @test convert(PyAny, PyObject(begin A = Array(Any); A[1] = 3; A; end)) == 3
 
@@ -194,12 +194,12 @@ end
 
 # Check 1D arrays
 a = array.array("f", [1,2,3])
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 1
 @test length(view) == 3
 @test sizeof(view) == sizeof(Float32) * 3
 @test size(view) == (3,)
-@test strides(view) == (1,)
+@test strides(view) == (1*sizeof(Float32),) # strides in bytes
 @test PyCall.aligned(view) == true
 # a vector is both c/f contiguous
 @test PyCall.c_contiguous(view) == true
@@ -209,12 +209,12 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 # Check 1D numpy arrays
 a = np.array([1.0,2.0,3.0])
 @test a[:dtype] == np.dtype("float64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 1
 @test length(view) == 3
 @test sizeof(view) == a[:nbytes]
 @test size(view) == (3,)
-@test strides(view) == (1,)
+@test strides(view) == (1*sizeof(Float64),) # strides in bytes
 @test PyCall.aligned(view) == true
 # a vector is both c/f contiguous
 @test PyCall.c_contiguous(view) == true
@@ -222,15 +222,15 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 @test PyCall.pyfmt(view) == "d"
 
 # Check 2D C ordered arrays
-a = np.array([[1 2 3],
+a = np.array([[1 2 3];
 	          [1 2 3]])
 @test a[:dtype] == np.dtype("int64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 2
 @test length(view) == 6
 @test sizeof(view) == a[:nbytes]
 @test size(view) == (2,3)
-@test strides(view) == (3,1)
+@test strides(view) == (3*sizeof(Int64),1*sizeof(Int64))
 @test PyCall.aligned(view) == true
 @test PyCall.c_contiguous(view) == true
 @test PyCall.f_contiguous(view) == false
@@ -239,12 +239,12 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 # Check Multi-D C ordered arrays
 a = np.ones((10,5,3), dtype="float32", order="C")
 @test a[:dtype] == np.dtype("float32")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
 @test sizeof(view) == a[:nbytes]
 @test size(view) == (10, 5, 3)
-@test strides(view) == (5 * 3, 3, 1)
+@test strides(view) == (5 * 3 * sizeof(Float32) , 3 * sizeof(Float32), 1 * sizeof(Float32))
 @test PyCall.aligned(view) == true
 @test PyCall.c_contiguous(view) == true
 @test PyCall.f_contiguous(view) == false
@@ -253,7 +253,7 @@ view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
 # Check Multi-D F ordered arrays
 a = np.ones((10,5,3), dtype="uint8", order="F")
 @test a[:dtype] == np.dtype("uint8")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_RECORDS)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test ndims(view) == 3
 @test length(view) == (10 * 5 * 3)
 @test sizeof(view) == a[:nbytes]
@@ -348,16 +348,16 @@ a[5] = 10
 #TODO: record array support
 
 a = np.zeros((2,), dtype=("i4,f4,a10"))
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_FULL)
 @test PyCall.pyfmt(view) == "T{=i:f0:f:f1:10s:f2:}"
 
 a = np.zeros(3, dtype="3int8, float32, (2,3)float64")
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+view = PyCall.PyBuffer(a, PyCall.PyBUF_FULL)
 @test PyCall.pyfmt(view) == "T{(3)b:f0:=f:f1:(2,3)d:f2:}"
 
-a = np.zeros(3, dtype={"names" => ["col1", "col2"],
-                       "formats" => ["i4", "f4"]})
-view = PyCall.pygetbuffer(a, PyCall.PyBUF_FULL)
+a = np.zeros(3, dtype=@compat Dict("names" => ["col1", "col2"],
+                                   "formats" => ["i4", "f4"]))
+view = PyCall.PyBuffer(a, PyCall.PyBUF_FULL)
 @test PyCall.pyfmt(view) == "T{i:col1:f:col2:}"
 
 immutable Test1
@@ -387,8 +387,8 @@ type Dummy end
 type Test4
    a::Dummy
 end
-@test_throws PyCall.jltype_to_pyfmt(Test4)
+@test_throws ErrorException PyCall.jltype_to_pyfmt(Test4)
 
 immutable Test5
 end
-@test_throws PyCall.jltype_to_pyfmt(Test5)
+@test_throws ErrorException PyCall.jltype_to_pyfmt(Test5)
