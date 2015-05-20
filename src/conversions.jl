@@ -433,7 +433,7 @@ convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
 convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
 
 # NumPy conversions (multidimensional arrays)
-include("numpy.jl")
+#include("numpy.jl")
 
 #########################################################################
 # PyDict: no-copy wrapping of a Julia object around a Python dictionary
