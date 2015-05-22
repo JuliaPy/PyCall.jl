@@ -54,15 +54,15 @@ function dlopen_libpython(python::AbstractString)
         ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
         # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro
         try
-	    run(pipe(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
+            run(pipe(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
         catch
-	    pop!(ENV, "PYTHONHOME")
+            pop!(ENV, "PYTHONHOME")
         end
     end
     # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
     for lib in libs
         for libpath in libpaths
-     	    if isfile(joinpath(libpath, lib))
+            if isfile(joinpath(libpath, lib))
                 try
                     return Libdl.dlopen(joinpath(libpath, lib),
                                   Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
@@ -75,7 +75,7 @@ function dlopen_libpython(python::AbstractString)
     # library path might be the wrong one if multiple python
     # versions are installed (we prefer the one in LIBDIR):
     for lib in libs
-        lib = splitext(lib)[1] 
+        lib = splitext(lib)[1]
         try
             return Libdl.dlopen(lib, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
         end
@@ -129,7 +129,7 @@ Py_GetVersion(libpy=libpython) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVers
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
 # initialize the Python interpreter (no-op on subsequent calls)
-function pyinitialize(libpy::Ptr{Void}, programname="")
+function pyinitialize(libpy::HandleT, programname="")
     global initialized
     global finalized
     if !initialized::Bool
@@ -147,7 +147,13 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         # namespace.  On windows, jl_exe_handle stores this, whereas on
         # other systems jl_dl_handle is equivalent to dlopen(NULL) and stores
         # this.  (These are internal vars present in Julia 0.2/0.3/0.4.)
-        global const libpython = libpy == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : libpy
+        # libpython_hdl is whatever passed in to this function. Can be either
+        # a DLHandle or a Ptr{Void} on 0.4. This is the one that should be
+        # closed in finalizer.
+        # libpython is always a Ptr{Void}, which can be the handle passed in or
+        # the global julia handle
+        global const libpython_hdl = libpy
+        global const libpython = hdl_ptr(libpy) == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : hdl_ptr(libpy)
 
         # cache the Python version as a Julia VersionNumber
         global const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
@@ -158,7 +164,7 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         # the PyMemberDef array must not be garbage-collected
         global const pyjlwrap_membername = "jl_value"
         global const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
-        global const pyjlwrap_members = 
+        global const pyjlwrap_members =
           PyMemberDef[ PyMemberDef(pyjlwrap_membername,
                                    T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
                                    pyjlwrap_doc),
@@ -168,10 +174,10 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
         if !already_inited
             if !isempty(pyprogramname)
                 if pyversion.major < 3
-                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},), 
+                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Uint8},),
                           pyprogramname)
                 else
-                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Cwchar_t},), 
+                    ccall((@pysym :Py_SetProgramName), Void, (Ptr{Cwchar_t},),
                           pyprogramname)
                 end
             end
@@ -285,7 +291,7 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
 
         init_datetime()
         pyjlwrap_init()
-        
+
         global const jl_FunctionType = pyjlwrap_type("PyCall.jl_Function",
                                                      t -> t.tp_call =
                                                        jl_Function_call_ptr)
@@ -301,7 +307,7 @@ function pyinitialize(libpy::Ptr{Void}, programname="")
                 argv   = unsafe_convert(Ptr{Cwchar_t}, argv_s)
                 ccall(pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
             end
-            
+
             # Some Python code checks sys.ps1 to see if it is running
             # interactively, and refuses to be interactive otherwise.
             # (e.g. Matplotlib: see PyPlot#79)
@@ -331,7 +337,7 @@ function pyinitialize(python::AbstractString)
     return
 end
 
-pyinitialize() = pyinitialize(get(ENV, "PYTHON", "python")) 
+pyinitialize() = pyinitialize(get(ENV, "PYTHON", "python"))
 dlopen_libpython() = dlopen_libpython(get(ENV, "PYTHON", "python"))
 
 # end the Python interpreter and free associated memory
@@ -359,7 +365,9 @@ function pyfinalize()
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
         ccall((@pysym :Py_Finalize), Void, ())
-        dlclose(libpython)
+        if hdl_ptr(libpython_hdl) != C_NULL
+            dlclose(libpython_hdl)
+        end
         initialized::Bool = false
         finalized::Bool = true
     end

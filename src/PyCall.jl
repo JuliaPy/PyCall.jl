@@ -15,7 +15,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
-# should really be fixed in Julia (#2622).  However, we will 
+# should really be fixed in Julia (#2622).  However, we will
 # use the sigatomic_begin/end functions to protect pycall and
 # similar long-running (or potentially long-running) code.
 import Base: sigatomic_begin, sigatomic_end
@@ -28,10 +28,18 @@ if VERSION >= v"0.4.0-dev+3710"
 else
     const unsafe_convert = Base.convert
 end
+# This is not the exact version but should be closed enough
+if VERSION >= v"0.4.0-dev+4922"
+    typealias HandleT Union(Libdl.DLHandle, Ptr{Void})
+    hdl_ptr(hdl::Libdl.DLHandle) = hdl.ptr
+else
+    typealias HandleT Ptr{Void}
+end
+hdl_ptr(hdl::Ptr{Void}) = hdl
 
 #########################################################################
 
-# Mirror of C PyObject struct (for non-debugging Python builds).  
+# Mirror of C PyObject struct (for non-debugging Python builds).
 # We won't actually access these fields directly; we'll use the Python
 # C API for everything.  However, we need to define a unique Ptr type
 # for PyObject*, and we might as well define the actual struct layout
@@ -115,10 +123,10 @@ function pyincref(o::PyPtr)
     PyObject(o)
 end
 
-pyisinstance(o::PyObject, t::PyObject) = 
+pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-pyisinstance(o::PyObject, t::Union(Ptr{Void},PyPtr)) = 
+pyisinstance(o::PyObject, t::Union(Ptr{Void},PyPtr)) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Void}, o::PyObject) =
@@ -173,7 +181,7 @@ function pystring(o::PyObject)
         end
         return convert(AbstractString, PyObject(s))
     end
-end    
+end
 
 function show(io::IO, o::PyObject)
     print(io, "PyObject $(pystring(o))")
@@ -216,7 +224,7 @@ function ==(o1::PyObject, o2::PyObject)
         return o1.o == o2.o
     elseif is_pyjlwrap(o1)
         if is_pyjlwrap(o2)
-            return unsafe_pyjlwrap_to_objref(o1.o) == 
+            return unsafe_pyjlwrap_to_objref(o1.o) ==
                    unsafe_pyjlwrap_to_objref(o2.o)
         else
             return false
@@ -302,7 +310,7 @@ const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     @pyinitialize
-    members = convert(Vector{@compat Tuple{AbstractString,PyObject}}, 
+    members = convert(Vector{@compat Tuple{AbstractString,PyObject}},
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     # Hack to create an anonymous bare module
@@ -385,7 +393,7 @@ function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
     nargs = length(args)
     sigatomic_begin()
     try
-        arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), 
+        arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,),
                                        nargs))
         for i = 1:nargs
             @pycheckzi ccall((@pysym :PyTuple_SetItem), Cint,
@@ -411,7 +419,7 @@ end
 # Once Julia lets us overload ".", we will use [] to access items, but
 # for now we can define "get"
 
-function get(o::PyObject, returntype::TypeTuple, k, default) 
+function get(o::PyObject, returntype::TypeTuple, k, default)
     r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
     if r == C_NULL
         pyerr_clear()
@@ -421,8 +429,8 @@ function get(o::PyObject, returntype::TypeTuple, k, default)
     end
 end
 
-get(o::PyObject, returntype::TypeTuple, k) = 
-    convert(returntype, PyObject(@pycheckni ccall((@pysym :PyObject_GetItem), 
+get(o::PyObject, returntype::TypeTuple, k) =
+    convert(returntype, PyObject(@pycheckni ccall((@pysym :PyObject_GetItem),
                                  PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
 
 get(o::PyObject, k, default) = get(o, PyAny, k, default)
@@ -474,7 +482,7 @@ const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
 
 # evaluate a python string, returning PyObject, given a dictionary
 # (string/symbol => value) of local variables to use in the expression
-function pyeval_(s::AbstractString, locals::PyDict) 
+function pyeval_(s::AbstractString, locals::PyDict)
     sb = bytestring(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
