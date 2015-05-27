@@ -96,28 +96,29 @@ iscontiguous(b::PyBuffer) =
 
 #############################################################################
 # pybuffer constant values from Include/object.h
-const PyBUF_MAX_NDIM = convert(Cint, 64)
-const PyBUF_SIMPLE    = convert(Cint, 0)
-const PyBUF_WRITABLE  = convert(Cint, 0x0001)
-const PyBUF_FORMAT    = convert(Cint, 0x0004)
-const PyBUF_ND        = convert(Cint, 0x0008)
+
+const PyBUF_MAX_NDIM       = convert(Cint, 64)
+const PyBUF_SIMPLE         = convert(Cint, 0)
+const PyBUF_WRITABLE       = convert(Cint, 0x0001)
+const PyBUF_FORMAT         = convert(Cint, 0x0004)
+const PyBUF_ND             = convert(Cint, 0x0008)
 const PyBUF_STRIDES        = convert(Cint, 0x0010) | PyBUF_ND
 const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
 const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 
-const PyBUF_CONTIG    = Cint(PyBUF_ND | PyBUF_WRITABLE)
-const PyBUF_CONTIG_RO = Cint(PyBUF_ND)
+const PyBUF_CONTIG     = convert(Cint, PyBUF_ND | PyBUF_WRITABLE)
+const PyBUF_CONTIG_RO  = convert(Cint, PyBUF_ND)
 
-const PyBUF_STRIDED    = Cint(PyBUF_STRIDES | PyBUF_WRITABLE)
-const PyBUF_STRIDED_RO = Cint(PyBUF_STRIDES)
+const PyBUF_STRIDED    = convert(Cint, PyBUF_STRIDES | PyBUF_WRITABLE)
+const PyBUF_STRIDED_RO = convert(Cint, PyBUF_STRIDES)
 
-const PyBUF_RECORDS    = Cint(PyBUF_STRIDES | PyBUF_WRITABLE | PyBUF_FORMAT)
-const PyBUF_RECORDS_RO = Cint(PyBUF_STRIDES | PyBUF_FORMAT)
+const PyBUF_RECORDS    = convert(Cint, PyBUF_STRIDES | PyBUF_WRITABLE | PyBUF_FORMAT)
+const PyBUF_RECORDS_RO = convert(Cint, PyBUF_STRIDES | PyBUF_FORMAT)
 
-const PyBUF_FULL    = Cint(PyBUF_INDIRECT | PyBUF_WRITABLE | PyBUF_FORMAT)
-const PyBUF_FULL_RO = Cint(PyBUF_INDIRECT | PyBUF_FORMAT)
+const PyBUF_FULL       = convert(Cint, PyBUF_INDIRECT | PyBUF_WRITABLE | PyBUF_FORMAT)
+const PyBUF_FULL_RO    = convert(Cint, PyBUF_INDIRECT | PyBUF_FORMAT)
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union(PyObject,PyPtr), flags=PyBUF_SIMPLE)
@@ -158,7 +159,6 @@ end
 
 function Base.write(io::IO, b::PyBuffer)
     b.buf.obj != C_NULL || error("attempted to write NULL buffer")
-
     if iscontiguous(b)
         # (note that 0-dimensional buffers are always contiguous)
         return write(io, pointer_to_array(convert(Ptr{Uint8}, pointer(b)),
