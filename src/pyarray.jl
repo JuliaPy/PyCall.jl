@@ -228,21 +228,15 @@ end
 #TODO: Bounds checking is needed
 Base.getindex{T}(a::PyArray{T,0}) = unsafe_load(a.data)
 
-function Base.getindex{T}(a::PyArray{T,1}, i::Integer)
+Base.getindex{T}(a::PyArray{T,1}, i::Integer) =
     unsafe_load(a.data, 1 + (i-1) * a.strides[1])
-end
 
-function Base.getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer)
+Base.getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer) =
     unsafe_load(a.data, 1 + (i-1) * a.strides[1] + (j-1) * a.strides[2])
-end
 
-function Base.getindex(a::PyArray, i::Integer)
-    if a.f_contig
-        return unsafe_load(a.data, i)
-    else
-        return a[ind2sub(a.dims, i)...]
-    end
-end
+Base.getindex(a::PyArray, i::Integer) =
+    a.f_contig ? unsafe_load(a.data, i) :
+                 getindex(a, ind2sub(a.dims, i)...)
 
 function Base.getindex(a::PyArray, is::Integer...)
     index = 1
