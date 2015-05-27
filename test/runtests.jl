@@ -173,6 +173,7 @@ end
 
 @pyimport array
 @pyimport numpy as np
+@pyimport numpy.random as random
 
 @test roundtripeq(Any[1 2 3; 4 5 6])
 @test roundtripeq(Any[])
@@ -263,6 +264,13 @@ view = PyCall.PyBuffer(a, PyCall.PyBUF_RECORDS)
 @test PyCall.c_contiguous(view) == false
 @test PyCall.f_contiguous(view) == true
 @test PyCall.pyfmt(view) == "B"
+
+# check endianness
+let a = random.randn(10,10),
+    bsa = a[:newbyteorder]()
+
+    @test_throws ArgumentError PyArray(bsa)
+end
 
 ###################################################
 # PyArray Tests
@@ -387,8 +395,8 @@ type Dummy end
 type Test4
    a::Dummy
 end
-@test_throws ErrorException PyCall.jltype_to_pyfmt(Test4)
+@test_throws ArgumentError PyCall.jltype_to_pyfmt(Test4)
 
 immutable Test5
 end
-@test_throws ErrorException PyCall.jltype_to_pyfmt(Test5)
+@test_throws ArgumentError PyCall.jltype_to_pyfmt(Test5)

@@ -107,7 +107,7 @@ jltype_to_pyfmt{T}(::Type{T}) = jltype_to_pyfmt(IOBuffer(), T)
 
 function jltype_to_pyfmt{T}(io::IO, ::Type{T})
     if nfields(T) == 0
-        error("no fields for structure type $T")
+        throw(ArgumentError("no fields for structure type $T"))
     end
     write(io, "T{")
     for n in fieldnames(T)
@@ -119,10 +119,10 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
             elseif Base.isstructtype(T)
                 jltype_to_pyfmt(io, ty)
             else
-                error("pyfmt unknown conversion for type $T")
+                throw(ArgumentError("unknown pyfmt conversion for type $T"))
             end
         else
-            error("pyfmt can only encode bits types")
+            throw(ArgumentError("$T is not a bits type"))
         end
     end
     write(io, "}")
@@ -192,12 +192,12 @@ function PyArray(o::PyObject)
         throw(ArgumentError("Python buffer has no format string"))
     end
     order, tys = parse_pyfmt(bytestring(view.buf.format))
-    if isempty(tys)
+    if order !== :native
+        throw(ArgumentError("PyArray cannot yet handle non-native endian buffers"))
+    elseif isempty(tys)
         throw(ArgumentError("PyArray cannot yet handle structure types"))
     end
-    ty   = first(tys)
-    ndim = ndims(view)
-    return PyArray{ty, ndim}(o, view)
+    return PyArray{tys[1], ndims(view)}(o, view)
 end
 
 Base.size(a::PyArray) = a.dims
