@@ -272,10 +272,18 @@ let a = random.randn(10,10),
     @test_throws ArgumentError PyArray(bsa)
 end
 
+# check read-only buffers
+let a = random.randn(10,10)
+    a[:setflags](write=false)
+
+    A = PyArray(a)
+    @test_throws ErrorException A[1] = 1.0
+end
+
 ###################################################
 # PyArray Tests
 
-npa = np.array([1,2,3])
+npa = np.array(Int64[1,2,3])
 a = PyArray(npa)
 
 @test size(a) == (3,)
@@ -283,7 +291,7 @@ a = PyArray(npa)
 @test strides(a) == (1,)
 @test size(similar(a)) == size(a)
 @test eltype(similar(a)) == eltype(a)
-@test summary(a) == "3-element Int64 PyArray"
+@test summary(a) == "3-element PyArray{Int64,1}"
 @test sprint() do io; show(io, a); end == "[1,2,3]"
 
 a[1] = 3
@@ -301,7 +309,7 @@ a = PyArray(npa)
 @test strides(a) == (10, 1)
 @test size(similar(a)) == size(a)
 @test eltype(similar(a)) == eltype(a)
-@test summary(a) == "10x10 Float32 PyArray"
+@test summary(a) == "10x10 PyArray{Float32,2}"
 @test sprint() do io; show(io, a); end == sprint() do io
 				              show(io, ones(Float32, (10,10)))
 				      	  end
@@ -315,7 +323,7 @@ a = PyArray(npa)
 @test ndims(a) == 3
 @test size(similar(a)) == size(a)
 @test eltype(similar(a)) == eltype(a)
-@test summary(a) == "10x10x20 Float32 PyArray"
+@test summary(a) == "10x10x20 PyArray{Float32,3}"
 
 aa = np.asarray(a)
 @test np.shape(aa) == size(a)

@@ -136,11 +136,12 @@ sizeof_pyfmt(fmt::ByteString) = ccall((@pysym :PyBuffer_SizeFromFormat), Cint,
 
 function aligned(b::PyBuffer)
     if b.buf.strides == C_NULL
-        throw(ArgumentError("PyBuffer strides field is NULL"))
+        # buffer is defined to be C-contiguous
+        return true
     end
-    for i=1:b.buf.ndim
-        if mod(unsafe_load(b.buf.strides, i), b.buf.itemsize) != 0
-	        return false
+    for i=1:ndims(b)
+        if mod(stride(b,i), b.buf.itemsize) != 0
+            return false
         end
     end
     return true
@@ -186,8 +187,14 @@ type PyArray{T, N} <: DenseArray{T, N}
 end
 
 function PyArray(o::PyObject)
-    #TODO: PyBUF_INDIRECT, READONLY
-    view = PyBuffer(o, PyBUF_RECORDS)
+    view = PyBuffer()
+    ret = ccall((@pysym :PyObject_GetBuffer), Cint,
+                (PyPtr, Ptr{PyBuffer}, Cint), o, &view, PyBUF_FULL)
+    if ret < 0
+        # try the readonly buffer interface
+        @pycheckzi ccall((@pysym :PyObject_GetBuffer), Cint,
+                         (PyPtr, Ptr{PyBuffer}, Cint), o, &view, PyBUF_FULL_RO)
+    end
     if view.buf.format == C_NULL
         throw(ArgumentError("Python buffer has no format string"))
     end
@@ -206,8 +213,8 @@ Base.similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 Base.stride(a::PyArray, i::Integer) = a.strides[i]
 Base.convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = convert(Ptr{T}, a.data)
 
-Base.summary{T}(a::PyArray{T}) = string(Base.dims2string(size(a)), " ",
-                                        string(T), " PyArray")
+Base.summary{T,N}(a::PyArray{T,N}) =
+    string(Base.dims2string(size(a)), " PyArray{$T,$N}")
 
 #TODO: is this correct for all buffer types other than contig/dense?
 #TODO: get rid of this, should be copy! but copy! uses similar under the hood
@@ -275,15 +282,21 @@ function Base.pointer{T}(a::PyArray{T}, is::@compat(Tuple{Vararg{Int}}))
     return a.data + offset * sizeof(T)
 end
 
-Base.setindex!{T}(a::PyArray{T,0}, v) = (unsafe_store!(pointer(a), v, 1); v)
+function Base.setindex!{T}(a::PyArray{T,0}, v)
+    a.readonly && throw(ErrorException("PyArray is read-only"))
+    unsafe_store!(pointer(a), v, 1)
+    return v
+end
 
 function Base.setindex!{T}(a::PyArray{T,1}, v, i::Integer)
+    a.readonly && throw(ErrorException("PyArray is read-only"))
     1 <= i <= length(a) || throw(BoundsError())
     unsafe_store!(pointer(a), v, 1 + (i-1) * a.strides[1])
     return v
 end
 
 function Base.setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer)
+    a.readonly && throw(ErrorException("PyArray is read-only"))
     1 <= i <= size(a,1) || throw(BoundsError())
     1 <= j <= size(a,2) || throw(BoundsError())
     unsafe_store!(pointer(a), v, 1 + (i-1) * a.strides[1] + (j-1) * a.strides[2])
@@ -291,6 +304,7 @@ function Base.setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer)
 end
 
 function Base.setindex!(a::PyArray, v, i::Integer)
+    a.readonly && throw(ErrorException("PyArray is read-only"))
     if a.f_contig
         1 <= i <= length(a) || throw(BoundsError())
         unsafe_store!(pointer(a), v, i)
@@ -300,6 +314,7 @@ function Base.setindex!(a::PyArray, v, i::Integer)
 end
 
 function Base.setindex!{T,N}(a::PyArray{T, N}, v, is::Integer...)
+    a.readonly && throw(ErrorException("PyArray is read-only"))
     index = 1
     n = min(length(is), N)
     for i = 1:n
