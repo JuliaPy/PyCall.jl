@@ -19,13 +19,8 @@
 #                            return value preceeded by -> @ end)
 # X{b:b}->b
 
-const pyfmt_byteorder = @compat Dict{Char,Symbol}('@' => :native,
-                                         '=' => :native,
-                                         '<' => :little,
-                                         '>' => :big,
-					                     '!' => :big)
-
-const pyfmt_jltype = @compat Dict{Char,Type}('x' => Uint8,
+const pyfmt_jltype = @compat Dict{Char,DataType}(
+                                    'x' => Uint8,
                                     'c' => Cchar,
                                     'b' => Cuchar,
                                     'B' => Uint8,
@@ -46,19 +41,27 @@ const pyfmt_jltype = @compat Dict{Char,Type}('x' => Uint8,
                                     'p' => Ptr{Cchar},
                                     'P' => Ptr{Void})
 
-# for now, heterogenous arrays of a single numeric type
+#TODO: for now, heterogenous arrays of a single numeric type
 const PyBufType = Union(values(pyfmt_jltype)...)
 
 const jltype_pyfmt = [v => k for (k,v) in pyfmt_jltype]
 
 #TODO: this only works for simple struct packing
 function parse_pyfmt(fmt::ByteString)
-    types = Type[]
+    types = DataType[]
     idx = 1
-    byteorder = :native
-    if haskey(pyfmt_byteorder, fmt[idx])
-        byteorder = pyfmt_byteorder[fmt[idx]]
-	    idx = 2
+    c = fmt[idx]
+    if c == '@' || c == '='
+        byteorder = :native
+        idx += 1
+    elseif c == '<'
+        byteorder = :little
+        idx += 1
+    elseif c == '>' || c == '!'
+        byteorder = :big
+        idx += 1
+    else
+        byteorder = :native
     end
     len = length(fmt)
     while idx <= len
@@ -73,42 +76,49 @@ function parse_pyfmt(fmt::ByteString)
             num = c - '0'
             idx += 1
             if idx > len
-                return (byteorder, types)
+                return (byteorder,types)
             end
             c = fmt[idx]
             while '0' <= c && c <= '9'
                 num = num * 10 + (c - '0')
+                if num < 0
+                    throw(OverflowError())
+                end
                 idx += 1
                 if idx > len
-                    return (byteorder, types)
+                    return (byteorder,types)
                 end
                 c = fmt[idx]
             end
         end
-        try
-            ty = pyfmt_jltype[c]
-            for _ = 1:num
-                push!(types, ty)
-            end
-        catch
-            throw(ArgumentError("invalid PyBuffer format string $fmt"))
+        ty = get(pyfmt_jltype, c, Void)::DataType
+        if ty === Void
+            throw(ArgumentError("invalid PyBuffer format string: $fmt"))
+        end
+        for _ = 1:num
+            push!(types,ty)
         end
         idx += 1
     end
-    return (byteorder, types)
+    return (byteorder,types)
 end
 
 jltype_to_pyfmt{T}(::Type{T}) = jltype_to_pyfmt(IOBuffer(), T)
 
 function jltype_to_pyfmt{T}(io::IO, ::Type{T})
-    nfields(T) == 0 && error("no fields for structure type $T")
+    if nfields(T) == 0
+        error("no fields for structure type $T")
+    end
     write(io, "T{")
     for n in fieldnames(T)
         ty = fieldtype(T, n)
         if isbits(ty)
             if haskey(jltype_pyfmt, ty)
                 fty = jltype_pyfmt[ty]
-                write(io, "$fty:$n:")
+                write(io, fty)
+                write(io, ':')
+                write(io, n)
+                write(io, ':')
             elseif Base.isstructtype(T)
                 jltype_to_pyfmt(io, ty)
             else
@@ -122,7 +132,7 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
     return bytestring(io)
 end
 
-pyfmt(b::PyBuffer) = b.buf.format == C_NULL ? bytestring("") : bytestring(b.buf.format)
+pyfmt(b::PyBuffer) = bytestring(b.buf.format == C_NULL ? "" : b.buf.format)
 
 sizeof_pyfmt(fmt::ByteString) = ccall((@pysym :PyBuffer_SizeFromFormat), Cint,
                                       (Ptr{Cchar},), &fmt)
