@@ -47,7 +47,12 @@ const PyBufType = Union(values(pyfmt_jltype)...)
 const jltype_pyfmt = [v => k for (k,v) in pyfmt_jltype]
 
 #TODO: this only works for simple struct packing
-function parse_pyfmt(fmt::ByteString)
+function parse_pyfmt(buf::PyBuffer)
+    # a missing format string is interpreted as a plain byte buffer
+    if buf.buf.format == C_NULL
+        return (:native, [Uint8,])
+    end
+    fmt = bytestring(buf.buf.format)
     types = DataType[]
     idx = 1
     c = fmt[idx]
@@ -195,10 +200,7 @@ function PyArray(o::PyObject)
         @pycheckzi ccall((@pysym :PyObject_GetBuffer), Cint,
                          (PyPtr, Ptr{PyBuffer}, Cint), o, &view, PyBUF_FULL_RO)
     end
-    if view.buf.format == C_NULL
-        throw(ArgumentError("Python buffer has no format string"))
-    end
-    order, tys = parse_pyfmt(bytestring(view.buf.format))
+    order, tys = parse_pyfmt(view)
     if order !== :native
         throw(ArgumentError("PyArray cannot yet handle non-native endian buffers"))
     elseif isempty(tys)
@@ -211,8 +213,6 @@ Base.size(a::PyArray) = a.dims
 Base.ndims{T,N}(a::PyArray{T,N}) = N
 Base.similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 Base.stride(a::PyArray, i::Integer) = a.strides[i]
-Base.convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = convert(Ptr{T}, a.data)
-
 Base.summary{T,N}(a::PyArray{T,N}) =
     string(Base.dims2string(size(a)), " PyArray{$T,$N}")
 
@@ -339,7 +339,7 @@ Base.convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 function Base.convert{T<:PyBufType}(::Type{Array{T,1}}, o::PyObject)
     try
         view = PyBuffer(o, PyBUF_RECORDS)
-        order, tys = parse_pyfmt(bytestring(view.format))
+        order, tys = parse_pyfmt(view)
         if length(tys) != 1
             throw(ArgumentError("PyArray cannot yet handle structure types"))
         end
