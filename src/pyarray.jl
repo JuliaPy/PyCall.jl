@@ -113,12 +113,9 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
     for n in fieldnames(T)
         ty = fieldtype(T, n)
         if isbits(ty)
-            if haskey(jltype_pyfmt, ty)
-                fty = jltype_pyfmt[ty]
-                write(io, fty)
-                write(io, ':')
-                write(io, n)
-                write(io, ':')
+            fty = get(jltype_pyfmt, ty, '\0')::Char
+            if fty != '\0'
+                write(io, "$fty:$n:")
             elseif Base.isstructtype(T)
                 jltype_to_pyfmt(io, ty)
             else
@@ -132,7 +129,7 @@ function jltype_to_pyfmt{T}(io::IO, ::Type{T})
     return bytestring(io)
 end
 
-pyfmt(b::PyBuffer) = bytestring(b.buf.format == C_NULL ? "" : b.buf.format)
+pyfmt(b::PyBuffer) = b.buf.format == C_NULL ? "" : bytestring(b.buf.format)
 
 sizeof_pyfmt(fmt::ByteString) = ccall((@pysym :PyBuffer_SizeFromFormat), Cint,
                                       (Ptr{Cchar},), &fmt)
@@ -207,7 +204,7 @@ Base.size(a::PyArray) = a.dims
 Base.ndims{T,N}(a::PyArray{T,N}) = N
 Base.similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 Base.stride(a::PyArray, i::Integer) = a.strides[i]
-Base.convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+Base.convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = convert(Ptr{T}, a.data)
 
 Base.summary{T}(a::PyArray{T}) = string(Base.dims2string(size(a)), " ",
                                         string(T), " PyArray")
@@ -262,6 +259,8 @@ function Base.getindex(a::PyArray, is::Integer...)
 end
 
 #TODO: This is only correct for dense, contiguous buffers
+Base.pointer{T}(a::PyArray{T}) = a.data
+
 function Base.pointer{T}(a::PyArray{T}, is::@compat(Tuple{Vararg{Int}}))
     offset = 0
     for i = 1:length(is)
@@ -270,26 +269,20 @@ function Base.pointer{T}(a::PyArray{T}, is::@compat(Tuple{Vararg{Int}}))
     return a.data + offset * sizeof(T)
 end
 
-#TODO: This would not be a defined method when PyArray has Read / Write in the type parameter
-function writeok_assign(a::PyArray, v, i::Integer)
-    unsafe_store!(a.data, v, i)
-    v
-end
-
-Base.setindex!{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
+Base.setindex!{T}(a::PyArray{T,0}, v) = (unsafe_store!(pointer(a), v, 1); v)
 
 Base.setindex!{T}(a::PyArray{T,1}, v, i::Integer) =
-    writeok_assign(a, v, 1 + (i-1) * a.strides[1])
+    (unsafe_store!(pointer(a), v, 1 + (i-1) * a.strides[1]); v)
 
 Base.setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) =
-    writeok_assign(a, v, 1 + (i-1) * a.strides[1] + (j-1) * a.strides[2])
+    (unsafe_store!(pointer(a), v, 1 + (i-1) * a.strides[1] + (j-1) * a.strides[2]); v)
 
 function Base.setindex!(a::PyArray, v, i::Integer)
     if a.f_contig
-        return writeok_assign(a, v, i)
-    else
-        return setindex!(a, v, ind2sub(a.dims, i)...)
+        unsafe_store!(pointer(a), v, i)
+        return v
     end
+    return setindex!(a, v, ind2sub(a.dims, i)...)
 end
 
 function Base.setindex!{T,N}(a::PyArray{T, N}, v, is::Integer...)
@@ -303,7 +296,8 @@ function Base.setindex!{T,N}(a::PyArray{T, N}, v, is::Integer...)
             throw(BoundsError())
         end
     end
-    return writeok_assign(a, v, index)
+    unsafe_store!(pointer(a), v, index)
+    return v
 end
 
 #########################################################################
@@ -340,7 +334,7 @@ Base.convert(::Type{Array{PyObject}}, o::PyObject) =
     map(pyincref, convert(Array{PyPtr}, o))
 
 Base.convert(::Type{Array{PyObject,1}}, o::PyObject) =
-    map(pyincref, convert(Array{PyPtr, 1}, o))
+    map(pyincref, convert(Array{PyPtr,1}, o))
 
 Base.convert{N}(::Type{Array{PyObject,N}}, o::PyObject) =
-    map(pyincref, convert(Array{PyPtr, N}, o))
+    map(pyincref, convert(Array{PyPtr,N}, o))
