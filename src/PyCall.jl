@@ -104,7 +104,7 @@ end
 
 function pydecref(o::PyObject)
     if initialized::Bool # don't decref after pyfinalize!
-        ccall((@pysym :Py_DecRef), Void, (PyPtr,), o.o)
+        ccall(py_decref, Void, (PyPtr,), o.o)
     end
     o.o = convert(PyPtr, C_NULL)
     o
