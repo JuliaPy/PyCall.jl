@@ -209,9 +209,10 @@ if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
         if len != length(tt)
             throw(BoundsError())
         end
-        ntuple(len, i ->
-               convert(tt[i], PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
-                                             (PyPtr, Int), o, i-1))))
+        ntuple((i ->
+                convert(tt[i], PyObject(ccall((@pysym :PySequence_GetItem),
+                                              PyPtr, (PyPtr, Int), o, i-1)))),
+               len)
     end
 else
     function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
@@ -219,10 +220,11 @@ else
         if len != length(tt.types)
             throw(BoundsError())
         end
-        ntuple(len, i ->
-               convert(tt.types[i],
-                       PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
-                                      (PyPtr, Int), o, i-1))))
+        ntuple((i ->
+                convert(tt.types[i],
+                        PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
+                                       (PyPtr, Int), o, i-1)))),
+               len)
     end
 end
 

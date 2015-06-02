@@ -142,7 +142,7 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test !obuf[:writable]()
-    @test obuf[:readable]()  
+    @test obuf[:readable]()
     @test obuf[:readlines]() == ["hello\n","again"]
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)

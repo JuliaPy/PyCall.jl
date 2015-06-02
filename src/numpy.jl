@@ -303,9 +303,9 @@ ndims{T,N}(a::PyArray{T,N}) = N
 
 similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 
-function copy{T,N}(a::PyArray{T,N}) 
+function copy{T,N}(a::PyArray{T,N})
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
-        B = pointer_to_array(a.data, ntuple(N, n -> a.dims[N - n + 1]))
+        B = pointer_to_array(a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
     end
     A = Array(T, a.dims)
@@ -322,10 +322,10 @@ end
 getindex{T}(a::PyArray{T,0}) = unsafe_load(a.data)
 getindex{T}(a::PyArray{T,1}, i::Integer) = unsafe_load(a.data, 1 + (i-1)*a.st[1])
 
-getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer) = 
+getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer) =
   unsafe_load(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
-function getindex(a::PyArray, i::Integer) 
+function getindex(a::PyArray, i::Integer)
     if a.f_contig
         return unsafe_load(a.data, i)
     else
