@@ -129,7 +129,7 @@ Py_GetVersion(libpy=libpython) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVers
 # low-level initialization, given a pointer to dlopen result on libpython,
 # or C_NULL if python symbols are in the global namespace:
 # initialize the Python interpreter (no-op on subsequent calls)
-function pyinitialize(libpy::HandleT, programname="")
+function pyinitialize(libpy::Ptr{Void}, programname="")
     global initialized
     global finalized
     if !initialized::Bool
@@ -147,13 +147,7 @@ function pyinitialize(libpy::HandleT, programname="")
         # namespace.  On windows, jl_exe_handle stores this, whereas on
         # other systems jl_dl_handle is equivalent to dlopen(NULL) and stores
         # this.  (These are internal vars present in Julia 0.2/0.3/0.4.)
-        # libpython_hdl is whatever passed in to this function. Can be either
-        # a DLHandle or a Ptr{Void} on 0.4. This is the one that should be
-        # closed in finalizer.
-        # libpython is always a Ptr{Void}, which can be the handle passed in or
-        # the global julia handle
-        global const libpython_hdl = libpy
-        global const libpython = hdl_ptr(libpy) == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : hdl_ptr(libpy)
+        global const libpython = libpy == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : libpy
 
         # cache the Python version as a Julia VersionNumber
         global const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
@@ -365,9 +359,7 @@ function pyfinalize()
         pygc_finalize()
         gc() # collect/decref any remaining PyObjects
         ccall((@pysym :Py_Finalize), Void, ())
-        if hdl_ptr(libpython_hdl) != C_NULL
-            dlclose(libpython_hdl)
-        end
+        dlclose(libpython)
         initialized::Bool = false
         finalized::Bool = true
     end
