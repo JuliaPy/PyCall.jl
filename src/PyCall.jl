@@ -29,7 +29,7 @@ else
     const unsafe_convert = Base.convert
 end
 # This is not the exact version but should be closed enough
-if VERSION >= v"0.4.0-dev+4922"
+if v"0.4.0-dev+4922" <= VERSION < v"0.4.0-dev+5199"
     typealias HandleT Union(Libdl.DLHandle, Ptr{Void})
     hdl_ptr(hdl::Libdl.DLHandle) = hdl.ptr
 else
