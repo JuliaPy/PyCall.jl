@@ -11,7 +11,7 @@ immutable Py_buffer
     obj::PyPtr
     len::Cssize_t
     itemsize::Cssize_t
-    
+
     readonly::Cint
     ndim::Cint
     format::Ptr{Cchar}
@@ -29,11 +29,11 @@ end
 type PyBuffer
     buf::Py_buffer
     PyBuffer() = begin
-        b = new(Py_buffer(C_NULL, C_NULL, 0, 0, 
+        b = new(Py_buffer(C_NULL, C_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
         finalizer(b, pydecref)
-        return b 
+        return b
     end
 end
 
@@ -41,7 +41,7 @@ function pydecref(o::PyBuffer)
     if initialized::Bool # don't decref after pyfinalize!
         # note that PyBuffer_Release sets o.obj to NULL, and
         # is a no-op if o.obj is already NULL
-        ccall((@pysym :PyBuffer_Release), Void, (Ptr{PyBuffer},), &o)
+        ccall(pybuffer_release, Void, (Ptr{PyBuffer},), &o)
     end
     o
 end

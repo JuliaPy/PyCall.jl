@@ -155,6 +155,9 @@ function pyinitialize(libpy::HandleT, programname="")
         global const libpython_hdl = libpy
         global const libpython = hdl_ptr(libpy) == C_NULL ? unsafe_load(cglobal((@windows ? :jl_exe_handle : :jl_dl_handle), Ptr{Void})) : hdl_ptr(libpy)
 
+        global const py_decref = pysym(:Py_DecRef)
+        global const pybuffer_release = pysym(:PyBuffer_Release)
+
         # cache the Python version as a Julia VersionNumber
         global const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
 
@@ -168,7 +171,7 @@ function pyinitialize(libpy::HandleT, programname="")
           PyMemberDef[ PyMemberDef(pyjlwrap_membername,
                                    T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
                                    pyjlwrap_doc),
-                       PyMemberDef(C_NULL,0,0,0,C_NULL) ]
+                      PyMemberDef(C_NULL,0,0,0,C_NULL) ]
 
         already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
         if !already_inited

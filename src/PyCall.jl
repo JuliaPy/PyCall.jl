@@ -29,7 +29,7 @@ else
     const unsafe_convert = Base.convert
 end
 # This is not the exact version but should be closed enough
-if VERSION >= v"0.4.0-dev+4922"
+if v"0.4.0-dev+4922" <= VERSION < v"0.4.0-dev+5199"
     typealias HandleT Union(Libdl.DLHandle, Ptr{Void})
     hdl_ptr(hdl::Libdl.DLHandle) = hdl.ptr
 else
@@ -104,7 +104,7 @@ end
 
 function pydecref(o::PyObject)
     if initialized::Bool # don't decref after pyfinalize!
-        ccall((@pysym :Py_DecRef), Void, (PyPtr,), o.o)
+        ccall(py_decref, Void, (PyPtr,), o.o)
     end
     o.o = convert(PyPtr, C_NULL)
     o
