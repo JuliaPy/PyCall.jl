@@ -62,8 +62,7 @@ end
 
 # call doevent(status) every sec seconds
 function install_doevent(doevent::Function, sec::Real)
-    timeout = Base.Timer(doevent)
-    Base.start_timer(timeout,sec,sec)
+    timeout = Base.Timer(doevent,sec,sec)
     return timeout
 end
 
@@ -177,7 +176,7 @@ end
 
 function pygui_stop(gui::Symbol=pygui())
     if haskey(eventloops, gui)
-        Base.stop_timer(pop!(eventloops, gui))
+        Base.close(pop!(eventloops, gui))
         true
     else
         false
