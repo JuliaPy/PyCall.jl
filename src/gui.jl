@@ -144,7 +144,11 @@ function Tk_eventloop(sec::Real=50e-3)
     install_doevent(doevent, sec)
 end
 # cache running event loops (so that we don't start any more than once)
-const eventloops = Dict{Symbol,Timer}()
+if VERSION < v"0.4.0-dev+5322"
+    const eventloops = Dict{Symbol,Compat.Timer2}()
+else
+    const eventloops = Dict{Symbol,Timer}()
+end
 
 function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
     pygui(gui)
