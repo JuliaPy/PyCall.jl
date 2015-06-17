@@ -62,8 +62,12 @@ end
 
 # call doevent(status) every sec seconds
 function install_doevent(doevent::Function, sec::Real)
-    timeout = Base.Timer(doevent)
-    Base.start_timer(timeout,sec,sec)
+    if VERSION >=v"0.4.0-dev+5390"
+        timeout = Base.Timer(doevent,sec,sec)
+    else
+        timeout = Base.Timer(doevent)
+        Base.start_timer(timeout,sec,sec)
+    end
     return timeout
 end
 
