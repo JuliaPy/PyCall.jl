@@ -62,8 +62,7 @@ end
 
 # call doevent(status) every sec seconds
 function install_doevent(doevent::Function, sec::Real)
-    timeout = Base.Timer(doevent)
-    Base.start_timer(timeout,sec,sec)
+    timeout = Base.Timer(doevent,sec,sec)
     return timeout
 end
 
@@ -145,7 +144,11 @@ function Tk_eventloop(sec::Real=50e-3)
     install_doevent(doevent, sec)
 end
 # cache running event loops (so that we don't start any more than once)
-const eventloops = Dict{Symbol,Timer}()
+if VERSION < v"0.4.0-dev+5322"
+    const eventloops = Dict{Symbol,Compat.Timer2}()
+else
+    const eventloops = Dict{Symbol,Timer}()
+end
 
 function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
     pygui(gui)
@@ -177,7 +180,7 @@ end
 
 function pygui_stop(gui::Symbol=pygui())
     if haskey(eventloops, gui)
-        Base.stop_timer(pop!(eventloops, gui))
+        Base.close(pop!(eventloops, gui))
         true
     else
         false
