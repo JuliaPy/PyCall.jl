@@ -313,9 +313,13 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
     members = convert(Vector{@compat Tuple{AbstractString,PyObject}},
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
-    # Hack to create an anonymous bare module
-    m = Module(:pyimport)
-    m = eval(m, Expr(:toplevel, Expr(:module, false, mname, Expr(:block)), mname))
+    if VERSION >= v"0.4.0-dev+4448"
+        m = Module(mname, false)
+    else
+        # Hack to create an anonymous bare module on older Julia
+        m = Module(:pyimport)
+        m = eval(m, Expr(:toplevel, Expr(:module, false, mname, Expr(:block)), mname))
+    end
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
                   convert(Vector{Symbol}, o["__all__"])
