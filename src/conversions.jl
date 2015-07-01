@@ -152,7 +152,7 @@ end
 pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, PyCObject_Type) || pyisinstance(po, PyCapsule_Type) ? Ptr{Void} : None
 
 #########################################################################
-# for automatic conversions, I pass Vector{PyAny}, NTuple{PyAny}, etc.,
+# for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
 # but since PyAny is an abstract type I need to convert this to Any
 # before actually creating the Julia object
 
@@ -204,7 +204,7 @@ function PyObject(t::Tuple)
 end
 
 if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
-    function convert(tt::NTuple{Type}, o::PyObject)
+    function convert{N}(tt::NTuple{N, Type}, o::PyObject)
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         if len != length(tt)
             throw(BoundsError())
