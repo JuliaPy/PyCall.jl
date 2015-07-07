@@ -20,7 +20,7 @@ function weakref_callback(callback::PyPtr, wo::PyPtr)
     return pynothing
 end
 
-const weakref_callback_obj = PyObject() # weakref_callback Python method
+const weakref_callback_obj = PyNULL() # weakref_callback Python method
 
 function pygc_finalize()
     pydecref(weakref_callback_obj)

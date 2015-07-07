@@ -99,8 +99,9 @@ type PyObject
         finalizer(po, pydecref)
         return po
     end
-    PyObject() = PyObject(convert(PyPtr, C_NULL))
 end
+
+PyNULL() = PyObject(convert(PyPtr, C_NULL))
 
 function pydecref(o::PyObject)
     if initialized::Bool # don't decref after pyfinalize!

@@ -25,7 +25,7 @@ typealias Tnpy_api Dict{Symbol, Ptr{Void}}
 # need a global to cache pyimport("numpy.core.multiarray"), in order
 # to ensure the module is not garbage-collected as long as we are using it
 # for the npy_api pointers.
-npy_multiarray = PyObject()
+npy_multiarray = PyNULL()
 
 npy_initialized = false # global to prevent multiple initializations
 

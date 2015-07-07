@@ -203,7 +203,7 @@ function pyinitialize(libpy::HandleT, programname="")
         global const ufuncType = try
             pyimport("numpy")["ufunc"]
         catch
-            PyObject() # NumPy not available
+            PyNULL() # NumPy not available
         end
 
         # PyUnicode_* may actually be a #define for another symbol, so
