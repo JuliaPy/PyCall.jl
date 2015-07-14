@@ -482,18 +482,21 @@ end
 
 #########################################################################
 
-const Py_eval_input = 258 # from Python.h
+const Py_single_input = 256  # from Python.h
+const Py_file_input = 257
+const Py_eval_input = 258
+
 const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
 
 # evaluate a python string, returning PyObject, given a dictionary
 # (string/symbol => value) of local variables to use in the expression
-function pyeval_(s::AbstractString, locals::PyDict)
+function pyeval_(s::AbstractString, locals::PyDict, input_type)
     sb = bytestring(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
                                      (Ptr{Uint8}, Ptr{Uint8}, Cint),
-                                     sb, pyeval_fname, Py_eval_input))
+                                     sb, pyeval_fname, input_type))
         main = @pycheckni ccall((@pysym :PyImport_AddModule),
                                 PyPtr, (Ptr{Uint8},),
                                 bytestring("__main__"))
@@ -507,12 +510,13 @@ function pyeval_(s::AbstractString, locals::PyDict)
     end
 end
 
-function pyeval(s::AbstractString, returntype::TypeTuple=PyAny; kwargs...)
-    locals = PyDict{AbstractString,PyObject}()
+function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
+                locals=PyDict{AbstractString, PyObject}(),
+                input_type=Py_eval_input; kwargs...)
     for (k, v) in kwargs
         locals[string(k)] = v
     end
-    return convert(returntype, pyeval_(s, locals))
+    return convert(returntype, pyeval_(s, locals, input_type))
 end
 
 #########################################################################
