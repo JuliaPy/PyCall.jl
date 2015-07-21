@@ -259,20 +259,6 @@ type PyTypeObject
     tp_name_save::ASCIIString
 
     function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
-        @pyinitialize
-        if WORD_SIZE == 64 && pyversion <= v"2.4"
-            error("requires Python 2.5 or later on 64-bit systems")
-        end
-        if pyhassym(:_Py_NewReference)
-            # when Python is compiled with Py_TRACE_REFS, _Py_NewReference
-            # becomes a function (otherwise it is a macro), which allows
-            # us to detect debugging builds.  These are not supported
-            # here because it adds two extra PyObject* fields to the
-            # beginning of PyObject_HEAD, requiring one to modify the
-            # structures above.  (In theory, we could do this at runtime
-            # but it doesn't seem worth it if Python debug builds are rare)
-            error("Python debug builds (Py_TRACE_REFS) are not supported")
-        end
         # figure out Py_TPFLAGS_DEFAULT, depending on Python version
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch 0; end
@@ -280,7 +266,6 @@ type PyTypeObject
           pyversion >= v"3.0" ?
             (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
              Py_TPFLAGS_HAVE_VERSION_TAG) :
-          pyversion >= v"2.5" ?
             (Py_TPFLAGS_HAVE_GETCHARBUFFER |
              Py_TPFLAGS_HAVE_SEQUENCE_IN |
              Py_TPFLAGS_HAVE_INPLACEOPS |
@@ -289,8 +274,7 @@ type PyTypeObject
              Py_TPFLAGS_HAVE_ITER |
              Py_TPFLAGS_HAVE_CLASS |
              Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
-             Py_TPFLAGS_HAVE_INDEX) :
-          error("Python < 2.5 not supported")
+             Py_TPFLAGS_HAVE_INDEX)
         name_save = bytestring(name)
         t = new(0,C_NULL,0,
                 unsafe_convert(Ptr{Uint8}, name_save),
@@ -318,9 +302,9 @@ type PyTypeObject
                 name_save)
         init(t) # initialize any other fields as needed
         if t.tp_new == C_NULL
-            t.tp_new = @pysym :PyType_GenericNew
+            t.tp_new = @pyglobal :PyType_GenericNew
         end
-        @pycheckzi ccall((@pysym :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
+        @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
         ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
         return t
     end
@@ -392,11 +376,12 @@ function pyjlwrap_hash32(o::PyPtr)
     return h == reinterpret(UInt32, @compat Int32(-1)) ? pysalt32 : h::Uint32
 end
 
-# called in pyinitialize
+# constant strings (must not be gc'ed) for pyjlwrap_members
+const pyjlwrap_membername = "jl_value"
+const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
+
+# called in __init__
 function pyjlwrap_init()
-    if pyversion < v"2.6"
-        error("Python version 2.6 or later required for T_PYSSIZET")
-    end
     global const jlWrapType =
         PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
                      t::PyTypeObject -> begin
@@ -411,7 +396,6 @@ end
 
 # use this to create a new jlwrap type, with init to set up custom members
 function pyjlwrap_type(name::AbstractString, init::Function)
-    @pyinitialize
     PyTypeObject(name, 
                  sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
                  t::PyTypeObject -> begin
@@ -436,7 +420,6 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
 end
 
 function pyjlwrap_new(x::Any)
-    @pyinitialize
     pyjlwrap_new(jlWrapType, x)
 end
 

@@ -38,11 +38,9 @@ type PyBuffer
 end
 
 function pydecref(o::PyBuffer)
-    if initialized::Bool # don't decref after pyfinalize!
-        # note that PyBuffer_Release sets o.obj to NULL, and
-        # is a no-op if o.obj is already NULL
-        ccall(pybuffer_release, Void, (Ptr{PyBuffer},), &o)
-    end
+    # note that PyBuffer_Release sets o.obj to NULL, and
+    # is a no-op if o.obj is already NULL
+    ccall(@pysym(:PyBuffer_Release), Void, (Ptr{PyBuffer},), &o)
     o
 end
 
@@ -107,7 +105,7 @@ const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union(PyObject,PyPtr), flags=PyBUF_SIMPLE)
     b = PyBuffer()
-    @pycheckzi ccall((@pysym :PyObject_GetBuffer), Cint,
+    @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Ptr{PyBuffer}, Cint), o, &b, flags)
     return b
 end

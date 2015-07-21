@@ -1,6 +1,5 @@
 language: python
 python:
-    - 2.6
     - 2.7
     - 3.2
     - 3.3
@@ -22,7 +21,7 @@ before_install:
   - git config --global user.email "travis@example.net"
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 script:
-  - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd())'
+  - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd()); Pkg.build("PyCall")'
   - if [ $JULIAVERSION = "julianightlies" ]; then julia --code-coverage test/runtests.jl; fi
   - if [ $JULIAVERSION = "juliareleases" ]; then julia test/runtests.jl; fi
 after_success:

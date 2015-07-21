@@ -16,7 +16,6 @@ pyexists(mod) = try
 
 # Tkinter was renamed to tkinter in Python 3
 function tkinter_name()
-    pyinitialize()
     return  pyversion < v"3" ? "Tkinter" : "tkinter"
 end
 

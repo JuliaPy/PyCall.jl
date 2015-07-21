@@ -40,16 +40,11 @@ immutable PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
     microseconds::Cint
 end
 
-# called from pyinitialize
+# called from __init__
 function init_datetime()
-    if pyversion < v"2.7"
-        warn("date conversions are not supported in Python $pyversion")
-        return
-    end
-
     # emulate PyDateTime_IMPORT:
     global const PyDateTimeAPI =
-        unsafe_load(@pycheckni ccall((@pysym :PyCapsule_Import),
+        unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
                                      Ptr{PyDateTime_CAPI}, (Ptr{Uint8}, Cint),
                                      "datetime.datetime_CAPI", 0))
 
@@ -114,7 +109,6 @@ for T in (:Date, :DateTime, :Delta)
 end
 
 function pydate_query(o::PyObject)
-    pyversion.major == 2 && pyversion.minor < 7 && return None
     if PyDate_Check(o)
         return PyDateTime_Check(o) ? Dates.DateTime : Dates.Date
     elseif PyDelta_Check(o)

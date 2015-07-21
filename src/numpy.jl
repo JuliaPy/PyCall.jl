@@ -48,13 +48,13 @@ function npyinitialize()
         error("numpy.core.multiarray required for multidimensional Array conversions - ", e)
     end
     if pyversion < v"3.0"
-        PyArray_API = @pychecki ccall((@pysym :PyCObject_AsVoidPtr), 
-                                      Ptr{Ptr{Void}}, (PyPtr,), 
-                                      (npy_multiarray::PyObject)["_ARRAY_API"])
+        PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr), 
+                                     Ptr{Ptr{Void}}, (PyPtr,), 
+                                     (npy_multiarray::PyObject)["_ARRAY_API"])
     else
-        PyArray_API = @pychecki ccall((@pysym :PyCapsule_GetPointer),
-                                      Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}), 
-                            (npy_multiarray::PyObject)["_ARRAY_API"], C_NULL)
+        PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
+                                     Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}), 
+                                     (npy_multiarray::PyObject)["_ARRAY_API"], C_NULL)
     end
 
     # directory for numpy include files to parse
@@ -184,7 +184,7 @@ const npy_typestrs = @compat Dict( "b1"=>Bool,
 function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     try
         @npyinitialize
-        p = @pychecki ccall(npy_api[:PyArray_New], PyPtr,
+        p = @pycheck ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
               npy_api[:PyArray_Type], 
               ndims(a), Int[size(a)...], npy_type(T),
@@ -416,7 +416,7 @@ function convert{T<:NPY_TYPES}(::Type{Array{T, 1}}, o::PyObject)
     try
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
-        len = @pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         A = Array(pyany_toany(T), len)
         py2array(T, A, o, 1, 1)
     end
