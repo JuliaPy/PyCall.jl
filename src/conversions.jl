@@ -859,7 +859,7 @@ function start(po::PyObject)
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), po))
-        nxt = PyObject(ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), o))
+        nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), o))
 
         return (nxt,o)
     finally
@@ -870,7 +870,7 @@ end
 function next(po::PyObject, s)
     sigatomic_begin()
     try
-        nxt = PyObject(ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+        nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
         return (convert(PyAny, s[1]), (nxt, s[2]))
     finally
         sigatomic_end()
