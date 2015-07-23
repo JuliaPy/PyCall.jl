@@ -463,7 +463,7 @@ convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
-haskey(d::PyDict, key) = 1 == (c.isdict ?
+haskey(d::PyDict, key) = 1 == (d.isdict ?
                                ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)) :
                                ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 
