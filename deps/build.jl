@@ -117,6 +117,8 @@ const programname = pysys(python, "executable")
 # cache the Python version as a Julia VersionNumber
 const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
 
+info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
+
 if pyversion < v"2.7"
     error("Python 2.7 or later is required for PyCall")
 end
