@@ -11,7 +11,7 @@ type PyError <: Exception
 
     # generate a PyError object.  Should normally only be called when
     # PyErr_Occurred returns non-NULL, and clears the Python error
-    # indicator.  Assumes Python is initialized!
+    # indicator.
     function PyError(msg::AbstractString)
         exc = Array(PyPtr, 3)
         pexc = convert(Uint, pointer(exc))
@@ -52,8 +52,6 @@ end
 pyerr_clear() = ccall((@pysym :PyErr_Clear), Void, ())
 
 function pyerr_check(msg::AbstractString, val::Any)
-    # note: don't call pyinitialize here since we will
-    # only use this in contexts where initialization was already done
     if ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
         throw(PyError(msg))
     end
@@ -70,20 +68,12 @@ import Base.Meta.isexpr
 callsym(ex::Expr) = isexpr(ex,:macrocall,2) ? callsym(ex.args[2]) : isexpr(ex,:ccall) ? callsym(ex.args[1]) : ex
 
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
-# (The "i" variant assumes Python is initialized.)
-macro pychecki(ex)
-    :(pyerr_check($(string(callsym(ex))), $ex))
-end
 macro pycheck(ex)
-    quote
-        @pyinitialize
-        @pychecki $ex
-    end
+    :(pyerr_check($(string(callsym(ex))), $ex))
 end
 
 # Macros to check that ccall((@pysym :Foo), ...) returns value != bad
-# (The "i" variants assume Python is initialized.)
-macro pycheckvi(ex, bad)
+macro pycheckv(ex, bad)
     quote
         val = $ex
         if val == $bad
@@ -94,29 +84,11 @@ macro pycheckvi(ex, bad)
         val
     end
 end
-macro pycheckni(ex)
-    :(@pycheckvi $ex C_NULL)
-end
-macro pycheckzi(ex)
-    :(@pycheckvi $ex -1)
-end
-macro pycheckv(ex, bad)
-    quote
-        @pyinitialize
-        @pycheckvi $ex $bad
-    end
-end
 macro pycheckn(ex)
-    quote
-        @pyinitialize
-        @pycheckni $ex
-    end
+    :(@pycheckv $ex C_NULL)
 end
 macro pycheckz(ex)
-    quote
-        @pyinitialize
-        @pycheckzi $ex
-    end
+    :(@pycheckv $ex -1)
 end
 
 #########################################################################
@@ -125,37 +97,31 @@ end
 const pyexc = Dict{DataType, PyPtr}()
 type PyIOError <: Exception end
 
-function pyexc_initialize()
-    exc = @compat Dict(Exception => :PyExc_RuntimeError,
-                       ErrorException => :PyExc_RuntimeError,
-                       SystemError => :PyExc_SystemError,
-                       TypeError => :PyExc_TypeError,
-                       ParseError => :PyExc_SyntaxError,
-                       ArgumentError => :PyExc_ValueError,
-                       KeyError => :PyExc_KeyError,
-                       LoadError => :PyExc_ImportError,
-                       MethodError => :PyExc_RuntimeError,
-                       EOFError => :PyExc_EOFError,
-                       BoundsError => :PyExc_IndexError,
-                       DivideError => :PyExc_ZeroDivisionError,
-                       DomainError => :PyExc_RuntimeError,
-                       OverflowError => :PyExc_OverflowError,
-                       InexactError => :PyExc_ArithmeticError,
-                       MemoryError => :PyExc_MemoryError,
-                       StackOverflowError => :PyExc_MemoryError,
-                       UndefRefError => :PyExc_RuntimeError,
-                       InterruptException => :PyExc_KeyboardInterrupt,
-                       PyIOError => :PyExc_IOError)
-    for (k,v) in exc
-        p = convert(Ptr{PyPtr}, pysym_e(v))
-        if p != C_NULL
-            pyexc[k] = unsafe_load(p)
-        end
-    end
+macro pyglobalobjptr(name)
+    :(unsafe_load(cglobal(($name, libpython), Ptr{PyObject_struct})))
 end
 
-function pyexc_finalize()
-    empty!(pyexc)
+function pyexc_initialize()
+    pyexc[Exception] = @pyglobalobjptr :PyExc_RuntimeError
+    pyexc[ErrorException] = @pyglobalobjptr :PyExc_RuntimeError
+    pyexc[SystemError] = @pyglobalobjptr :PyExc_SystemError
+    pyexc[TypeError] = @pyglobalobjptr :PyExc_TypeError
+    pyexc[ParseError] = @pyglobalobjptr :PyExc_SyntaxError
+    pyexc[ArgumentError] = @pyglobalobjptr :PyExc_ValueError
+    pyexc[KeyError] = @pyglobalobjptr :PyExc_KeyError
+    pyexc[LoadError] = @pyglobalobjptr :PyExc_ImportError
+    pyexc[MethodError] = @pyglobalobjptr :PyExc_RuntimeError
+    pyexc[EOFError] = @pyglobalobjptr :PyExc_EOFError
+    pyexc[BoundsError] = @pyglobalobjptr :PyExc_IndexError
+    pyexc[DivideError] = @pyglobalobjptr :PyExc_ZeroDivisionError
+    pyexc[DomainError] = @pyglobalobjptr :PyExc_RuntimeError
+    pyexc[OverflowError] = @pyglobalobjptr :PyExc_OverflowError
+    pyexc[InexactError] = @pyglobalobjptr :PyExc_ArithmeticError
+    pyexc[MemoryError] = @pyglobalobjptr :PyExc_MemoryError
+    pyexc[StackOverflowError] = @pyglobalobjptr :PyExc_MemoryError
+    pyexc[UndefRefError] = @pyglobalobjptr :PyExc_RuntimeError
+    pyexc[InterruptException] = @pyglobalobjptr :PyExc_KeyboardInterrupt
+    pyexc[PyIOError] = @pyglobalobjptr :PyExc_IOError
 end
 
 function pyraise(e)

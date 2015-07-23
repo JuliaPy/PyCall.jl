@@ -50,7 +50,6 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
 end
 
 function pycallback(f::Function)
-    @pyinitialize
     pyjlwrap_new(jl_FunctionType, f)
 end
 

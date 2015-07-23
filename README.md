@@ -17,7 +17,7 @@ call Python functions from the Julia language with type conversions.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.3 or later is required.
+install the files.  Julia 0.3 or later and Python 2.7 or later are required.
 
 The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
@@ -26,7 +26,32 @@ this after installing the package, run `Pkg.checkout("PyCall")`.
 You must, of course, have Python and its `libpython` shared-library
 installed, and a `python` executable must be in your `PATH` (or be
 specified manually as described below).  Usually, the necessary
-libraries are installed along with Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.4.3`.
+libraries are installed along with Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.4.3`.  The Enthought Canopy Python distribution is currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
+
+As a general rule, we tend to recommend the [Anaconda Python
+distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
+Windows in order to minimize headaches.
+
+## Specifying the Python version
+
+The Python version that is used defaults to whatever `python` program is in
+your `PATH`.   If PyCall can't find your Python (in which case `Pkg.add` will fail with an error message), or if you want to use a different version of Python on your system, you can change the Python version by setting the `PYTHON` environment variable and then re-running `Pkg.build("PyCall")`.  In Julia:
+
+    ENV["PYTHON"] = "... path of the python program you want ..."
+    Pkg.build("PyCall")
+
+Note also that you will need to re-run `Pkg.build("PyCall")` if your
+`python` program changes significantly (e.g. you switch to a new
+Python distro, or you switch from Python 2 to Python 3).
+
+The current Python version being used is stored in the `pyversion`
+global variable of the `PyCall` module.  You can also look at
+`PyCall.libpython` to find the name of the Python library or
+`PyCall.pyprogramname` for the `python` program name.
+
+(Technically, PyCall does not use the `python` program per se: it links
+directly to the `libpython` library.  But it finds the location of `libpython`
+by running `python` during `Pkg.build`.)
 
 ## Usage
 
@@ -97,8 +122,6 @@ Here are solutions to some common problems:
 * As mentioned above, use `foo[:bar]` rather than `foo.bar` to access fields and methods of Python objects.
 
 * Sometimes calling a Python function fails because PyCall doesn't realize it is a callable object (since so many types of objects can be callable in Python).   The workaround is to use `pycall(foo, PyAny, args...)` instead of `foo(args...)`.   If you want to call `foo.bar(args...)` in Python, it is good to use `pycall(foo["bar"], PyAny, args...)`, where using `foo["bar"]` instead of `foo[:bar]` prevents any automatic conversion of the `bar` field.
-
-* If PyCall can't find the version of Python you want, try setting the `PYTHON` environment variable to the full pathname of the `python` executable.   Note that PyCall doesn't work properly with [Canopy/EPD Python](https://github.com/stevengj/PyCall.jl/issues/42) yet, and we recommend [Anaconda](https://store.continuum.io/cshop/anaconda/) instead.
 
 * By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/stevengj/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `unshift!(PyVector(pyimport("sys")["path"]), "")`.
 
@@ -260,49 +283,6 @@ and also by providing more type information to the Julia compiler.
   instead use `w.pymember(:member)` (for the `PyAny` conversion) or
   `w.pymember("member")` (for the raw `PyObject`).
 
-### Initialization
-
-By default, whenever you call any of the high-level PyCall routines
-above, the Python interpreter (corresponding to the `python`
-executable name) is initialized and remains in memory until Julia
-exits.
-
-However, you may want to modify this behavior to change the default
-Python version, to call low-level Python functions directly via
-`ccall`, or to free the memory consumed by Python.  This can be
-accomplished using:
-
-* PyCall uses the Python executable specified by the `PYTHON`
-  environment variable, or `"python"` if the environment variable
-  is not set, in order to determine what Python libraries to use.
-  You can set this environment variable as usual in your operating
-  system (e.g. in the Unix shell before running Julia), or from
-  within Julia via `ENV["PYTHON"] = "..."`.  Alternatively, you
-  can call `pyinitialize` (below) explicitly.
-
-* `pyinitialize(s::String)`: Initialize the Python interpreter using
-  the Python libraries corresponding to the `python` shared-library or
-  executable name given by the argument `s`.  Calling `pyinitialize()`
-  defaults to `pyinitialize(get(ENV,"PYTHON","python"))` as described
-  above, but you may need to change this in rare cases.  The
-  `pyinitialize` function *must* be called before you can call any
-  low-level Python functions (via `ccall`), but it is called
-  automatically as needed when you use the higher-level functions
-  above.  It is safe to call this function more than once; subsequent
-  calls will do nothing.
-
-* `pyfinalize()`: End the Python interpreter and free all associated
-  memory.  After this function is called, you *may no longer restart
-  Python* by calling `pyinitialize` again (an exception will be
-  thrown).  The reason is that some Python modules (e.g. numpy) crash
-  if their initialization routine is called more than once.
-  Subsequent calls to `pyfinalize` do nothing.  You must *not* try
-  to access any Python functions or data (that has not been *copied*
-  to native Julia types) after `pyfinalize` runs!
-
-* The Python version number is stored in the global variable
-  `pyversion::VersionNumber`.
-
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),
@@ -352,10 +332,10 @@ module](https://github.com/stevengj/PyPlot.jl) for Julia.
 ### Low-level Python API access
 
 If you want to call low-level functions in the Python C API, you can
-do so using `ccall`.  Just remember to call `pyinitialize()` first, and:
+do so using `ccall`. 
 
-* Use `pysym(func::Symbol)` to get a function pointer to pass to `ccall`
-  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(pysym(:Py_IsInitialized), Int32, ())`.
+* Use `@pysym(func::Symbol)` to get a function pointer to pass to `ccall`
+  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(@pysym(:Py_IsInitialized), Int32, ())`.
 
 * PyCall defines the typealias `PyPtr` for `PythonObject*` argument types,
   and `PythonObject` (see above) arguments are correctly converted to this

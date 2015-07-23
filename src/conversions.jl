@@ -5,9 +5,9 @@
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(@pycheckn ccall(pyint_from_size_t,
+PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSize_t),
                                                  PyPtr, (Uint,), i))
-PyObject(i::Integer) = PyObject(@pycheckn ccall(pyint_from_ssize_t,
+PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSsize_t),
                                                 PyPtr, (Int,), i))
 
 PyObject(b::Bool) = PyObject(@pycheckn ccall((@pysym :PyBool_FromLong),
@@ -20,12 +20,12 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-PyObject(n::Nothing) = begin @pyinitialize; pyerr_check("PyObject(nothing)", pyincref(pynothing)); end
+PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
 
 # conversions to Julia types from PyObject
 
 convert{T<:Integer}(::Type{T}, po::PyObject) =
-  convert(T, @pycheck ccall(pyint_as_ssize_t, Int, (PyPtr,), po))
+  convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po))
 
 if WORD_SIZE == 32
   convert{T<:Union(Int64,Uint64)}(::Type{T}, po::PyObject) =
@@ -33,7 +33,7 @@ if WORD_SIZE == 32
 end
 
 convert(::Type{Bool}, po::PyObject) =
-  convert(Bool, @pycheck ccall(pyint_as_ssize_t, Int, (PyPtr,), po))
+    0 != @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
 
 convert{T<:Real}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), po))
@@ -53,30 +53,28 @@ convert(::Type{Nothing}, po::PyObject) = nothing
 # String conversions (both bytes arrays and unicode strings)
 
 PyObject(s::UTF8String) =
-  PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8,
+  PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
                            PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
                            bytestring(s), sizeof(s), C_NULL))
 
 function PyObject(s::AbstractString)
-    @pyinitialize
     if pyunicode_literals
         sb = bytestring(s)
-        PyObject(@pycheckn ccall(PyUnicode_DecodeUTF8,
+        PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
                                  PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
                                  sb, sizeof(sb), C_NULL))
     else
-        PyObject(@pycheckn ccall(pystring_fromstring,
+        PyObject(@pycheckn ccall(@pysym(PyString_FromString),
                                  PyPtr, (Ptr{Uint8},), bytestring(s)))
     end
 end
 
 function convert{T<:AbstractString}(::Type{T}, po::PyObject)
-    @pyinitialize
-    if pyisinstance(po, @pysym :PyUnicode_Type)
-        convert(T, PyObject(@pycheckni ccall(PyUnicode_AsUTF8String,
+    if pyisinstance(po, @pyglobalobj :PyUnicode_Type)
+        convert(T, PyObject(@pycheckn ccall(@pysym(PyUnicode_AsUTF8String),
                                              PyPtr, (PyPtr,), po)))
     else
-        convert(T, bytestring(@pycheckni ccall(pystring_asstring,
+        convert(T, bytestring(@pycheckn ccall(@pysym(PyString_AsString),
                                                Ptr{Uint8}, (PyPtr,), po)))
     end
 end
@@ -94,15 +92,15 @@ PyObject(a::Vector{Uint8}) =
                            PyPtr, (Ptr{Uint8}, Int), a, length(a)))
 
 ispybytearray(po::PyObject) =
-  pyisinstance(po, @pysym :PyByteArray_Type)
+  pyisinstance(po, @pyglobalobj :PyByteArray_Type)
 
 function convert(::Type{Vector{Uint8}}, po::PyObject)
     if !ispybytearray(po)
         # TODO: support Py_buffer interface? via PyBytes_FromObject?
         try
-            p = @pycheckni ccall(pystring_asstring,
+            p = @pycheckn ccall(@pysym(PyString_AsString),
                                   Ptr{Uint8}, (PyPtr,), po)
-            len = ccall(pystring_size, Int, (PyPtr,), po)
+            len = ccall(@pysym(PyString_Size), Int, (PyPtr,), po)
             a = Array(Uint8, len)
             ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t),
                   a, p, len)
@@ -126,30 +124,27 @@ end
 # TODO: support zero-copy PyByteArray <: AbstractVector{Uint8} object
 
 #########################################################################
-# Pointer conversions, using ctypes, PyCObject, or PyCapsule
+# Pointer conversions, using ctypes or PyCapsule
 
-PyObject(p::Ptr) = begin @pyinitialize; py_void_p(p); end
+PyObject(p::Ptr) = py_void_p(p)
 
 function convert(::Type{Ptr{Void}}, po::PyObject)
-    @pyinitialize
     if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL :
           convert(Ptr{Void}, convert(Uint, po["value"]))
-    elseif pyisinstance(po, PyCObject_Type)
-        @pychecki ccall((@pysym :PyCObject_AsVoidPtr), Ptr{Void}, (PyPtr,), po)
-    elseif pyisinstance(po, PyCapsule_Type)
-        @pychecki ccall((@pysym :PyCapsule_GetPointer),
-                        Ptr{Void}, (PyPtr,Ptr{Uint8}),
-                        po, ccall((@pysym :PyCapsule_GetName),
-                                  Ptr{Uint8}, (PyPtr,), po))
+    elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
+        @pycheck ccall((@pysym :PyCapsule_GetPointer),
+                       Ptr{Void}, (PyPtr,Ptr{Uint8}),
+                       po, ccall((@pysym :PyCapsule_GetName),
+                                 Ptr{Uint8}, (PyPtr,), po))
     else
         convert(Ptr{Void}, convert(Uint, po))
     end
 end
 
-pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, PyCObject_Type) || pyisinstance(po, PyCapsule_Type) ? Ptr{Void} : None
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : None
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
@@ -196,7 +191,7 @@ function PyObject(t::Tuple)
                                  length(t)))
     for i = 1:length(t)
         oi = PyObject(t[i])
-        @pycheckzi ccall((@pysym :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
+        @pycheckz ccall((@pysym :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
         pyincref(oi) # PyTuple_SetItem steals the reference
     end
@@ -257,23 +252,23 @@ similar{T}(a::PyVector{T}, dims::Int...) = similar(a, pyany_toany(T), dims)
 eltype{T}(::PyVector{T}) = pyany_toany(T)
 eltype{T}(::Type{PyVector{T}}) = pyany_toany(T)
 
-size(a::PyVector) = ((@pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), a)),)
+size(a::PyVector) = ((@pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), a)),)
 
 getindex(a::PyVector) = getindex(a, 1)
-getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckni ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
+getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
 
 setindex!(a::PyVector, v) = setindex!(a, v, 1)
-setindex!(a::PyVector, v, i::Integer) = @pycheckzi ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
+setindex!(a::PyVector, v, i::Integer) = @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
 
 function splice!(a::PyVector, i::Integer)
     v = a[i]
-    @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     v
 end
 function splice!{T,I<:Integer}(a::PyVector{T}, indices::AbstractVector{I})
     v = pyany_toany(T)[a[i] for i in indices]
     for i in sort(indices, rev=true)
-        @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     end
     v
 end
@@ -281,11 +276,11 @@ end
 pop!(a::PyVector) = splice!(a, length(a))
 shift!(a::PyVector) = splice!(a, 1)
 
-append!{T}(a::PyVector{T}, items) = PyVector{T}(PyObject(@pycheckni ccall((@pysym :PySequence_InPlaceConcat), PyPtr, (PyPtr, PyPtr), a, PyObject(items))))
+append!{T}(a::PyVector{T}, items) = PyVector{T}(PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat), PyPtr, (PyPtr, PyPtr), a, PyObject(items))))
 
 function empty!(a::PyVector)
     for i in length(a):-1:1
-        @pycheckzi ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     end
     a
 end
@@ -296,13 +291,13 @@ summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
 # The following operations only work for the list type and subtypes thereof:
 
 function push!(a::PyVector, item)
-    @pycheckzi ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
+    @pycheckz ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
                      a, PyObject(item))
     a
 end
 
 function insert!(a::PyVector, i::Integer, item)
-    @pycheckzi ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
+    @pycheckz ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
                      a, i-1, PyObject(item))
     a
 end
@@ -330,7 +325,7 @@ function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
         o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
         for j = 0:len-1
             oi = PyObject(A[i+j*s])
-            @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
+            @pycheckz ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
                              o, j, oi)
             pyincref(oi) # PyList_SetItem steals the reference
         end
@@ -341,7 +336,7 @@ function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
         o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
         for j = 0:len-1
             oi = array2py(A, dim+1, i+j*s)
-            @pycheckzi ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
+            @pycheckz ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
                              o, j, oi)
             pyincref(oi) # PyList_SetItem steals the reference
         end
@@ -389,7 +384,7 @@ end
 # figure out if we can treat o as a multidimensional array, and return
 # the dimensions
 function pyarray_dims(o::PyObject, forcelist=true)
-    if !(forcelist || pyisinstance(o, @pysym :PyList_Type))
+    if !(forcelist || pyisinstance(o, @pyglobalobj :PyList_Type))
         return () # too many non-List types can pretend to be sequences
     end
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
@@ -450,11 +445,10 @@ type PyDict{K,V} <: Associative{K,V}
         elseif pydict_query(o) == None
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
-        new(o, pyisinstance(o, @pysym :PyDict_Type))
+        new(o, pyisinstance(o, @pyglobalobj :PyDict_Type))
     end
     function PyDict()
-        @pyinitialize
-        new(PyObject(@pycheckni ccall((@pysym :PyDict_New), PyPtr, ())), true)
+        new(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())), true)
     end
 end
 
@@ -469,21 +463,21 @@ convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
-haskey(d::PyDict, key) = 1 == ccall(d.isdict ? (@pysym :PyDict_Contains)
-                                          : (@pysym :PyMapping_HasKey),
-                                  Cint, (PyPtr, PyPtr), d, PyObject(key))
+haskey(d::PyDict, key) = 1 == (c.isdict ?
+                               ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)) :
+                               ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 
-pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckni ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
+pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckn ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
 
-keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckni ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
+keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
 
-values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckni ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pyobject_call(d, "values"))
+values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pyobject_call(d, "values"))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
 
 function setindex!(d::PyDict, v, k)
-    @pycheckzi ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
+    @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      d, PyObject(k), PyObject(v))
     d
 end
@@ -492,9 +486,8 @@ get{K,V}(d::PyDict{K,V}, k, default) = get(d.o, V, k, default)
 
 function pop!(d::PyDict, k)
     v = d[k]
-    @pycheckzi ccall(d.isdict ? (@pysym :PyDict_DelItem)
-                              : (@pysym :PyObject_DelItem),
-                     Cint, (PyPtr, PyPtr), d, PyObject(k))
+    @pycheckz (d.isdict ? ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+                : ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k)))
     return v
 end
 
@@ -507,9 +500,8 @@ function pop!(d::PyDict, k, default)
 end
 
 function delete!(d::PyDict, k)
-    e = ccall(d.isdict ? (@pysym :PyDict_DelItem)
-                       : (@pysym :PyObject_DelItem),
-              Cint, (PyPtr, PyPtr), d, PyObject(k))
+    e = (d.isdict ? ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+         : ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k)))
     if e == -1
         pyerr_clear() # delete! ignores errors in Julia
     end
@@ -518,7 +510,7 @@ end
 
 function empty!(d::PyDict)
     if d.isdict
-        @pychecki ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
+        @pycheck ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
     else
         # for generic Mapping items we must delete keys one by one
         for k in keys(d)
@@ -528,9 +520,8 @@ function empty!(d::PyDict)
     return d
 end
 
-length(d::PyDict) = @pycheckz ccall(d.isdict ? (@pysym :PyDict_Size)
-                                             : (@pysym :PyObject_Size),
-                                    Int, (PyPtr,), d)
+length(d::PyDict) = @pycheckz (d.isdict ? ccall(@pysym(:PyDict_Size), Int, (PyPtr,), d)
+                               : ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d))
 isempty(d::PyDict) = length(d) == 0
 
 type PyDict_Iterator
@@ -574,7 +565,7 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     else
         # generic Mapping object, use items list
-        (convert(@compat(Tuple{K,V}), PyObject(@pycheckni ccall((@pysym :PySequence_GetItem),
+        (convert(@compat(Tuple{K,V}), PyObject(@pycheckn ccall((@pysym :PySequence_GetItem),
                                                   PyPtr, (PyPtr,Int),
                                                   itr.items, itr.i))),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
@@ -599,14 +590,13 @@ end
 function PyObject(d::Associative)
     o = PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ()))
     for k in keys(d)
-        @pycheckzi ccall((@pysym :PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
+        @pycheckz ccall((@pysym :PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
                          o, PyObject(k), PyObject(d[k]))
     end
     return o
 end
 
 function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
-    @pyinitialize
     copy(PyDict{K,V}(o))
 end
 
@@ -625,7 +615,6 @@ function PyObject{T<:Integer}(r::Range{T})
         # in Python 2.x, xrange is limited to Clong
         PyObject(T[r...])
     else
-        @pyinitialize
         xrange(f, l, s)
     end
 end
@@ -735,25 +724,25 @@ include("pydates.jl")
 # for use with the convert function, or None if there isn't one.
 
 # TODO: In Python 3.x, the BigInt check here won't work since int == long.
-pyint_query(o::PyObject) = pyisinstance(o, pyint_type) ?
-  (pyisinstance(o, @pysym :PyBool_Type) ? Bool : Int) :
-  pyisinstance(o, @pysym :PyLong_Type) ? BigInt : None
+pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
+  (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
+  pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt : None
 
-pyfloat_query(o::PyObject) = pyisinstance(o, @pysym :PyFloat_Type) ? Float64 : None
+pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ? Float64 : None
 
 pycomplex_query(o::PyObject) =
-  pyisinstance(o, @pysym :PyComplex_Type) ? Complex128 : None
+  pyisinstance(o, @pyglobalobj :PyComplex_Type) ? Complex128 : None
 
-pystring_query(o::PyObject) = pyisinstance(o, pystring_type) ? AbstractString : pyisinstance(o, @pysym :PyUnicode_Type) ? UTF8String : None
+pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : None
 
-pyfunction_query(o::PyObject) = pyisinstance(o, @pysym :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
+pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
 
 pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, @pysym :PyDict_Type) || (pyquery((@pysym :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
 
 if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
     typetuple(Ts) = tuple(Ts...)
@@ -766,8 +755,8 @@ function pysequence_query(o::PyObject)
     # but it seems we need to be careful; I've noticed that things like
     # scipy define "fake" sequence types with intmax lengths and other
     # problems
-    if pyisinstance(o, @pysym :PyTuple_Type)
-        len = @pycheckzi ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    if pyisinstance(o, @pyglobalobj :PyTuple_Type)
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
     elseif pyisinstance(o, pyxrange)
         return Range
@@ -784,7 +773,7 @@ function pysequence_query(o::PyObject)
             return Array{T}
         catch
             # only handle PyList for now
-            return pyisinstance(o, @pysym :PyList_Type) ? Array : None
+            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : None
         end
     end
 end
@@ -813,7 +802,6 @@ end
 function pytype_query(o::PyObject, default::Type)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)
-    @pyinitialize
     @return_not_None pyint_query(o)
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)

@@ -22,8 +22,8 @@ function jl_IO_close(self_::PyPtr, noarg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
         close(io)
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
-        return pynothing
+        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
+        return pynothing::PyPtr
     catch e
         ioraise(e)
     end
@@ -60,8 +60,8 @@ function jl_IO_flush(self_::PyPtr, noarg_::PyPtr)
         if method_exists(flush, @compat Tuple{typeof(io)})
             flush(io)
         end
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
-        return pynothing
+        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
+        return pynothing::PyPtr
     catch e
         ioraise(e)
     end
@@ -217,8 +217,8 @@ function jl_IO_writelines(self_::PyPtr, arg_::PyPtr)
         for s in PyVector{AbstractString}(pyincref(arg_))
             write(io, s)
         end
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
-        return pynothing
+        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
+        return pynothing::PyPtr
     catch e
         ioraise(e)
     end
@@ -303,7 +303,7 @@ end
 
 ##########################################################################
 
-# make method tables for text/binary IO objects (called in pyinitialize)
+# make method tables for text/binary IO objects (called in __io__)
 make_io_methods(text::Bool) =
     PyMethodDef[
                 PyMethodDef("close", jl_IO_close, METH_NOARGS),
@@ -341,7 +341,7 @@ function pyio_initialize()
         global const jl_IOType =
             pyjlwrap_type("PyCall.jl_IO",
                           t -> begin
-                              t.tp_getattro = pysym(:PyObject_GenericGetAttr)
+                              t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
                               t.tp_methods = pointer(jl_IO_methods)
                               t.tp_getset = pointer(jl_IO_getset)
                               t.tp_repr = pyio_repr_ptr
@@ -349,7 +349,7 @@ function pyio_initialize()
         global const jl_TextIOType =
             pyjlwrap_type("PyCall.jl_TextIO",
                           t -> begin
-                              t.tp_getattro = pysym(:PyObject_GenericGetAttr)
+                              t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
                               t.tp_methods = pointer(jl_TextIO_methods)
                               t.tp_getset = pointer(jl_IO_getset)
                               t.tp_repr = pyio_repr_ptr
