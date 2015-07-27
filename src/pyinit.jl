@@ -14,29 +14,33 @@ end
 function __init__()
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
-    # PYTHONHOME only has to be set when the Python path is initialized
-    with_env("PYTHONHOME", PYTHONHOME) do
-        # cache the Python version as a Julia VersionNumber
-        global const pyversion = convert(VersionNumber,
-                                         split(bytestring(ccall(@pysym(:Py_GetVersion), 
-                                                                Ptr{Uint8}, ())))[1])
-        if pyversion_build.major != pyversion.major
-            error("PyCall built with Python $pyversion_build.major, but using Python $pyversion; ",
-                  "you need to re-run Pkg.build(\"PyCall\")")
-        end
-        
-        if !already_inited
-            if !isempty(pyprogramname)
-                if pyversion.major < 3
-                    ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)
-                else
-                    ccall((@pysym :Py_SetProgramName), Void, (Cwstring,), pyprogramname)
-                end
+    if !already_inited
+        if !isempty(PYTHONHOME)
+            if pyversion_build.major < 3
+                ccall((@pysym :Py_SetPythonHome), Void, (Cstring,), PYTHONHOME)
+            else
+                ccall((@pysym :Py_SetPythonHome), Void, (Cwstring,), PYTHONHOME)
             end
-            ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
         end
+        if !isempty(pyprogramname)
+            if pyversion_build.major < 3
+                ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)
+            else
+                ccall((@pysym :Py_SetProgramName), Void, (Cwstring,), pyprogramname)
+            end
+        end
+        ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
     end
    
+    # cache the Python version as a Julia VersionNumber
+    global const pyversion = convert(VersionNumber,
+                                     split(bytestring(ccall(@pysym(:Py_GetVersion), 
+                                                            Ptr{Uint8}, ())))[1])
+    if pyversion_build.major != pyversion.major
+        error("PyCall built with Python $pyversion_build, but now using Python $pyversion; ",
+              "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
+    end
+
     global const inspect = pyimport("inspect")
     global const builtin = pyimport(pyversion.major < 3 ? "__builtin__" : "builtins")
     

@@ -10,11 +10,17 @@ isfile("deps.jl") && rm("deps.jl")
 
 using Compat
 
+PYTHONIOENCODING = get(ENV, "PYTHONIOENCODING", nothing)
+PYTHONHOME = get(ENV, "PYTHONHOME", nothing)
+
+try # save/restore environment vars
+
+ENV["PYTHONIOENCODING"] = "UTF-8"
+
 #########################################################################
 
 # set PYTHONIOENCODING when running python executable, so that
 # we get UTF-8 encoded text as output (this is not the default on Windows).
-ENV["PYTHONIOENCODING"] = "UTF-8"
 
 pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
@@ -160,14 +166,16 @@ const Py_hash_t = pyversion < v"3.2" ? Clong:Int
 # whether to use unicode for strings by default, ala Python 3
 const pyunicode_literals = pyversion >= v"3.0"
 
+# some arguments changed from char* to wchar_t* in Python 3
+pystring = pyversion.major < 3 ? "bytestring" : "wstring"
+
 open("deps.jl", "w") do f
     print(f, """
           const python = "$(escape_string(python))"
           const libpython = "$(escape_string(libpy_name))"
-          const pyprogramname = $(pyversion.major < 3 ? "bytestring" : "wstring")("$(escape_string(programname))")
+          const pyprogramname = $pystring("$(escape_string(programname))")
           const pyversion_build = $(repr(pyversion))
-
-          const PYTHONHOME = "$(escape_string(get(ENV, "PYTHONHOME", nothing)))"
+          const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", nothing)))")
 
           const PyUnicode_AsUTF8String = :$PyUnicode_AsUTF8String
           const PyUnicode_DecodeUTF8 = :$PyUnicode_DecodeUTF8
@@ -185,4 +193,13 @@ open("deps.jl", "w") do f
           
           const pyunicode_literals = $pyunicode_literals
           """)
+end
+
+#########################################################################
+
+finally # restore env vars
+
+PYTHONIOENCODING != nothing ? (ENV["PYTHONIOENCODING"] = PYTHONIOENCODING) : pop!(ENV, "PYTHONIOENCODING")
+PYTHONHOME != nothing ? (ENV["PYTHONHOME"] = PYTHONHOME) : pop!(ENV, "PYTHONHOME")
+
 end
