@@ -180,7 +180,7 @@ open("deps.jl", "w") do f
           const libpython = "$(escape_string(libpy_name))"
           const pyprogramname = $pystring("$(escape_string(programname))")
           const pyversion_build = $(repr(pyversion))
-          const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", nothing)))")
+          const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", "")))")
 
           const PyUnicode_AsUTF8String = :$PyUnicode_AsUTF8String
           const PyUnicode_DecodeUTF8 = :$PyUnicode_DecodeUTF8
