@@ -15,12 +15,11 @@ PYTHONHOME = get(ENV, "PYTHONHOME", nothing)
 
 try # save/restore environment vars
 
+# set PYTHONIOENCODING when running python executable, so that
+# we get UTF-8 encoded text as output (this is not the default on Windows).
 ENV["PYTHONIOENCODING"] = "UTF-8"
 
 #########################################################################
-
-# set PYTHONIOENCODING when running python executable, so that
-# we get UTF-8 encoded text as output (this is not the default on Windows).
 
 pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
@@ -44,15 +43,18 @@ function find_libpython(python::AbstractString)
     lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
     libs = unique(libs)
 
+    # it is ridiculous that it is this hard to find the path of libpython
     libpaths = [pyconfigvar(python, "LIBDIR"),
                 (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
     @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
 
     # `prefix` and `exec_prefix` are the path prefixes where python should look for python only and compiled libraries, respectively.
     # These are also changed when run in a virtualenv.
-    exec_prefix = pyconfigvar(python, "exec_prefix")
-    # Since we only use `libpaths` to find the python dynamic library, we should only add `exec_prefix` to it.
+    exec_prefix = pysys(python, "exec_prefix")
+
     push!(libpaths, exec_prefix)
+    push!(libpaths, joinpath(exec_prefix, "lib"))
+
     if !haskey(ENV, "PYTHONHOME")
         # PYTHONHOME tells python where to look for both pure python
         # and binary modules.  When it is set, it replaces both
@@ -61,15 +63,18 @@ function find_libpython(python::AbstractString)
         # documentation recommends.  However, they are documented
         # to always be the same on Windows, where it causes
         # problems if we try to include both.
-        ENV["PYTHONHOME"] = @windows? exec_prefix : pyconfigvar(python, "prefix") * ":" * exec_prefix
-        # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro
+        ENV["PYTHONHOME"] = @windows? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+        # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro?
         try
             run(pipe(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
         catch
             pop!(ENV, "PYTHONHOME")
         end
     end
-    # TODO: look in python-config output? pyconfigvar("LDFLAGS")?
+
+    # TODO: other paths? python-config output? pyconfigvar("LDFLAGS")?
+
+    # find libpython (we hope):
     for lib in libs
         for libpath in libpaths
             libpath_lib = joinpath(libpath, lib)
