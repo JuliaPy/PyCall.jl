@@ -10,7 +10,7 @@ export pycall, pyimport, pybuiltin, PyObject,
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
-       next, filter!, hash, splice!, pop!, ==, isequal, help, push!,
+       next, filter!, hash, splice!, pop!, ==, isequal, push!,
        unshift!, shift!, append!, insert!, prepend!, writemime, mimewritable
 
 # Python C API is not interrupt-save.  In principle, we should
@@ -156,8 +156,17 @@ function show(io::IO, o::PyObject)
     print(io, "PyObject $(pystring(o))")
 end
 
-function help(o::PyObject)
-    pycall(pybuiltin("help"), PyAny, o)
+
+if VERSION < v"0.4.0-dev+6471"
+    function Base.help(o::PyObject)
+        pycall(pybuiltin("help"), PyAny, o)
+    end
+else
+    function Base.Docs.doc(o::PyObject)
+        Base.Docs.Text(haskey(o, "__doc__") ?
+                       convert(AbstractString, o["__doc__"]) :
+                       "Python object (no docstring found)")
+    end
 end
 
 #########################################################################
