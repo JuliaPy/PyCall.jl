@@ -65,14 +65,14 @@ function __init__()
     global const pynothing = @pyglobalobj(:_Py_NoneStruct)
     
     # xrange type (or range in Python 3)
-    global const pyxrange = pyincref(@pyglobalobj(:PyRange_Type))
+    global const pyxrange = @pyglobalobj(:PyRange_Type)
 
     # cache ctypes.c_void_p type and function if available
     vpt, pvp = try
         (pyimport("ctypes")["c_void_p"],
-         p::Ptr -> pycall(c_void_p_Type::PyObject, PyObject, @compat UInt(p)))
+         p::Ptr -> pycall(c_void_p_Type, PyObject, @compat UInt(p)))
     catch # fallback to CObject
-        (pyincref(@pyglobalobj(:PyCObject_FromVoidPtr)),
+        (@pyglobalobj(:PyCObject_FromVoidPtr),
          p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL)))
     end
     global const c_void_p_Type = vpt

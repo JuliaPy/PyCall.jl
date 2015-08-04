@@ -368,7 +368,7 @@ end
 
 typealias TypeTuple{N} Union(Type,NTuple{N, Type})
 
-function pycall(o::PyObject, returntype::TypeTuple, args...; kwargs...)
+function pycall(o::Union(PyObject,PyPtr), returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
     sigatomic_begin()
