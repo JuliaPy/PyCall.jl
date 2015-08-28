@@ -1,0 +1,81 @@
+environment:
+  matrix:
+
+# Released versions
+  - JULIAVERSION: "julialang/bin/winnt/x86/0.3/julia-0.3-latest-win32.exe"
+    PYTHONDIR: "C:\\Python27"
+    PYTHON: "C:\\Python27\\python.exe"
+
+  - JULIAVERSION: "julialang/bin/winnt/x86/0.3/julia-0.3-latest-win32.exe"
+    PYTHONDIR: "C:\\Python33"
+    PYTHON: "C:\\Python33\\python.exe"
+
+  - JULIAVERSION: "julialang/bin/winnt/x86/0.3/julia-0.3-latest-win32.exe"
+    PYTHONDIR: "C:\\Python34"
+    PYTHON: "C:\\Python34\\python.exe"
+
+  - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
+    PYTHONDIR: "C:\\Python27-x64"
+    PYTHON: "C:\\Python27-x64\\python.exe"
+
+  - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
+    PYTHONDIR: "C:\\Python33-x64"
+    PYTHON: "C:\\Python33-x64\\python.exe"
+
+  - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
+    PYTHONDIR: "C:\\Python34-x64"
+    PYTHON: "C:\\Python34-x64\\python.exe"
+
+# Nightlies
+  - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
+    PYTHONDIR: "C:\\Python27"
+    PYTHON: "C:\\Python27\\python.exe"
+
+  - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
+    PYTHONDIR: "C:\\Python33"
+    PYTHON: "C:\\Python33\\python.exe"
+
+  - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
+    PYTHONDIR: "C:\\Python34"
+    PYTHON: "C:\\Python34\\python.exe"
+
+  - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+    PYTHONDIR: "C:\\Python27-x64"
+    PYTHON: "C:\\Python27-x64\\python.exe"
+
+  - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+    PYTHONDIR: "C:\\Python33-x64"
+    PYTHON: "C:\\Python33-x64\\python.exe"
+
+  - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+    PYTHONDIR: "C:\\Python34-x64"
+    PYTHON: "C:\\Python34-x64\\python.exe"
+
+branches:
+  only:
+    - master
+    - /release-.*/
+
+notifications:
+  - provider: Email
+    on_build_success: false
+    on_build_failure: false
+    on_build_status_changed: false
+
+install:
+  - "SET PATH=%PYTHONDIR%;%PYTHONDIR%\\Scripts;%PATH%"
+# Download most recent Julia Windows binary
+  - ps: (new-object net.webclient).DownloadFile(
+        $("http://s3.amazonaws.com/"+$env:JULIAVERSION),
+        "C:\projects\julia-binary.exe")
+# Run installer silently, output to C:\projects\julia
+  - C:\projects\julia-binary.exe /S /D=C:\projects\julia
+
+build_script:
+# Need to convert from shallow to complete for Pkg.clone to work
+  - IF EXIST .git\shallow (git fetch --unshallow)
+  - C:\projects\julia\bin\julia -e "versioninfo();
+      Pkg.clone(pwd(), \"PyCall\"); Pkg.build(\"PyCall\")"
+
+test_script:
+  - C:\projects\julia\bin\julia --check-bounds=yes -e "Pkg.test(\"PyCall\")"
