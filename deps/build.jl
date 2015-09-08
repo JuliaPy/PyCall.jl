@@ -205,6 +205,6 @@ end
 finally # restore env vars
 
 PYTHONIOENCODING != nothing ? (ENV["PYTHONIOENCODING"] = PYTHONIOENCODING) : pop!(ENV, "PYTHONIOENCODING")
-PYTHONHOME != nothing ? (ENV["PYTHONHOME"] = PYTHONHOME) : pop!(ENV, "PYTHONHOME")
+PYTHONHOME != nothing ? (ENV["PYTHONHOME"] = PYTHONHOME) : pop!(ENV, "PYTHONHOME", "")
 
 end
