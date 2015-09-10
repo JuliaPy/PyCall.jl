@@ -66,7 +66,7 @@ function find_libpython(python::AbstractString)
         ENV["PYTHONHOME"] = @windows? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
         # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro?
         try
-            run(pipe(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
+            run(pipeline(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
         catch
             pop!(ENV, "PYTHONHOME")
         end
