@@ -1,6 +1,7 @@
 # Calling Python functions from the Julia language
 
 [![Build Status](https://travis-ci.org/stevengj/PyCall.jl.svg?branch=master)](https://travis-ci.org/stevengj/PyCall.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/otj9pnwsq32to211?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl)
 [![Coverage Status](https://coveralls.io/repos/stevengj/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/stevengj/PyCall.jl?branch=master)
 
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.3.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.3)
