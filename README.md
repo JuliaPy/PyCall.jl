@@ -2,7 +2,9 @@
 
 [![Build Status](https://travis-ci.org/stevengj/PyCall.jl.svg?branch=master)](https://travis-ci.org/stevengj/PyCall.jl)
 [![Coverage Status](https://coveralls.io/repos/stevengj/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/stevengj/PyCall.jl?branch=master)
-[![PyCall](http://pkg.julialang.org/badges/PyCall_release.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=release)
+
+[![PyCall](http://pkg.julialang.org/badges/PyCall_0.3.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.3)
+[![PyCall](http://pkg.julialang.org/badges/PyCall_0.4.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.4)
 
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
