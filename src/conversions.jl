@@ -649,21 +649,20 @@ end
 # we could do it when PyCall is initialized (if mpmath is available),
 # at the cost of slowing down initialization in the common case where
 # BigFloat conversion is not needed.
-prec = 0
-mpmath_initialized = false
+const mpprec = [0]
+const mpmath = PyNULL()
+const mpf = PyNULL()
+const mpc = PyNULL()
 function mpmath_init()
-    global mpmath_initialized
-    global prec
-    if !(mpmath_initialized::Bool)
-        global const mpmath = pyimport("mpmath")
-        global const mpf = mpmath["mpf"]
-        global const mpc = mpmath["mpc"]
-        mpmath_initialized::Bool = true
+    if mpmath.o == C_NULL
+        copy!(mpmath, pyimport("mpmath"))
+        copy!(mpf, mpmath["mpf"])
+        copy!(mpc, mpmath["mpc"])
     end
     curprec = get_bigfloat_precision()
-    if prec::Int != curprec
-        prec::Int = curprec
-        mpmath["mp"]["prec"] = curprec
+    if mpprec[1] != curprec
+        mpprec[1] = curprec
+        mpmath["mp"]["prec"] = mpprec[1]
     end
 end
 
@@ -683,8 +682,9 @@ function PyObject(x::Complex{BigFloat})
 end
 
 function convert(::Type{BigFloat}, o::PyObject)
-    BigFloat(convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
-                                            PyPtr, (PyPtr,), o))))
+    parse(BigFloat,
+          convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
+                                                 PyPtr, (PyPtr,), o))))
 end
 
 function convert(::Type{Complex{BigFloat}}, o::PyObject)
@@ -696,7 +696,7 @@ function convert(::Type{Complex{BigFloat}}, o::PyObject)
     end
 end
 
-pymp_query(o::PyObject) = mpmath_initialized::Bool ? (pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc::PyObject) ? Complex{BigFloat} : None) : None
+pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : None
 
 #########################################################################
 # BigInt conversion to Python "long" integers

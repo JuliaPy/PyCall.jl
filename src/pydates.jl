@@ -40,6 +40,18 @@ immutable PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
     microseconds::Cint
 end
 
+# the DateTime, Date, and Time objects are a struct with fields:
+#     ob_refcnt::Int
+#     ob_type::PyPtr
+#     hashcode::Py_hash_t
+#     hastzinfo::Uint8
+#     unsigned char data[LEN]
+#     tzinfo::PyPtr
+# where LEN = 4 for Date, 6 for Time, and 10 for DateTime.  We
+# will access this via raw Ptr{Uint8} loads, with the following offset
+# for data:
+const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
+
 # called from __init__
 function init_datetime()
     # emulate PyDateTime_IMPORT:
@@ -47,18 +59,6 @@ function init_datetime()
         unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
                                      Ptr{PyDateTime_CAPI}, (Ptr{Uint8}, Cint),
                                      "datetime.datetime_CAPI", 0))
-
-    # the DateTime, Date, and Time objects are a struct with fields:
-    #     ob_refcnt::Int
-    #     ob_type::PyPtr
-    #     hashcode::Py_hash_t
-    #     hastzinfo::Uint8
-    #     unsigned char data[LEN]
-    #     tzinfo::PyPtr
-    # where LEN = 4 for Date, 6 for Time, and 10 for DateTime.  We
-    # will access this via raw Ptr{Uint8} loads, with the following offset
-    # for data:
-    global const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
 end
 
 PyObject(d::Dates.Date) =

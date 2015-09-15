@@ -10,6 +10,20 @@ else
 end
 
 #########################################################################
+# global constants, initialized to NULL and then overwritten in __init__
+# (eventually, the ability to define global const in __init__ may go away,
+#  and in any case this is better for type inference during precompilation)
+
+const inspect = PyNULL()
+const builtin = PyNULL()
+const BuiltinFunctionType = PyNULL()
+const TypeType = PyNULL()
+const MethodType = PyNULL()
+const MethodWrapperType = PyNULL()
+const ufuncType = PyNULL()
+const format_traceback = PyNULL()
+
+#########################################################################
 
 function __init__()
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
@@ -41,8 +55,8 @@ function __init__()
               "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
     end
 
-    global const inspect = pyimport("inspect")
-    global const builtin = pyimport(pyversion.major < 3 ? "__builtin__" : "builtins")
+    copy!(inspect, pyimport("inspect"))
+    copy!(builtin, pyimport(pyversion.major < 3 ? "__builtin__" : "builtins"))
     
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
 
@@ -50,14 +64,12 @@ function __init__()
     # to the FunctionType in the C API.  We have to obtain these
     # at runtime and cache them in globals
     types = pyimport("types")
-    global const BuiltinFunctionType = types["BuiltinFunctionType"]
-    global const TypeType = pybuiltin("type")
-    global const MethodType = types["MethodType"]
-    global const MethodWrapperType = pytypeof(PyObject(PyObject[])["__add__"])
-    global const ufuncType = try
-        pyimport("numpy")["ufunc"]
-    catch
-        PyNULL() # NumPy not available
+    copy!(BuiltinFunctionType, types["BuiltinFunctionType"])
+    copy!(TypeType, pybuiltin("type"))
+    copy!(MethodType, types["MethodType"])
+    copy!(MethodWrapperType, pytypeof(PyObject(PyObject[])["__add__"]))
+    try # may fail if numpy not installed
+        copy!(ufuncType, pyimport("numpy")["ufunc"])
     end
     
     # cache Python None -- PyPtr, not PyObject, to prevent it from
@@ -79,7 +91,7 @@ function __init__()
     global const py_void_p = pvp
 
     # traceback.format_tb function, for show(PyError)
-    global const format_traceback = pyimport("traceback")["format_tb"]
+    copy!(format_traceback, pyimport("traceback")["format_tb"])
 
     # all cfunctions must be compiled at runtime
     global const jl_Function_call_ptr =

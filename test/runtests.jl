@@ -171,10 +171,27 @@ end
 @test roundtripeq(Array{Int8}, [1,2,3,4])
 
 # conversion of numpy scalars
-pyanycheck(T, o) = isa(convert(PyAny, o), T)
+pyanycheck(x::Any) = pyanycheck(typeof(x), PyObject(x))
+pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
 @test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
 @test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
 @test pyanycheck(Complex128, PyVector{PyObject}(PyObject([1.3+1im]))[1])
+
+pymodule_exists(s::AbstractString) = try
+    pyimport(s)
+    true
+catch
+    false
+end
+
+# bigfloat conversion
+if pymodule_exists("mpmath")
+    for x in (big(pi), big(pi) + im/big(pi))
+        @test pyanycheck(x)
+        # conversion may not be exact since it goes through a decimal string
+        @test abs(roundtrip(x) - x) < eps(BigFloat) * 1e3 * abs(x)
+    end
+end
 
 # buffers
 let b = PyCall.PyBuffer(pyutf8("test string"))
