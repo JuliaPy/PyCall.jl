@@ -36,6 +36,7 @@ end
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 if VERSION >= v"0.4.0-dev+1246" # call overloading
     @test PyObject(x -> x + 1)(314158) == 314159
+    @test PyAny(PyObject(3)) == 3
 end
 @test roundtrip(x -> x + 1)(314158) == 314159
 

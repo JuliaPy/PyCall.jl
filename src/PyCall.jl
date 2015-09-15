@@ -405,6 +405,9 @@ end
 
 if VERSION >= v"0.4.0-dev+1246" # call overloading
     Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
+
+    # can't use default call(PyAny, o) since it has a ::PyAny typeassert
+    Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
 end
 
 #########################################################################
