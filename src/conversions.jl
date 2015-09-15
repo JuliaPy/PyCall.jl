@@ -24,28 +24,34 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
 
 # conversions to Julia types from PyObject
 
+# Numpy scalars need to be converted to ordinary Python scalars with
+# the item() method before passing to the Python API conversion functions
+asscalar(o::PyObject) = pyisinstance(o, npy_number) ? pycall(o["item"], PyObject) : o
+
 convert{T<:Integer}(::Type{T}, po::PyObject) =
-  convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po))
+  convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
 if WORD_SIZE == 32
   convert{T<:Union(Int64,Uint64)}(::Type{T}, po::PyObject) =
-    @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), po)
+    @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
 end
 
 convert(::Type{Bool}, po::PyObject) =
-    0 != @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
+    0 != @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po))
 
 convert{T<:Real}(::Type{T}, po::PyObject) =
-  convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), po))
+  convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), asscalar(po)))
 
-convert{T<:Complex}(::Type{T}, po::PyObject) =
-  convert(T,
-    begin
-        re = @pycheck ccall((@pysym :PyComplex_RealAsDouble),
-                            Cdouble, (PyPtr,), po)
-        complex(re, ccall((@pysym :PyComplex_ImagAsDouble),
-                    Cdouble, (PyPtr,), po))
-    end)
+function convert{T<:Complex}(::Type{T}, po_::PyObject)
+    po = asscalar(po_)
+    convert(T,
+            begin
+                re = @pycheck ccall((@pysym :PyComplex_RealAsDouble),
+                                    Cdouble, (PyPtr,), po)
+                complex(re, ccall((@pysym :PyComplex_ImagAsDouble),
+                                  Cdouble, (PyPtr,), po))
+            end)
+end
 
 convert(::Type{Nothing}, po::PyObject) = nothing
 
@@ -726,12 +732,13 @@ include("pydates.jl")
 # TODO: In Python 3.x, the BigInt check here won't work since int == long.
 pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
   (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
-  pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt : None
+  pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
+  pyisinstance(o, npy_integer) ? Int : None
 
-pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ? Float64 : None
+pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : None
 
 pycomplex_query(o::PyObject) =
-  pyisinstance(o, @pyglobalobj :PyComplex_Type) ? Complex128 : None
+  pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : None
 
 pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : None
 

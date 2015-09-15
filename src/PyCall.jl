@@ -94,6 +94,12 @@ function pyincref(o::PyPtr)
     PyObject(o)
 end
 
+function Base.copy!(dest::PyObject, src::PyObject)
+    pydecref(dest)
+    dest.o = src.o
+    return pyincref(dest)
+end
+
 pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 

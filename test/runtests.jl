@@ -5,6 +5,7 @@ roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
 roundtripeq(x) = roundtrip(x) == x
 
+
 # test handling of type-tuple changes in Julia 0.4
 import PyCall.pyany_toany
 @test pyany_toany(Int) == Int
@@ -168,6 +169,12 @@ end
 # issue #112
 @test roundtripeq(Array, [1,2,3,4])
 @test roundtripeq(Array{Int8}, [1,2,3,4])
+
+# conversion of numpy scalars
+pyanycheck(T, o) = isa(convert(PyAny, o), T)
+@test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
+@test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
+@test pyanycheck(Complex128, PyVector{PyObject}(PyObject([1.3+1im]))[1])
 
 # buffers
 let b = PyCall.PyBuffer(pyutf8("test string"))

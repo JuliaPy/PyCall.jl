@@ -17,15 +17,12 @@
 #
 # The result of npy_api_initialize, below, is to produce the following
 # tables of API pointers:
-npy_api = Dict{Symbol, Ptr{Void}}()
-
-# type alias to shorten type decorations (needed for JIT) of our table
-typealias Tnpy_api Dict{Symbol, Ptr{Void}}
+const npy_api = Dict{Symbol, Ptr{Void}}()
 
 # need a global to cache pyimport("numpy.core.multiarray"), in order
 # to ensure the module is not garbage-collected as long as we are using it
 # for the npy_api pointers.
-npy_multiarray = PyNULL()
+const npy_multiarray = PyNULL()
 
 npy_initialized = false # global to prevent multiple initializations
 
@@ -34,31 +31,43 @@ macro npyinitialize()
     :(npy_initialized::Bool ? nothing : npyinitialize())
 end
 
+# numpy.number types, used to detect scalars for conversion routines
+const npy_number = PyNULL()
+const npy_integer = PyNULL()
+const npy_floating = PyNULL()
+const npy_complexfloating = PyNULL()
+
 function npyinitialize()
-    global npy_api
     global npy_initialized
-    global npy_multiarray
 
     if npy_initialized::Bool
         return
     end
     try
-        npy_multiarray::PyObject = pyimport("numpy.core.multiarray")
+        copy!(npy_multiarray, pyimport("numpy.core.multiarray"))
     catch e
         error("numpy.core.multiarray required for multidimensional Array conversions - ", e)
     end
     if pyversion < v"3.0"
         PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr), 
                                      Ptr{Ptr{Void}}, (PyPtr,), 
-                                     (npy_multiarray::PyObject)["_ARRAY_API"])
+                                     npy_multiarray["_ARRAY_API"])
     else
         PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
                                      Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}), 
-                                     (npy_multiarray::PyObject)["_ARRAY_API"], C_NULL)
+                                     npy_multiarray["_ARRAY_API"], C_NULL)
     end
 
+    numpy = pyimport("numpy")
+
     # directory for numpy include files to parse
-    inc = pycall(pyimport("numpy")["get_include"], AbstractString)
+    inc = pycall(numpy["get_include"], AbstractString)
+
+    # numpy.number types
+    copy!(npy_number, numpy["number"])
+    copy!(npy_integer, numpy["integer"])
+    copy!(npy_floating, numpy["floating"])
+    copy!(npy_complexfloating, numpy["complexfloating"])
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try
@@ -76,26 +85,13 @@ function npyinitialize()
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
     for m in eachmatch(r, hdr) # build npy_api table
-        (npy_api::Tnpy_api)[symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
+        npy_api[symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
     end
-    if !haskey(npy_api::Tnpy_api, :PyArray_New)
+    if !haskey(npy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
     end
 
     npy_initialized::Bool = true
-    return
-end
-
-function npyfinalize()
-    global npy_api
-    global npy_initialized
-    global npy_multiarray
-
-    if npy_initialized::Bool
-        empty!(npy_api::Tnpy_api)
-        pydecref(npy_multiarray::PyObject)
-        npy_initialized::Bool = false
-    end
     return
 end
 
