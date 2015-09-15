@@ -183,6 +183,7 @@ end
 
 #########################################################################
 # Function conversion (see callback.jl for conversion the other way)
+# (rarely needed given call overloading in Julia 0.4)
 
 convert(::Type{Function}, po::PyObject) =
     function fn(args...; kwargs...)
@@ -742,7 +743,13 @@ pycomplex_query(o::PyObject) =
 
 pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : None
 
-pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
+if VERSION >= v"0.4.0-dev+1246" # call overloading
+    # Given call overloading, all PyObjects are callable already, so
+    # we never automatically convert to Function.
+    pyfunction_query(o::PyObject) = None
+else
+    pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
+end
 
 pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
 

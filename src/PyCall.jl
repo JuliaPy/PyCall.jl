@@ -403,6 +403,10 @@ function pycall(o::Union(PyObject,PyPtr), returntype::TypeTuple, args...; kwargs
     end
 end
 
+if VERSION >= v"0.4.0-dev+1246" # call overloading
+    Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
+end
+
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
 # for now we can define "get"

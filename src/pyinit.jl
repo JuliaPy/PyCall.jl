@@ -60,16 +60,19 @@ function __init__()
     
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
 
-    # Python has zillions of types that a function be, in addition
-    # to the FunctionType in the C API.  We have to obtain these
-    # at runtime and cache them in globals
     types = pyimport("types")
-    copy!(BuiltinFunctionType, types["BuiltinFunctionType"])
-    copy!(TypeType, pybuiltin("type"))
-    copy!(MethodType, types["MethodType"])
-    copy!(MethodWrapperType, pytypeof(PyObject(PyObject[])["__add__"]))
-    try # may fail if numpy not installed
-        copy!(ufuncType, pyimport("numpy")["ufunc"])
+    copy!(TypeType, pybuiltin("type")) # for pytypeof
+
+    if VERSION < v"0.4.0-dev+1246" # no call overloading
+        # Python has zillions of types that a function be, in addition
+        # to the FunctionType in the C API.  We have to obtain these
+        # at runtime and cache them in globals
+        copy!(BuiltinFunctionType, types["BuiltinFunctionType"])
+        copy!(MethodType, types["MethodType"])
+        copy!(MethodWrapperType, pytypeof(PyObject(PyObject[])["__add__"]))
+        try # may fail if numpy not installed
+            copy!(ufuncType, pyimport("numpy")["ufunc"])
+        end
     end
     
     # cache Python None -- PyPtr, not PyObject, to prevent it from

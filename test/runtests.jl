@@ -34,6 +34,9 @@ end
 @test roundtripeq(Uint8[1,3,4,5])
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
+if VERSION >= v"0.4.0-dev+1246" # call overloading
+    @test PyObject(x -> x + 1)(314158) == 314159
+end
 @test roundtrip(x -> x + 1)(314158) == 314159
 
 testkw(x; y=0) = x + 2*y

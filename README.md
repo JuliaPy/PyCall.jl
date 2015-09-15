@@ -24,7 +24,7 @@ install the files.  Julia 0.3 or later and Python 2.7 or later are required.
 
 The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
-this after installing the package, run `Pkg.checkout("PyCall")`.
+this after installing the package, run `Pkg.checkout("PyCall"); Pkg.build("PyCall")`.
 
 You must, of course, have Python and its `libpython` shared-library
 installed, and a `python` executable must be in your `PATH` (or be
@@ -124,7 +124,7 @@ Here are solutions to some common problems:
 
 * As mentioned above, use `foo[:bar]` rather than `foo.bar` to access fields and methods of Python objects.
 
-* Sometimes calling a Python function fails because PyCall doesn't realize it is a callable object (since so many types of objects can be callable in Python).   The workaround is to use `pycall(foo, PyAny, args...)` instead of `foo(args...)`.   If you want to call `foo.bar(args...)` in Python, it is good to use `pycall(foo["bar"], PyAny, args...)`, where using `foo["bar"]` instead of `foo[:bar]` prevents any automatic conversion of the `bar` field.
+* In Julia 0.3, sometimes calling a Python function fails because PyCall doesn't realize it is a callable object (since so many types of objects can be callable in Python).   The workaround is to use `pycall(foo, PyAny, args...)` instead of `foo(args...)`.   If you want to call `foo.bar(args...)` in Python, it is good to use `pycall(foo["bar"], PyAny, args...)`, where using `foo["bar"]` instead of `foo[:bar]` prevents any automatic conversion of the `bar` field.  In Julia 0.4, however, this problem goes away: all PyObjects are automatically callable, thanks to call overloading in Julia 0.4.
 
 * By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/stevengj/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `unshift!(PyVector(pyimport("sys")["path"]), "")`.
 
@@ -164,6 +164,12 @@ if the key is not found by `get(o, key, default)` or `get(o, SomeType,
 key, default)`.  Similarly, `set!(o, key, val)` is equivalent to
 `o[key] = val` in Python, and `delete!(o, key)` is equivalent to `del
 o[key]` in Python.
+
+In Julia 0.4, you can call an `o::PyObject` via `o(args...)` just like
+in Python (assuming that the object is callable in Python).  In Julia
+0.3, you have to do `pycall(o, PyAny, args...)`, although the explicit
+`pycall` form is still useful in Julia 0.4 if you want to specify the
+return type.
 
 #### PyArray
 
