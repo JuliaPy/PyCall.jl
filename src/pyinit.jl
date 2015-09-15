@@ -26,6 +26,9 @@ const format_traceback = PyNULL()
 #########################################################################
 
 function __init__()
+    # issue #189
+    Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
     if !already_inited
