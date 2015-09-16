@@ -117,7 +117,7 @@ function pyexc_initialize()
     pyexc[DomainError] = @pyglobalobjptr :PyExc_RuntimeError
     pyexc[OverflowError] = @pyglobalobjptr :PyExc_OverflowError
     pyexc[InexactError] = @pyglobalobjptr :PyExc_ArithmeticError
-    pyexc[MemoryError] = @pyglobalobjptr :PyExc_MemoryError
+    pyexc[OutOfMemoryError] = @pyglobalobjptr :PyExc_MemoryError
     pyexc[StackOverflowError] = @pyglobalobjptr :PyExc_MemoryError
     pyexc[UndefRefError] = @pyglobalobjptr :PyExc_RuntimeError
     pyexc[InterruptException] = @pyglobalobjptr :PyExc_KeyboardInterrupt

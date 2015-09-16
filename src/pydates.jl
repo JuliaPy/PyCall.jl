@@ -114,7 +114,7 @@ function pydate_query(o::PyObject)
     elseif PyDelta_Check(o)
         return Dates.Millisecond
     else
-        return None
+        return @compat Union{}
     end
 end
 
