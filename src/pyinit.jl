@@ -52,7 +52,7 @@ function __init__()
     # cache the Python version as a Julia VersionNumber
     global const pyversion = convert(VersionNumber,
                                      split(bytestring(ccall(@pysym(:Py_GetVersion), 
-                                                            Ptr{Uint8}, ())))[1])
+                                                            Ptr{UInt8}, ())))[1])
     if pyversion_build.major != pyversion.major
         error("PyCall built with Python $pyversion_build, but now using Python $pyversion; ",
               "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
@@ -105,8 +105,8 @@ function __init__()
     global const pyio_repr_ptr = cfunction(pyio_repr, PyPtr, (PyPtr,))
     global const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
     global const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
-    global const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, Uint, (PyPtr,))
-    global const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, Uint32, (PyPtr,))
+    global const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
+    global const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
     
     # similarly, any MethodDef calls involve cfunctions
     global const jl_TextIO_methods = make_io_methods(true)
@@ -135,8 +135,8 @@ function __init__()
         # some modules (e.g. IPython) expect sys.argv to be set
         if pyversion.major < 3
             argv_s = bytestring("")
-            argv = unsafe_convert(Ptr{Uint8}, argv_s)
-            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{Uint8}},Cint), 1, &argv, 0)
+            argv = unsafe_convert(Ptr{UInt8}, argv_s)
+            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{UInt8}},Cint), 1, &argv, 0)
         else
             argv_s = Cwchar_t[0]
             argv   = unsafe_convert(Ptr{Cwchar_t}, argv_s)

@@ -6,7 +6,7 @@
 # conversions from Julia types to PyObject:
 
 PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSize_t),
-                                                 PyPtr, (Uint,), i))
+                                                 PyPtr, (UInt,), i))
 PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSsize_t),
                                                 PyPtr, (Int,), i))
 
@@ -32,7 +32,7 @@ convert{T<:Integer}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
 if WORD_SIZE == 32
-  convert{T<:Union(Int64,Uint64)}(::Type{T}, po::PyObject) =
+  convert{T<:Union(Int64,UInt64)}(::Type{T}, po::PyObject) =
     @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
 end
 
@@ -60,18 +60,18 @@ convert(::Type{Nothing}, po::PyObject) = nothing
 
 PyObject(s::UTF8String) =
   PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
-                           PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
+                           PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
                            bytestring(s), sizeof(s), C_NULL))
 
 function PyObject(s::AbstractString)
     if pyunicode_literals
         sb = bytestring(s)
         PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
-                                 PyPtr, (Ptr{Uint8}, Int, Ptr{Uint8}),
+                                 PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
                                  sb, sizeof(sb), C_NULL))
     else
         PyObject(@pycheckn ccall(@pysym(PyString_FromString),
-                                 PyPtr, (Ptr{Uint8},), bytestring(s)))
+                                 PyPtr, (Ptr{UInt8},), bytestring(s)))
     end
 end
 
@@ -81,7 +81,7 @@ function convert{T<:AbstractString}(::Type{T}, po::PyObject)
                                              PyPtr, (PyPtr,), po)))
     else
         convert(T, bytestring(@pycheckn ccall(@pysym(PyString_AsString),
-                                               Ptr{Uint8}, (PyPtr,), po)))
+                                               Ptr{UInt8}, (PyPtr,), po)))
     end
 end
 
@@ -93,41 +93,41 @@ convert(::Type{Symbol}, po::PyObject) = symbol(convert(AbstractString, po))
 #########################################################################
 # ByteArray conversions
 
-PyObject(a::Vector{Uint8}) =
+PyObject(a::Vector{UInt8}) =
   PyObject(@pycheckn ccall((@pysym :PyByteArray_FromStringAndSize),
-                           PyPtr, (Ptr{Uint8}, Int), a, length(a)))
+                           PyPtr, (Ptr{UInt8}, Int), a, length(a)))
 
 ispybytearray(po::PyObject) =
   pyisinstance(po, @pyglobalobj :PyByteArray_Type)
 
-function convert(::Type{Vector{Uint8}}, po::PyObject)
+function convert(::Type{Vector{UInt8}}, po::PyObject)
     if !ispybytearray(po)
         # TODO: support Py_buffer interface? via PyBytes_FromObject?
         try
             p = @pycheckn ccall(@pysym(PyString_AsString),
-                                  Ptr{Uint8}, (PyPtr,), po)
+                                  Ptr{UInt8}, (PyPtr,), po)
             len = ccall(@pysym(PyString_Size), Int, (PyPtr,), po)
-            a = Array(Uint8, len)
-            ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t),
+            a = Array(UInt8, len)
+            ccall(:memcpy, Ptr{UInt8}, (Ptr{UInt8}, Ptr{UInt8}, Csize_t),
                   a, p, len)
             return a
         catch
             try
                 info = PyArray_Info(po)
-                return copy(PyArray{Uint8, length(info.sz)}(po, info))
+                return copy(PyArray{UInt8, length(info.sz)}(po, info))
             catch
-                return py2array(Uint8, po)
+                return py2array(UInt8, po)
             end
         end
     end
-    p = ccall((@pysym :PyByteArray_AsString), Ptr{Uint8}, (PyPtr,), po)
+    p = ccall((@pysym :PyByteArray_AsString), Ptr{UInt8}, (PyPtr,), po)
     len = ccall((@pysym :PyByteArray_Size), Int, (PyPtr,), po)
-    a = Array(Uint8, len)
-    ccall(:memcpy, Ptr{Uint8}, (Ptr{Uint8}, Ptr{Uint8}, Csize_t), a, p, len)
+    a = Array(UInt8, len)
+    ccall(:memcpy, Ptr{UInt8}, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), a, p, len)
     return a
 end
 
-# TODO: support zero-copy PyByteArray <: AbstractVector{Uint8} object
+# TODO: support zero-copy PyByteArray <: AbstractVector{UInt8} object
 
 #########################################################################
 # Pointer conversions, using ctypes or PyCapsule
@@ -139,14 +139,14 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL :
-          convert(Ptr{Void}, convert(Uint, po["value"]))
+          convert(Ptr{Void}, convert(UInt, po["value"]))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
-                       Ptr{Void}, (PyPtr,Ptr{Uint8}),
+                       Ptr{Void}, (PyPtr,Ptr{UInt8}),
                        po, ccall((@pysym :PyCapsule_GetName),
-                                 Ptr{Uint8}, (PyPtr,), po))
+                                 Ptr{UInt8}, (PyPtr,), po))
     else
-        convert(Ptr{Void}, convert(Uint, po))
+        convert(Ptr{Void}, convert(UInt, po))
     end
 end
 
@@ -474,7 +474,7 @@ haskey(d::PyDict, key) = 1 == (d.isdict ?
                                ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)) :
                                ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 
-pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckn ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{Uint8},Ptr{Uint8}), d, bytestring(vec), C_NULL))
+pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckn ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{UInt8},Ptr{UInt8}), d, bytestring(vec), C_NULL))
 
 keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
 
@@ -704,7 +704,7 @@ pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc)
 
 function PyObject(i::BigInt)
     PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
-                             (Ptr{Uint8}, Ptr{Void}, Cint),
+                             (Ptr{UInt8}, Ptr{Void}, Cint),
                              bytestring(string(i)), C_NULL, 10))
 end
 
@@ -756,7 +756,7 @@ pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{Uint8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
 
 if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
     typetuple(Ts) = tuple(Ts...)
@@ -775,7 +775,7 @@ function pysequence_query(o::PyObject)
     elseif pyisinstance(o, pyxrange)
         return Range
     elseif ispybytearray(o)
-        return Vector{Uint8}
+        return Vector{UInt8}
     else
         try
             otypestr = get(o["__array_interface__"], PyObject, "typestr")

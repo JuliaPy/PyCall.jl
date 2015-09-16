@@ -124,7 +124,7 @@ function writedims(io::IO, b::PyBuffer, offset, d)
         end
     else
         @assert d == b.buf.ndim
-        p = convert(Ptr{Uint8}, pointer(b)) + offset
+        p = convert(Ptr{UInt8}, pointer(b)) + offset
         for i = 1:size(b,d)
             # would be nicer not to write this one byte at a time,
             # but the alternative seems to be to create an Array
@@ -144,7 +144,7 @@ function Base.write(io::IO, b::PyBuffer)
 
     if iscontiguous(b)
         # (note that 0-dimensional buffers are always contiguous)
-        return write(io, pointer_to_array(convert(Ptr{Uint8}, pointer(b)),
+        return write(io, pointer_to_array(convert(Ptr{UInt8}, pointer(b)),
                                           sizeof(b)))
     else
         return writedims(io, b, 0, 1)

@@ -44,11 +44,11 @@ end
 #     ob_refcnt::Int
 #     ob_type::PyPtr
 #     hashcode::Py_hash_t
-#     hastzinfo::Uint8
+#     hastzinfo::UInt8
 #     unsigned char data[LEN]
 #     tzinfo::PyPtr
 # where LEN = 4 for Date, 6 for Time, and 10 for DateTime.  We
-# will access this via raw Ptr{Uint8} loads, with the following offset
+# will access this via raw Ptr{UInt8} loads, with the following offset
 # for data:
 const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
 
@@ -57,7 +57,7 @@ function init_datetime()
     # emulate PyDateTime_IMPORT:
     global const PyDateTimeAPI =
         unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
-                                     Ptr{PyDateTime_CAPI}, (Ptr{Uint8}, Cint),
+                                     Ptr{PyDateTime_CAPI}, (Ptr{UInt8}, Cint),
                                      "datetime.datetime_CAPI", 0))
 end
 
@@ -120,7 +120,7 @@ end
 
 function convert(::Type{Dates.DateTime}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{Uint8}, o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
         if PyDateTime_Check(o)
             Dates.DateTime(@compat(UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
                            unsafe_load(dt,3), unsafe_load(dt,4), # month, day
@@ -140,7 +140,7 @@ end
 
 function convert(::Type{Dates.Date}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{Uint8}, o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
         Dates.Date(@compat(UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
                    unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
     else

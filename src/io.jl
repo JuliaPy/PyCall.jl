@@ -10,7 +10,7 @@
 # IO objects should raise IOError for unsupported operations or failed IO
 function ioraise(e)
     if isa(e, MethodError) || isa(e, ErrorException) 
-        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
+        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{UInt8}),
               (pyexc::Dict)[PyIOError],
               bytestring(string("Julia exception: ", e)))
     else
@@ -270,7 +270,7 @@ end
 function jl_IO_readinto(self_::PyPtr, arg_::PyPtr)
     try
         io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = PyVector{Uint8}(pyincref(arg_))
+        b = PyVector{UInt8}(pyincref(arg_))
         return pyincref(PyObject(readbytes!(io, b))).o
     catch e
         ioraise(e)

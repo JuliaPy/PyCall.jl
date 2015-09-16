@@ -119,7 +119,7 @@ end
 #########################################################################
 
 # need to be able to get the version before Python is initialized
-Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{Uint8}, ()))
+Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
 
 const python = get(ENV, "PYTHON", "python")
 const (libpython, libpy_name) = find_libpython(python)

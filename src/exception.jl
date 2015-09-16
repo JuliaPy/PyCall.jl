@@ -14,11 +14,11 @@ type PyError <: Exception
     # indicator.
     function PyError(msg::AbstractString)
         exc = Array(PyPtr, 3)
-        pexc = convert(Uint, pointer(exc))
+        pexc = convert(UInt, pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-        ccall((@pysym :PyErr_Fetch), Void, (Uint,Uint,Uint),
+        ccall((@pysym :PyErr_Fetch), Void, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
-        ccall((@pysym :PyErr_NormalizeException), Void, (Uint,Uint,Uint),
+        ccall((@pysym :PyErr_NormalizeException), Void, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         new(msg, exc[1], exc[2], exc[3])
     end
@@ -127,7 +127,7 @@ end
 function pyraise(e)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
-    ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{Uint8}),
+    ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{UInt8}),
           pyeT, bytestring(string("Julia exception: ", e)))
 end
 

@@ -7,17 +7,17 @@ const prevent_gc = Any[]
 function gstring_ptr(name::AbstractString, s::AbstractString)
     g = bytestring(s)
     push!(prevent_gc, g)
-    unsafe_convert(Ptr{Uint8}, g)
+    unsafe_convert(Ptr{UInt8}, g)
 end
 
 ################################################################
 # mirror of Python API types and constants from methodobject.h
 
 immutable PyMethodDef
-    ml_name::Ptr{Uint8}
+    ml_name::Ptr{UInt8}
     ml_meth::Ptr{Void}
     ml_flags::Cint
-    ml_doc::Ptr{Uint8} # may be NULL
+    ml_doc::Ptr{UInt8} # may be NULL
 end
 
 # A PyCFunction is a C function of the form
@@ -38,26 +38,26 @@ const METH_O = 0x0008       # single argument (not wrapped in tuple)
 const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
-const NULL_Uint8_Ptr = convert(Ptr{Uint8}, C_NULL)
+const NULL_UInt8_Ptr = convert(Ptr{UInt8}, C_NULL)
 function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
                 cfunction(meth, PyPtr, (PyPtr,PyPtr)),
                 convert(Cint, flags),
-                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc))
+                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
     
 # used as sentinel value to end method arrays:
-PyMethodDef() = PyMethodDef(NULL_Uint8_Ptr, C_NULL, 
-                            convert(Cint, 0), NULL_Uint8_Ptr)
+PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL, 
+                            convert(Cint, 0), NULL_UInt8_Ptr)
 
 ################################################################
 # mirror of Python API types and constants from descrobject.h
 
 immutable PyGetSetDef
-    name::Ptr{Uint8}
+    name::Ptr{UInt8}
     get::Ptr{Void}
     set::Ptr{Void} # may be NULL for read-only members
-    doc::Ptr{Uint8} # may be NULL
+    doc::Ptr{UInt8} # may be NULL
     closure::Ptr{Void} # pass-through thunk, may be NULL
 end
 
@@ -65,7 +65,7 @@ function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::Abs
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
-                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),
+                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
 
@@ -73,29 +73,29 @@ function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString=""
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
                 C_NULL,
-                isempty(doc) ? NULL_Uint8_Ptr : gstring_ptr(name, doc),
+                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
 
 # used as sentinel value to end attribute arrays:
-PyGetSetDef() = PyGetSetDef(NULL_Uint8_Ptr, C_NULL, C_NULL, NULL_Uint8_Ptr, C_NULL)
+PyGetSetDef() = PyGetSetDef(NULL_UInt8_Ptr, C_NULL, C_NULL, NULL_UInt8_Ptr, C_NULL)
 
 ################################################################
 # from Python structmember.h:
 
 # declare immutable because we need a C-like array of these
 immutable PyMemberDef
-    name::Ptr{Uint8}
+    name::Ptr{UInt8}
     typ::Cint
     offset::Int # warning: was Cint for Python <= 2.4
     flags::Cint
-    doc::Ptr{Uint8}
+    doc::Ptr{UInt8}
     PyMemberDef(name,typ,offset,flags,doc) =
-        new(unsafe_convert(Ptr{Uint8},name),
+        new(unsafe_convert(Ptr{UInt8},name),
             convert(Cint,typ),
             convert(Int,offset),
             convert(Cint,flags),
-            unsafe_convert(Ptr{Uint8},doc))
+            unsafe_convert(Ptr{UInt8},doc))
 end
 
 # types:
@@ -179,7 +179,7 @@ type PyTypeObject
     ob_size::Int # PyObject_VAR_HEAD
 
     # PyTypeObject fields:
-    tp_name::Ptr{Uint8} # required, should be in format "<module>.<name>"
+    tp_name::Ptr{UInt8} # required, should be in format "<module>.<name>"
 
     # warning: these two were Cint for Python <= 2.4
     tp_basicsize::Int # required, = sizeof(instance)
@@ -206,7 +206,7 @@ type PyTypeObject
 
     tp_flags::Clong # Required, should default to Py_TPFLAGS_DEFAULT
 
-    tp_doc::Ptr{Uint8} # normally set in example code, but may be NULL
+    tp_doc::Ptr{UInt8} # normally set in example code, but may be NULL
 
     tp_traverse::Ptr{Void}
 
@@ -277,7 +277,7 @@ type PyTypeObject
              Py_TPFLAGS_HAVE_INDEX)
         name_save = bytestring(name)
         t = new(0,C_NULL,0,
-                unsafe_convert(Ptr{Uint8}, name_save),
+                unsafe_convert(Ptr{UInt8}, name_save),
                 convert(Int, basicsize), 0,
                 C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_dealloc ...
                 C_NULL,C_NULL,C_NULL, # tp_as_number...
@@ -364,16 +364,16 @@ end
 function pyjlwrap_hash(o::PyPtr) 
     h = hash(unsafe_pyjlwrap_to_objref(o))
     # Python hashes are not permitted to return -1!!
-    return h == reinterpret(UInt, -1) ? pysalt::Uint : h::Uint
+    return h == reinterpret(UInt, -1) ? pysalt::UInt : h::UInt
 end
 
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
 const pysalt32 = 0xb592cd9b # hash("PyCall") % UInt32
 function pyjlwrap_hash32(o::PyPtr)
-    h = ccall(:int64to32hash, Uint32, (Uint64,), 
+    h = ccall(:int64to32hash, UInt32, (UInt64,), 
               hash(unsafe_pyjlwrap_to_objref(o)))
     # Python hashes are not permitted to return -1!!
-    return h == reinterpret(UInt32, @compat Int32(-1)) ? pysalt32 : h::Uint32
+    return h == reinterpret(UInt32, @compat Int32(-1)) ? pysalt32 : h::UInt32
 end
 
 # constant strings (must not be gc'ed) for pyjlwrap_members

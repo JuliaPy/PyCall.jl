@@ -234,7 +234,7 @@ function getindex(o::PyObject, s::AbstractString)
         throw(ArgumentError("ref of NULL PyObject"))
     end
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr,
-              (PyPtr, Ptr{Uint8}), o, bytestring(s))
+              (PyPtr, Ptr{UInt8}), o, bytestring(s))
     if p == C_NULL
         pyerr_clear()
         throw(KeyError(s))
@@ -249,7 +249,7 @@ function setindex!(o::PyObject, v, s::AbstractString)
         throw(ArgumentError("assign of NULL PyObject"))
     end
     if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Ptr{Uint8}, PyPtr), o, bytestring(s), PyObject(v))
+                   (PyPtr, Ptr{UInt8}, PyPtr), o, bytestring(s), PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
     end
@@ -263,7 +263,7 @@ function haskey(o::PyObject, s::AbstractString)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
-                      (PyPtr, Ptr{Uint8}), o, bytestring(s))
+                      (PyPtr, Ptr{UInt8}), o, bytestring(s))
 end
 
 haskey(o::PyObject, s::Symbol) = haskey(o, string(s))
@@ -320,7 +320,7 @@ end
 
 pyimport(name::AbstractString) =
     PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
-                             (Ptr{Uint8},), bytestring(name)))
+                             (Ptr{UInt8},), bytestring(name)))
 
 pyimport(name::Symbol) = pyimport(string(name))
 
@@ -453,7 +453,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/png", "_repr_png_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
-    T = istext(mime()) ? AbstractString : Vector{Uint8}
+    T = istext(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
         function writemime(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
@@ -485,10 +485,10 @@ function pyeval_(s::AbstractString, locals::PyDict, input_type)
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                     (Ptr{Uint8}, Ptr{Uint8}, Cint),
+                                     (Ptr{UInt8}, Ptr{UInt8}, Cint),
                                      sb, pyeval_fname, input_type))
         main = @pycheckn ccall((@pysym :PyImport_AddModule),
-                                PyPtr, (Ptr{Uint8},),
+                                PyPtr, (Ptr{UInt8},),
                                 bytestring("__main__"))
         maindict = @pycheckn ccall((@pysym :PyModule_GetDict), PyPtr,
                                     (PyPtr,), main)

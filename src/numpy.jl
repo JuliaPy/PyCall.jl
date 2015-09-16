@@ -149,27 +149,27 @@ end
 
 npy_type(::Type{Bool}) = NPY_BOOL
 npy_type(::Type{Int8}) = NPY_BYTE
-npy_type(::Type{Uint8}) = NPY_UBYTE
+npy_type(::Type{UInt8}) = NPY_UBYTE
 npy_type(::Type{Int16}) = NPY_SHORT
-npy_type(::Type{Uint16}) = NPY_USHORT
+npy_type(::Type{UInt16}) = NPY_USHORT
 npy_type(::Type{Int32}) = NPY_INT
-npy_type(::Type{Uint32}) = NPY_UINT
+npy_type(::Type{UInt32}) = NPY_UINT
 npy_type(::Type{Int64}) = NPY_LONGLONG
-npy_type(::Type{Uint64}) = NPY_ULONGLONG
+npy_type(::Type{UInt64}) = NPY_ULONGLONG
 npy_type(::Type{Float32}) = NPY_FLOAT
 npy_type(::Type{Float64}) = NPY_DOUBLE
 npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-typealias NPY_TYPES Union(Bool,Int8,Uint8,Int16,Uint16,Int32,Uint32,Int64,Uint64,Float32,Float64,Complex64,Complex128,PyPtr)
+typealias NPY_TYPES Union(Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float32,Float64,Complex64,Complex128,PyPtr)
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = @compat Dict( "b1"=>Bool,
-                                   "i1"=>Int8,      "u1"=>Uint8,
-                                   "i2"=>Int16,     "u2"=>Uint16,
-                                   "i4"=>Int32,     "u4"=>Uint32,
-                                   "i8"=>Int64,     "u8"=>Uint64,
+                                   "i1"=>Int8,      "u1"=>UInt8,
+                                   "i2"=>Int16,     "u2"=>UInt16,
+                                   "i4"=>Int32,     "u4"=>UInt32,
+                                   "i8"=>Int64,     "u8"=>UInt64,
                                    "f4"=>Float32,   "f8"=>Float64,
                                    "c8"=>Complex64, "c16"=>Complex128,
                                    "O$(div(WORD_SIZE,8))"=>PyPtr )
