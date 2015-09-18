@@ -273,7 +273,7 @@ and also by providing more type information to the Julia compiler.
   type-conversion).  Unlike the `@pyimport` macro, this does not
   define a Julia module and members cannot be accessed with `s.name`.
 
-* `pyeval(s::String, rtype=PyAny; locals...)` evaluates `s`
+* `pyeval(s::AbstractString, rtype=PyAny; locals...)` evaluates `s`
   as a Python string and returns the result converted to `rtype`
   (which defaults to `PyAny`).  The remaining arguments are keywords
   that define local variables to be used in the expression.  For 
@@ -366,9 +366,9 @@ do so using `ccall`.
   manually increment/decrement the reference count.  This is sometimes
   needed when low-level functions steal a reference or return a borrowed one.
 
-* The function `pyerr_check(msg::String)` can be used to check if a
+* The function `pyerr_check(msg::AbstractString)` can be used to check if a
   Python exception was thrown, and throw a Julia exception (which includes
-  both `msg` and the Python exception object) if so.  The Python 
+  both `msg` and the Python exception object) if so.  The Python
   exception status may be cleared by calling `pyerr_clear()`.
 
 * The function `pytype_query(o::PyObject)` returns a native Julia

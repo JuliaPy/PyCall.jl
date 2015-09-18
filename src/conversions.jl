@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
+@compat PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
 
 # conversions to Julia types from PyObject
 
@@ -53,7 +53,7 @@ function convert{T<:Complex}(::Type{T}, po_::PyObject)
             end)
 end
 
-convert(::Type{Nothing}, po::PyObject) = nothing
+@compat convert(::Type{Void}, po::PyObject) = nothing
 
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
@@ -138,7 +138,7 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
-        pynothing_query(v) == Nothing ? C_NULL :
+        @compat pynothing_query(v) == Void ? C_NULL :
           convert(Ptr{Void}, convert(UInt, po["value"]))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
@@ -150,7 +150,7 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
     end
 end
 
-pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : None
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : @compat Union{}
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
@@ -449,7 +449,7 @@ type PyDict{K,V} <: Associative{K,V}
     function PyDict(o::PyObject)
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyDict from NULL PyObject"))
-        elseif pydict_query(o) == None
+        elseif pydict_query(o) == @compat Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         new(o, pyisinstance(o, @pyglobalobj :PyDict_Type))
@@ -697,7 +697,7 @@ function convert(::Type{Complex{BigFloat}}, o::PyObject)
     end
 end
 
-pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : None
+pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : @compat Union{}
 
 #########################################################################
 # BigInt conversion to Python "long" integers
@@ -718,7 +718,7 @@ end
 
 include("pydates.jl")
 #init_datetime() = nothing
-#pydate_query(o) = None
+#pydate_query(o) = Union{}
 
 #########################################################################
 # Inferring Julia types at runtime from Python objects:
@@ -728,35 +728,35 @@ include("pydates.jl")
 #  is a macro (hence inaccessible in Julia).]
 
 # A type-query function f(o::PyObject) returns the Julia type
-# for use with the convert function, or None if there isn't one.
+# for use with the convert function, or Union{} if there isn't one.
 
 # TODO: In Python 3.x, the BigInt check here won't work since int == long.
 pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
   (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
   pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
-  pyisinstance(o, npy_integer) ? Int : None
+  pyisinstance(o, npy_integer) ? Int : @compat Union{}
 
-pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : None
+pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : @compat Union{}
 
 pycomplex_query(o::PyObject) =
-  pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : None
+    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : @compat Union{}
 
-pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : None
+pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : @compat Union{}
 
 if VERSION >= v"0.4.0-dev+1246" # call overloading
     # Given call overloading, all PyObjects are callable already, so
     # we never automatically convert to Function.
-    pyfunction_query(o::PyObject) = None
+    pyfunction_query(o::PyObject) = @compat Union{}
 else
-    pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : None
+    pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : Union()
 end
 
-pynothing_query(o::PyObject) = o.o == pynothing ? Nothing : None
+pynothing_query(o::PyObject) = @compat o.o == pynothing ? Void : Union{}
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : None
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : @compat Union{}
 
 if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
     typetuple(Ts) = tuple(Ts...)
@@ -787,7 +787,7 @@ function pysequence_query(o::PyObject)
             return Array{T}
         catch
             # only handle PyList for now
-            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : None
+            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : @compat Union{}
         end
     end
 end
@@ -795,7 +795,7 @@ end
 macro return_not_None(ex)
     quote
         T = $ex
-        if T != None
+        if T != @compat Union{}
             return T
         end
     end
