@@ -103,7 +103,7 @@ end
 pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-pyisinstance(o::PyObject, t::Union(Ptr{Void},PyPtr)) =
+@compat pyisinstance(o::PyObject, t::Union{Ptr{Void},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Void}, o::PyObject) =
@@ -374,9 +374,9 @@ end
 
 #########################################################################
 
-typealias TypeTuple{N} Union(Type,NTuple{N, Type})
+@compat typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 
-function pycall(o::Union(PyObject,PyPtr), returntype::TypeTuple, args...; kwargs...)
+@compat function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
     sigatomic_begin()

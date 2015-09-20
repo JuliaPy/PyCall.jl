@@ -32,7 +32,7 @@ convert{T<:Integer}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
 if WORD_SIZE == 32
-  convert{T<:Union(Int64,UInt64)}(::Type{T}, po::PyObject) =
+  @compat convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
     @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
 end
 
@@ -159,7 +159,7 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 
 # I want to use a union, but this seems to confuse Julia's method
 # dispatch for the convert function in some circumstances
-# typealias PyAny Union(PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array)
+# typealias PyAny Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
 abstract PyAny
 
 if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
