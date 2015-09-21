@@ -85,7 +85,7 @@ function Base.stride(b::PyBuffer, d::Integer)
     return @compat Int(unsafe_load(b.buf.strides, d))
 end
 
-iscontiguous(b::PyBuffer) = 
+iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
                (Ptr{PyBuffer}, Cchar), &b, 'A')
 
@@ -103,14 +103,14 @@ const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 
 # construct a PyBuffer from a PyObject, if possible
-function PyBuffer(o::Union(PyObject,PyPtr), flags=PyBUF_SIMPLE)
+@compat function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     b = PyBuffer()
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Ptr{PyBuffer}, Cint), o, &b, flags)
     return b
 end
 
-#############################################################################  
+#############################################################################
 
 # recursive function to write buffer dimension by dimension, starting at
 # dimension d with the given pointer offset (in bytes).
