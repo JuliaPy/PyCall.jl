@@ -122,7 +122,6 @@ end
 # need to be able to get the version before Python is initialized
 Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
 
-use_conda = false
 const python = try
     let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") : "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
         if vers < v"2.7"
@@ -132,10 +131,13 @@ const python = try
     end
 catch e1
     info( "No system-wide Python was found; got the following error:\n",
-    "$e1\nusing the Python distribution in the Conda package")
-    use_conda = true
-    Conda.add("numpy")
+          "$e1\nusing the Python distribution in the Conda package")
     abspath(Conda.PYTHONDIR, "python" * (@windows? ".exe" : ""))
+end
+
+use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
+if use_conda
+    Conda.add("numpy")
 end
 
 const (libpython, libpy_name) = find_libpython(python)
