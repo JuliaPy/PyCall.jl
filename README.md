@@ -77,6 +77,12 @@ global variable of the `PyCall` module.  You can also look at
 directly to the `libpython` library.  But it finds the location of `libpython`
 by running `python` during `Pkg.build`.)
 
+Subsequent builds of PyCall (e.g. when you update the package via
+`Pkg.update`) will use the same Python executable name by default,
+unless you set the `PYTHON` environment variable or delete the file
+`joinpath(Pkg.dir("PyCall"), "deps", "PYTHON")`.
+
+
 ## Usage
 
 Here is a simple example to call Python's `math.sin` function and

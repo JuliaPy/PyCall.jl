@@ -124,7 +124,7 @@ Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{
 
 use_conda = false
 const python = try
-    let py = get(ENV, "PYTHON", "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
+    let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") : "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
         if vers < v"2.7"
             error("Python version $vers < 2.7 is not supported")
         end
@@ -217,6 +217,11 @@ open("deps.jl", "w") do f
           
           const pyunicode_literals = $pyunicode_literals
           """)
+end
+
+# Make subsequent builds (e.g. Pkg.update) use the same Python by default:
+open("PYTHON", "w") do f
+    println(f, isfile(programname) ? programname : python)
 end
 
 #########################################################################
