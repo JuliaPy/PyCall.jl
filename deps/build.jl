@@ -197,8 +197,9 @@ open("deps.jl", "w") do f
           const pyprogramname = $pystring("$(escape_string(programname))")
           const pyversion_build = $(repr(pyversion))
           const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", "")))")
-          "Returns a boolean of whether the Python distribtion in the Conda package is used"
-          const use_conda = $use_conda
+
+          "True if we are using the Python distribtion in the Conda package."
+          const conda = $use_conda
 
           const PyUnicode_AsUTF8String = :$PyUnicode_AsUTF8String
           const PyUnicode_DecodeUTF8 = :$PyUnicode_DecodeUTF8
