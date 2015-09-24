@@ -9,6 +9,7 @@
 isfile("deps.jl") && rm("deps.jl")
 
 using Compat
+import Conda
 
 PYTHONIOENCODING = get(ENV, "PYTHONIOENCODING", nothing)
 PYTHONHOME = get(ENV, "PYTHONHOME", nothing)
@@ -121,7 +122,22 @@ end
 # need to be able to get the version before Python is initialized
 Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
 
-const python = get(ENV, "PYTHON", "python")
+use_conda = false
+const python = try
+    let py = get(ENV, "PYTHON", "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
+        if vers < v"2.7"
+            error("Python version $vers < 2.7 is not supported")
+        end
+        py
+    end
+catch e1
+    info( "No system-wide Python was found; got the following error:\n",
+    "$e1\nusing the Python distribution in the Conda package")
+    use_conda = true
+    Conda.add("numpy")
+    abspath(Conda.PYTHONDIR, "python" * (@windows? ".exe" : ""))
+end
+
 const (libpython, libpy_name) = find_libpython(python)
 const programname = pysys(python, "executable")
 
@@ -181,6 +197,8 @@ open("deps.jl", "w") do f
           const pyprogramname = $pystring("$(escape_string(programname))")
           const pyversion_build = $(repr(pyversion))
           const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", "")))")
+          "Returns a boolean of whether the Python distribtion in the Conda package is used"
+          const use_conda = $use_conda
 
           const PyUnicode_AsUTF8String = :$PyUnicode_AsUTF8String
           const PyUnicode_DecodeUTF8 = :$PyUnicode_DecodeUTF8

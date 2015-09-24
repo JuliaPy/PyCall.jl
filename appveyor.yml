@@ -13,6 +13,10 @@ environment:
   - JULIAVERSION: "julialang/bin/winnt/x86/0.3/julia-0.3-latest-win32.exe"
     PYTHONDIR: "C:\\Python34"
     PYTHON: "C:\\Python34\\python.exe"
+    
+  - JULIAVERSION: "julialang/bin/winnt/x86/0.3/julia-0.3-latest-win32.exe"
+    PYTHONDIR: "use_conda"
+    PYTHON: "use_conda"
 
   - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
     PYTHONDIR: "C:\\Python27-x64"
@@ -25,6 +29,10 @@ environment:
   - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
     PYTHONDIR: "C:\\Python34-x64"
     PYTHON: "C:\\Python34-x64\\python.exe"
+    
+  - JULIAVERSION: "julialang/bin/winnt/x64/0.3/julia-0.3-latest-win64.exe"
+    PYTHONDIR: "use_conda"
+    PYTHON: "use_conda"
 
 # Nightlies
   - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
@@ -38,6 +46,10 @@ environment:
   - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
     PYTHONDIR: "C:\\Python34"
     PYTHON: "C:\\Python34\\python.exe"
+    
+  - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
+    PYTHONDIR: "use_conda"
+    PYTHON: "use_conda"
 
   - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python27-x64"
@@ -50,6 +62,10 @@ environment:
   - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python34-x64"
     PYTHON: "C:\\Python34-x64\\python.exe"
+    
+  - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
+    PYTHONDIR: "use_conda"
+    PYTHON: "use_conda"
 
 branches:
   only:
