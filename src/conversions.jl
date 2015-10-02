@@ -709,7 +709,7 @@ function PyObject(i::BigInt)
 end
 
 function convert(::Type{BigInt}, o::PyObject)
-    BigInt(convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
+    parse(BigInt, convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
                                           PyPtr, (PyPtr,), o))))
 end
 
