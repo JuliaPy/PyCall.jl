@@ -196,6 +196,7 @@ if pymodule_exists("mpmath")
         @test abs(roundtrip(x) - x) < eps(BigFloat) * 1e3 * abs(x)
     end
 end
+@test convert(BigInt, PyObject(1234)) == 1234
 
 # buffers
 let b = PyCall.PyBuffer(pyutf8("test string"))
