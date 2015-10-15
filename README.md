@@ -55,7 +55,7 @@ The Python version that is used defaults to whatever `python` program is in
 your `PATH`.   If PyCall can't find your Python, then it will install its
 own via Conda as described above.
 
-If you want to use a different version of Python on your system, you can change the Python version by setting the `PYTHON` environment variable and then re-running `Pkg.build("PyCall")`.  In Julia:
+If you want to use a different version of Python on your system, you can change the Python version by setting the `PYTHON` environment variable to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.  In Julia:
 
     ENV["PYTHON"] = "... path of the python program you want ..."
     Pkg.build("PyCall")
