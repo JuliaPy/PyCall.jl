@@ -80,8 +80,14 @@ by running `python` during `Pkg.build`.)
 Subsequent builds of PyCall (e.g. when you update the package via
 `Pkg.update`) will use the same Python executable name by default,
 unless you set the `PYTHON` environment variable or delete the file
-`joinpath(Pkg.dir("PyCall"), "deps", "PYTHON")`.
+`Pkg.dir("PyCall","deps","PYTHON")`.
 
+**Note:** If you use Python
+[virtualenvs](http://docs.python-guide.org/en/latest/dev/virtualenvs/),
+then be aware that PyCall *uses the virtualenv it was built with*, even
+if you switch virtualenvs.  If you want to switch PyCall to use a
+different virtualenv, then you should switch virtualenvs and run
+`rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
 
 ## Usage
 
