@@ -122,6 +122,9 @@ function __init__()
         PyMemberDef[ PyMemberDef(pyjlwrap_membername,
                                  T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
                                  pyjlwrap_doc),
+                     PyMemberDef(weakreflist_membername,
+                                 T_OBJECT_EX, sizeof_PyObject_HEAD+sizeof(PyPtr), 0,
+                                 weakreflist_doc),
                      PyMemberDef(C_NULL,0,0,0,C_NULL) ]
 
     init_datetime()
