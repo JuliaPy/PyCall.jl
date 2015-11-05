@@ -49,12 +49,12 @@ function npyinitialize()
         error("numpy.core.multiarray required for multidimensional Array conversions - ", e)
     end
     if pyversion < v"3.0"
-        PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr), 
-                                     Ptr{Ptr{Void}}, (PyPtr,), 
+        PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr),
+                                     Ptr{Ptr{Void}}, (PyPtr,),
                                      npy_multiarray["_ARRAY_API"])
     else
         PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
-                                     Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}), 
+                                     Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}),
                                      npy_multiarray["_ARRAY_API"], C_NULL)
     end
 
@@ -80,7 +80,7 @@ function npyinitialize()
     hdr = replace(hdr, r"\\\s*\n", " "); # rm backslashed newlines
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
-    for m in eachmatch(r, hdr) # search for max index into PyArray_API 
+    for m in eachmatch(r, hdr) # search for max index into PyArray_API
         PyArray_API_length = max(PyArray_API_length, parse(Int, m.captures[2])+1)
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
@@ -182,7 +182,7 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
         @npyinitialize
         p = @pycheck ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
-              npy_api[:PyArray_Type], 
+              npy_api[:PyArray_Type],
               ndims(a), Int[size(a)...], npy_type(T),
               Int[strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
               NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
@@ -217,7 +217,7 @@ type PyArray_Info
         try
             st = isempty(sz) ? Int[] : convert(Vector{Int}, ai["strides"])
         catch
-            # default is C-order contiguous 
+            # default is C-order contiguous
             st = similar(sz)
             st[end] = sizeof(T)
             for i = length(sz)-1:-1:1
@@ -226,7 +226,7 @@ type PyArray_Info
         end
         return new(T,
                    (ENDIAN_BOM == 0x04030201 && typestr[1] == '<')
-                   || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>') 
+                   || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
                    || typestr[1] == '|',
                    sz, st,
                    convert(Ptr{Void}, datatuple[1]),
@@ -355,10 +355,10 @@ end
 setindex!{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
 setindex!{T}(a::PyArray{T,1}, v, i::Integer) = writeok_assign(a, v, 1 + (i-1)*a.st[1])
 
-setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) = 
+setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) =
   writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
-function setindex!(a::PyArray, v, i::Integer) 
+function setindex!(a::PyArray, v, i::Integer)
     if a.f_contig
         return writeok_assign(a, v, i)
     else
