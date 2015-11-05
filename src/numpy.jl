@@ -172,6 +172,7 @@ const npy_typestrs = @compat Dict( "b1"=>Bool,
                                    "i8"=>Int64,     "u8"=>UInt64,
                                    "f4"=>Float32,   "f8"=>Float64,
                                    "c8"=>Complex64, "c16"=>Complex128,
+                                   "O"=>PyPtr,
                                    "O$(div(WORD_SIZE,8))"=>PyPtr )
 
 #########################################################################
