@@ -58,7 +58,7 @@ let d = PyDict(@compat Dict(1 => "hello", 34 => "yes" ))
     @test get(d.o, 1) == "hello"
     set!(d.o, 34, "goodbye")
     @test d[34] == "goodbye"
-    @test sort!(keys(Int, d)) == sort!(d.o[:keys]()) == sort!(collect(keys(d))) == [1, 34]
+    @test sort!(keys(Int, d)) == sort!(collect(d.o[:keys]())) == sort!(collect(keys(d))) == [1, 34]
 end
 
 @test roundtripeq(Any[1 2 3; 4 5 6])
