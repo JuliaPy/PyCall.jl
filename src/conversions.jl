@@ -263,19 +263,21 @@ similar{T}(a::PyVector{T}, dims::Int...) = similar(a, pyany_toany(T), dims)
 eltype{T}(::PyVector{T}) = pyany_toany(T)
 eltype{T}(::Type{PyVector{T}}) = pyany_toany(T)
 
-size(a::PyVector) = ((@pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), a)),)
+size(a::PyVector) = (length(a.o),)
 
 getindex(a::PyVector) = getindex(a, 1)
 getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
 
 setindex!(a::PyVector, v) = setindex!(a, v, 1)
-setindex!(a::PyVector, v, i::Integer) = @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
-
-function splice!(a::PyVector, i::Integer)
-    v = a[i]
-    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+function setindex!(a::PyVector, v, i::Integer)
+    @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), a, i-1, PyObject(v))
     v
 end
+
+summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
+                                   string(pyany_toany(T)), " PyVector")
+
+splice!(a::PyVector, i::Integer) = splice!(a.o, i)
 function splice!{T,I<:Integer}(a::PyVector{T}, indices::AbstractVector{I})
     v = pyany_toany(T)[a[i] for i in indices]
     for i in sort(indices, rev=true)
@@ -283,44 +285,16 @@ function splice!{T,I<:Integer}(a::PyVector{T}, indices::AbstractVector{I})
     end
     v
 end
+pop!(a::PyVector) = pop!(a.o)
+shift!(a::PyVector) = shift!(a.o)
+empty!(a::PyVector) = empty!(a.o)
 
-pop!(a::PyVector) = splice!(a, length(a))
-shift!(a::PyVector) = splice!(a, 1)
-
-append!{T}(a::PyVector{T}, items) = PyVector{T}(PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat), PyPtr, (PyPtr, PyPtr), a, PyObject(items))))
-
-function empty!(a::PyVector)
-    for i in length(a):-1:1
-        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
-    end
-    a
-end
-
-summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
-                                   string(pyany_toany(T)), " PyVector")
-
-# The following operations only work for the list type and subtypes thereof:
-
-function push!(a::PyVector, item)
-    @pycheckz ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
-                     a, PyObject(item))
-    a
-end
-
-function insert!(a::PyVector, i::Integer, item)
-    @pycheckz ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
-                     a, i-1, PyObject(item))
-    a
-end
-
-unshift!(a::PyVector, item) = insert!(a, 1, item)
-
-function prepend!(a::PyVector, items)
-    for (i,x) in enumerate(items)
-        insert!(a, i, x)
-    end
-    a
-end
+# only works for List subtypes:
+push!(a::PyVector, item) = push!(a.o, item)
+insert!(a::PyVector, i::Integer, item) = insert!(a.o, i, item)
+unshift!(a::PyVector, item) = unshift!(a.o, item)
+prepend!(a::PyVector, items) = prepend!(a.o, items)
+append!{T}(a::PyVector{T}, items) = PyVector{T}(append!(a.o, items))
 
 #########################################################################
 # Lists and 1d arrays.
@@ -488,7 +462,7 @@ eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
 function setindex!(d::PyDict, v, k)
     @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      d, PyObject(k), PyObject(v))
-    d
+    v
 end
 
 get{K,V}(d::PyDict{K,V}, k, default) = get(d.o, V, k, default)

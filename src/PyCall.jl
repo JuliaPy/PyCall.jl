@@ -393,7 +393,7 @@ end
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
-# for now we can define "get"
+# for now we can define "get".
 
 function get(o::PyObject, returntype::TypeTuple, k, default)
     r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
@@ -424,6 +424,75 @@ function set!(o::PyObject, k, v)
     @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
                      o, PyObject(k), PyObject(v))
     v
+end
+
+#########################################################################
+# Support [] for integer keys, and other duck-typed sequence/list operations,
+# as those don't conflict with symbols/strings used for attributes.
+
+# Index conversion: Python is zero-based.  It also has -1 based
+# backwards indexing, but we don't support this, in favor of the
+# Julian syntax o[end-1] etc.
+function ind2py(i)
+    i <= 0 && throw(BoundsError())
+    return i-1
+end
+
+getindex(o::PyObject, i::Integer) = convert(PyAny, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
+function setindex!(o::PyObject, v, i::Integer)
+    @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
+    v
+end
+getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2)))
+setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py(i2)), v)
+getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
+setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
+Base.endof(o::PyObject) = length(o)
+length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+
+function splice!(a::PyObject, i::Integer)
+    v = a[i]
+    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    v
+end
+
+pop!(a::PyObject) = splice!(a, length(a))
+shift!(a::PyObject) = splice!(a, 1)
+
+function empty!(a::PyObject)
+    for i in length(a):-1:1
+        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    end
+    a
+end
+
+# The following operations only work for the list type and subtypes thereof:
+function push!(a::PyObject, item)
+    @pycheckz ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
+                     a, PyObject(item))
+    a
+end
+
+function insert!(a::PyObject, i::Integer, item)
+    @pycheckz ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
+                     a, ind2py(i), PyObject(item))
+    a
+end
+
+unshift!(a::PyObject, item) = insert!(a, 1, item)
+
+function prepend!(a::PyObject, items)
+    for (i,x) in enumerate(items)
+        insert!(a, i, x)
+    end
+    a
+end
+
+function append!(a::PyObject, items)
+    for item in items
+        push!(a, item)
+    end
+    return a
 end
 
 #########################################################################

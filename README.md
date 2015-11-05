@@ -138,7 +138,9 @@ we could call the Newton solver in scipy.optimize via:
 
 The biggest diffence from Python is that object attributes/members are
 accessed with `o[:attribute]` rather than `o.attribute`, and you use
-`get(o, key)` rather than `o[key]`.  (This is because Julia does not
+`get(o, key)` rather than `o[key]`.  (However, you can access integer
+indices via `o[i]` as in Python, albeit with 1-based Julian indices rather
+than 0-based Python indices.)  (This is because Julia does not
 permit overloading the `.` operator yet.)  See also the section on
 `PyObject` below, as well as the `pywrap` function to create anonymous
 modules that simulate `.` access (this is what `@pyimport` does).  For
@@ -196,7 +198,8 @@ without type conversion, do `get(o, PyObject, key)`, or more generally
 if the key is not found by `get(o, key, default)` or `get(o, SomeType,
 key, default)`.  Similarly, `set!(o, key, val)` is equivalent to
 `o[key] = val` in Python, and `delete!(o, key)` is equivalent to `del
-o[key]` in Python.
+o[key]` in Python.   For one or more *integer* indices, `o[i]` in Julia
+is equivalent to `o[i-1]` in Python. 
 
 In Julia 0.4, you can call an `o::PyObject` via `o(args...)` just like
 in Python (assuming that the object is callable in Python).  In Julia

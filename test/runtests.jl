@@ -214,3 +214,31 @@ let o = PyObject(1+2im)
     @test :real in keys(o)
     @test o[:real] == 1
 end
+
+# []-based sequence access
+let a1=[5,8,6], a2=rand(3,4), a3=rand(3,4,5), o1=PyObject(a1), o2=PyObject(a2), o3=PyObject(a3)
+    @test [o1[i] for i in eachindex(a1)] == a1
+    @test [o1[end-(i-1)] for i in eachindex(a1)] == reverse(a1)
+    @test [o2[i,j] for i=1:3, j=1:4] == a2
+    @test [o3[i,j,k] for i=1:3, j=1:4, k=1:5] == a3
+    @test o2[1] == collect(a2[1,:])
+    @test o3[2,3] == collect(a3[2,3,:])
+    @test length(o1) == length(o2) == length(o3) == 3
+    o1[end-1] = 7
+    @test o1[2] == 7
+    o2[2,3] = 8
+    @test o2[2,3] == 8
+    o3[2,3,4] = 9
+    @test o3[2,3,4] == 9
+end
+
+# list operations:
+let o = PyObject(Any[8,3])
+    @test collect(push!(o, 5)) == [8,3,5]
+    @test pop!(o) == 5 && collect(o) == [8,3]
+    @test shift!(o) == 8 && collect(o) == [3]
+    @test collect(unshift!(o, 9)) == [9,3]
+    @test collect(prepend!(o, [5,4,2])) == [5,4,2,9,3]
+    @test collect(append!(o, [1,6,8])) == [5,4,2,9,3,1,6,8]
+    @test isempty(empty!(o))
+end
