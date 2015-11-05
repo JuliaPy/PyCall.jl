@@ -1,5 +1,10 @@
 using Base.Test, PyCall, Compat
 
+PYTHONPATH=get(ENV,"PYTHONPATH","")
+PYTHONHOME=get(ENV,"PYTHONHOME","")
+PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
+info("Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE")
+
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
