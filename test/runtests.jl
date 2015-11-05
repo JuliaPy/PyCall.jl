@@ -205,3 +205,9 @@ let b = PyCall.PyBuffer(pyutf8("test string"))
     @test stride(b, 1) == 1
     @test PyCall.iscontiguous(b) == true
 end
+
+let o = PyObject(1+2im)
+    @test haskey(o, :real)
+    @test :real in keys(o)
+    @test o[:real] == 1
+end

@@ -233,8 +233,7 @@ function getindex(o::PyObject, s::AbstractString)
     if (o.o == C_NULL)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = ccall((@pysym :PyObject_GetAttrString), PyPtr,
-              (PyPtr, Ptr{UInt8}), o, bytestring(s))
+    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL
         pyerr_clear()
         throw(KeyError(s))
@@ -244,48 +243,30 @@ end
 
 getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
-function setindex!(o::PyObject, v, s::AbstractString)
+function setindex!(o::PyObject, v, s::@compat(Union{Symbol,AbstractString}))
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
     if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Ptr{UInt8}, PyPtr), o, bytestring(s), PyObject(v))
+                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
     end
     o
 end
 
-setindex!(o::PyObject, v, s::Symbol) = setindex!(o, v, string(s))
-
-function haskey(o::PyObject, s::AbstractString)
+function haskey(o::PyObject, s::@compat(Union{Symbol,AbstractString}))
     if (o.o == C_NULL)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
-                      (PyPtr, Ptr{UInt8}), o, bytestring(s))
+                      (PyPtr, Cstring), o, s)
 end
-
-haskey(o::PyObject, s::Symbol) = haskey(o, string(s))
 
 #########################################################################
-# keys(o) should return an iterator over the keys (members) of o
 
-type PyObjectMembers
-    members::PyVector{@compat Tuple{Symbol,PyObject}}
-end
-
-function show(io::IO, m::PyObjectMembers)
-    print(io, "PyObjectMembers iterator (", length(m), " members)")
-end
-
-keys(o::PyObject) = PyObjectMembers(pycall(inspect["getmembers"],
-                                           PyVector{(Symbol,PyObject)}, o))
-
-start(m::PyObjectMembers) = 1
-done(m::PyObjectMembers, i::Int) = i > length(m.members)
-next(m::PyObjectMembers, i::Int) = (m.members[i][1], i+1)
-length(m::PyObjectMembers) = length(m.members)
+keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
+                                PyVector{@compat(Tuple{Symbol,PyObject})}, o)]
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
