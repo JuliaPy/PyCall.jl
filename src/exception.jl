@@ -34,7 +34,7 @@ function show(io::IO, e::PyError)
     else
         println(io, pystring(e.T), "\n", pystring(e.val))
     end
-    
+
     if e.traceback.o != C_NULL
         o = pycall(format_traceback, PyObject, e.traceback)
         if o.o != C_NULL
@@ -127,8 +127,8 @@ end
 function pyraise(e)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
-    ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{UInt8}),
-          pyeT, bytestring(string("Julia exception: ", e)))
+    ccall((@pysym :PyErr_SetString), Void, (PyPtr, Cstring),
+          pyeT, string("Julia exception: ", e))
 end
 
 function pyraise(e::PyError)

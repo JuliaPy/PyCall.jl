@@ -160,14 +160,14 @@ const PyUnicode_DecodeUTF8 =
     findsym(libpython, :PyUnicode_DecodeUTF8, :PyUnicodeUCS4_DecodeUTF8, :PyUnicodeUCS2_DecodeUTF8)
 
 # Python 2/3 compatibility: cache symbols for renamed functions
-if hassym(libpython, :PyString_FromString)
-    const PyString_FromString = :PyString_FromString
-    const PyString_AsString = :PyString_AsString
+if hassym(libpython, :PyString_FromStringAndSize)
+    const PyString_FromStringAndSize = :PyString_FromStringAndSize
+    const PyString_AsStringAndSize = :PyString_AsStringAndSize
     const PyString_Size = :PyString_Size
     const PyString_Type = :PyString_Type
 else
-    const PyString_FromString = :PyBytes_FromString
-    const PyString_AsString = :PyBytes_AsString
+    const PyString_FromStringAndSize = :PyBytes_FromStringAndSize
+    const PyString_AsStringAndSize = :PyBytes_AsStringAndSize
     const PyString_Size = :PyBytes_Size
     const PyString_Type = :PyBytes_Type
 end
@@ -206,8 +206,8 @@ open("deps.jl", "w") do f
           const PyUnicode_AsUTF8String = :$PyUnicode_AsUTF8String
           const PyUnicode_DecodeUTF8 = :$PyUnicode_DecodeUTF8
 
-          const PyString_FromString = :$PyString_FromString
-          const PyString_AsString = :$PyString_AsString
+          const PyString_FromStringAndSize = :$PyString_FromStringAndSize
+          const PyString_AsStringAndSize = :$PyString_AsStringAndSize
           const PyString_Size = :$PyString_Size
           const PyString_Type = :$PyString_Type
           const PyInt_Type = :$PyInt_Type
@@ -216,7 +216,7 @@ open("deps.jl", "w") do f
           const PyInt_AsSsize_t = :$PyInt_AsSsize_t
 
           const Py_hash_t = $Py_hash_t
-          
+
           const pyunicode_literals = $pyunicode_literals
           """)
 end

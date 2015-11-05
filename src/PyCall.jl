@@ -301,7 +301,7 @@ end
 
 pyimport(name::AbstractString) =
     PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
-                             (Ptr{UInt8},), bytestring(name)))
+                             (Cstring,), name))
 
 pyimport(name::Symbol) = pyimport(string(name))
 
@@ -466,11 +466,10 @@ function pyeval_(s::AbstractString, locals::PyDict, input_type)
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                     (Ptr{UInt8}, Ptr{UInt8}, Cint),
+                                     (Cstring, Cstring, Cint),
                                      sb, pyeval_fname, input_type))
         main = @pycheckn ccall((@pysym :PyImport_AddModule),
-                                PyPtr, (Ptr{UInt8},),
-                                bytestring("__main__"))
+                                PyPtr, (Cstring,), "__main__")
         maindict = @pycheckn ccall((@pysym :PyModule_GetDict), PyPtr,
                                     (PyPtr,), main)
         return PyObject(@pycheckn ccall((@pysym :PyEval_EvalCode),

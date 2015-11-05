@@ -9,10 +9,10 @@
 
 # IO objects should raise IOError for unsupported operations or failed IO
 function ioraise(e)
-    if isa(e, MethodError) || isa(e, ErrorException) 
-        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Ptr{UInt8}),
+    if isa(e, MethodError) || isa(e, ErrorException)
+        ccall((@pysym :PyErr_SetString), Void, (PyPtr, Cstring),
               (pyexc::Dict)[PyIOError],
-              bytestring(string("Julia exception: ", e)))
+              string("Julia exception: ", e))
     else
         pyraise(e)
     end
@@ -163,7 +163,7 @@ function jl_IO_seek(self_::PyPtr, args_::PyPtr)
         if nargs < 1 || nargs > 2
             throw(ArgumentError("seek cannot accept $nargs arguments"))
         end
-        offset = convert(FileOffset, 
+        offset = convert(FileOffset,
                          PyObject(ccall((@pysym :PySequence_GetItem),
                                         PyPtr, (PyPtr, Int), args_, 0)))
         whence = nargs == 1 ? 0 :
@@ -235,7 +235,7 @@ for text in (true, false)
         function $jl_IO_read(self_::PyPtr, args_::PyPtr)
             try
                 io = unsafe_pyjlwrap_to_objref(self_)::IO
-                
+
                 nargs = ccall((@pysym :PySequence_Size), Int, (PyPtr,), args_)
                 if nargs > 1
                     throw(ArgumentError("read cannot accept $nargs arguments"))
@@ -246,7 +246,7 @@ for text in (true, false)
                 if nb < 0
                     nb = typemax(Int)
                 end
-                
+
                 b = $(text ? :(bytestring(readbytes(io, nb))) : :(readbytes(io, nb)))
                 return pyincref(PyObject(b)).o
             catch e

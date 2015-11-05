@@ -24,6 +24,8 @@ end
 @test roundtripeq(nothing)
 @test roundtripeq("Hello world")
 @test roundtripeq("Hëllö")
+@test roundtripeq("Hello \0\0\0world")
+@test roundtripeq("Hël\0\0lö")
 @test roundtripeq(Symbol, :Hello)
 @test roundtripeq(C_NULL) && roundtripeq(convert(Ptr{Void}, 12345))
 @test roundtripeq([1,3,4,5]) && roundtripeq([1,3.2,"hello",true])
@@ -52,10 +54,11 @@ end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
 @test PyDict(PyObject(@compat Dict(1 => "hello", 2 => "goodbye"))) == @compat Dict(1 => "hello", 2 => "goodbye")
 
-let d = PyDict(@compat Dict(1 => "hello", "yes" => 34))
+let d = PyDict(@compat Dict(1 => "hello", 34 => "yes" ))
     @test get(d.o, 1) == "hello"
-    set!(d.o, "yes", "goodbye")
-    @test d["yes"] == "goodbye"
+    set!(d.o, 34, "goodbye")
+    @test d[34] == "goodbye"
+    @test sort!(keys(Int, d)) == sort!(d.o[:keys]()) == sort!(collect(keys(d))) == [1, 34]
 end
 
 @test roundtripeq(Any[1 2 3; 4 5 6])

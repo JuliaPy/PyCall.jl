@@ -61,27 +61,31 @@ end
 PyObject(s::UTF8String) =
   PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
                            PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
-                           bytestring(s), sizeof(s), C_NULL))
+                           s, sizeof(s), C_NULL))
 
 function PyObject(s::AbstractString)
+    sb = bytestring(s)
     if pyunicode_literals
-        sb = bytestring(s)
         PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
                                  PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
                                  sb, sizeof(sb), C_NULL))
     else
-        PyObject(@pycheckn ccall(@pysym(PyString_FromString),
-                                 PyPtr, (Ptr{UInt8},), bytestring(s)))
+        PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
+                                 PyPtr, (Ptr{UInt8}, Int), sb, sizeof(sb)))
     end
 end
 
+const _ps_ptr= Ptr{UInt8}[C_NULL]
+const _ps_len = Int[0]
 function convert{T<:AbstractString}(::Type{T}, po::PyObject)
     if pyisinstance(po, @pyglobalobj :PyUnicode_Type)
         convert(T, PyObject(@pycheckn ccall(@pysym(PyUnicode_AsUTF8String),
                                              PyPtr, (PyPtr,), po)))
     else
-        convert(T, bytestring(@pycheckn ccall(@pysym(PyString_AsString),
-                                               Ptr{UInt8}, (PyPtr,), po)))
+        @pycheckz ccall(@pysym(PyString_AsStringAndSize),
+                        Cint, (PyPtr, Ptr{Ptr{UInt8}}, Ptr{Int}),
+                        po, _ps_ptr, _ps_len)
+        convert(T, bytestring(_ps_ptr[1], _ps_len[1]))
     end
 end
 
@@ -474,11 +478,9 @@ haskey(d::PyDict, key) = 1 == (d.isdict ?
                                ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)) :
                                ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 
-pyobject_call(d::PyDict, vec::AbstractString) = PyObject(@pycheckn ccall((@pysym :PyObject_CallMethod), PyPtr, (PyPtr,Ptr{UInt8},Ptr{UInt8}), d, bytestring(vec), C_NULL))
+keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pycall(d.o["keys"], PyObject))
 
-keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pyobject_call(d, "keys"))
-
-values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pyobject_call(d, "values"))
+values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pycall(d.o["values"], PyObject))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
@@ -548,7 +550,7 @@ function start(d::PyDict)
         PyDict_Iterator(Array(PyPtr,1), Array(PyPtr,1), zeros(Int,1),
                         PyNULL(), 0, length(d))
     else
-        items = convert(Vector{PyObject}, pyobject_call(d, "items"))
+        items = convert(Vector{PyObject}, pycall(d.o["items"], PyObject))
         PyDict_Iterator(Array(PyPtr,0), Array(PyPtr,0), zeros(Int,0),
                         items, 0,
                         @pycheckz ccall((@pysym :PySequence_Size),
