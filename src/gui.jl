@@ -27,7 +27,7 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
      (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
-     
+
 # get or set the default GUI; doesn't affect running GUI
 function pygui()
     global gui
@@ -78,6 +78,14 @@ end
 
 # GTK (either GTK2 or GTK3, depending on gtkmodule):
 function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
+    if startswith(gtkmodule, "gi.")
+        # issue #181: recent pygobject releases emit a warning
+        # if we don't specify which version we want:
+        gi = pyimport("gi")
+        if gi[:get_required_version]("Gtk") === nothing
+            gi[:require_version]("Gtk", "3.0")
+        end
+    end
     gtk = pyimport(gtkmodule)
     events_pending = gtk["events_pending"]
     main_iteration = gtk["main_iteration"]
@@ -107,7 +115,7 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
     install_doevent(doevent, sec)
 end
 
-# wx:  (based on IPython/lib/inputhookwx.py, which is 3-clause BSD-licensed) 
+# wx:  (based on IPython/lib/inputhookwx.py, which is 3-clause BSD-licensed)
 function wx_eventloop(sec::Real=50e-3)
     wx = pyimport("wx")
     GetApp = wx["GetApp"]
