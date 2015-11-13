@@ -105,30 +105,9 @@ ispybytearray(po::PyObject) =
   pyisinstance(po, @pyglobalobj :PyByteArray_Type)
 
 function convert(::Type{Vector{UInt8}}, po::PyObject)
-    if !ispybytearray(po)
-        # TODO: support Py_buffer interface? via PyBytes_FromObject?
-        try
-            p = @pycheckn ccall(@pysym(PyString_AsString),
-                                  Ptr{UInt8}, (PyPtr,), po)
-            len = ccall(@pysym(PyString_Size), Int, (PyPtr,), po)
-            a = Array(UInt8, len)
-            ccall(:memcpy, Ptr{UInt8}, (Ptr{UInt8}, Ptr{UInt8}, Csize_t),
-                  a, p, len)
-            return a
-        catch
-            try
-                info = PyArray_Info(po)
-                return copy(PyArray{UInt8, length(info.sz)}(po, info))
-            catch
-                return py2array(UInt8, po)
-            end
-        end
-    end
-    p = ccall((@pysym :PyByteArray_AsString), Ptr{UInt8}, (PyPtr,), po)
-    len = ccall((@pysym :PyByteArray_Size), Int, (PyPtr,), po)
-    a = Array(UInt8, len)
-    ccall(:memcpy, Ptr{UInt8}, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), a, p, len)
-    return a
+    b = PyBuffer(po)
+    iscontiguous(b) || error("a contiguous buffer is required")
+    return copy(pointer_to_array(Ptr{UInt8}(pointer(b)), sizeof(b)))
 end
 
 # TODO: support zero-copy PyByteArray <: AbstractVector{UInt8} object

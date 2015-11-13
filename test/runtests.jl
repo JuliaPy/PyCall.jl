@@ -39,6 +39,7 @@ end
 @test roundtripeq(Int32)
 @test roundtripeq(@compat Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
 @test roundtripeq(UInt8[1,3,4,5])
+@test convert(Vector{UInt8}, "hello") == "hello".data
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 if VERSION >= v"0.4.0-dev+1246" # call overloading
