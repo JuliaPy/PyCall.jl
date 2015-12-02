@@ -137,7 +137,8 @@ we could call the Newton solver in scipy.optimize via:
     so.newton(x -> cos(x) - x, 1)
 
 **Important:** The biggest difference from Python is that object attributes/members are
-accessed with `o[:attribute]` rather than `o.attribute`, and you use
+accessed with `o[:attribute]` rather than `o.attribute`, so that `o.method(...)` in
+Python is replaced by `o[:method](...)` in Julia.  Also, you use
 `get(o, key)` rather than `o[key]`.  (However, you can access integer
 indices via `o[i]` as in Python, albeit with 1-based Julian indices rather
 than 0-based Python indices.)  (This is because Julia does not
@@ -157,7 +158,8 @@ whereas in Python the last step would have been `my_dna.find("ACT")`.
 
 Here are solutions to some common problems:
 
-* As mentioned above, use `foo[:bar]` rather than `foo.bar` to access fields and methods of Python objects.
+* As mentioned above, use `foo[:bar]` and `foo[:bar](...)` rather than `foo.bar` and `foo.bar(...)`,
+respectively, to access attributes and methods of Python objects.
 
 * In Julia 0.3, sometimes calling a Python function fails because PyCall doesn't realize it is a callable object (since so many types of objects can be callable in Python).   The workaround is to use `pycall(foo, PyAny, args...)` instead of `foo(args...)`.   If you want to call `foo.bar(args...)` in Python, it is good to use `pycall(foo["bar"], PyAny, args...)`, where using `foo["bar"]` instead of `foo[:bar]` prevents any automatic conversion of the `bar` field.  In Julia 0.4, however, this problem goes away: all PyObjects are automatically callable, thanks to call overloading in Julia 0.4.
 
@@ -199,7 +201,7 @@ if the key is not found by `get(o, key, default)` or `get(o, SomeType,
 key, default)`.  Similarly, `set!(o, key, val)` is equivalent to
 `o[key] = val` in Python, and `delete!(o, key)` is equivalent to `del
 o[key]` in Python.   For one or more *integer* indices, `o[i]` in Julia
-is equivalent to `o[i-1]` in Python. 
+is equivalent to `o[i-1]` in Python.
 
 In Julia 0.4, you can call an `o::PyObject` via `o(args...)` just like
 in Python (assuming that the object is callable in Python).  In Julia
@@ -295,7 +297,7 @@ cases where the Python return type is known can also improve
 performance, both by eliminating the overhead of runtime type inference
 and also by providing more type information to the Julia compiler.
 
-* `pycall(function::PyObject, returntype::Type, args...)`.   Call the given 
+* `pycall(function::PyObject, returntype::Type, args...)`.   Call the given
   Python `function` (typically looked up from a module) with the given
   `args...` (of standard Julia types which are converted automatically to
   the corresponding Python types if possible), converting the return value
@@ -312,7 +314,7 @@ and also by providing more type information to the Julia compiler.
 * `pyeval(s::AbstractString, rtype=PyAny; locals...)` evaluates `s`
   as a Python string and returns the result converted to `rtype`
   (which defaults to `PyAny`).  The remaining arguments are keywords
-  that define local variables to be used in the expression.  For 
+  that define local variables to be used in the expression.  For
   example, `pyeval("x + y", x=1, y=2)` returns `3`.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
@@ -377,7 +379,7 @@ module](https://github.com/stevengj/PyPlot.jl) for Julia.
 ### Low-level Python API access
 
 If you want to call low-level functions in the Python C API, you can
-do so using `ccall`. 
+do so using `ccall`.
 
 * Use `@pysym(func::Symbol)` to get a function pointer to pass to `ccall`
   given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(@pysym(:Py_IsInitialized), Int32, ())`.
