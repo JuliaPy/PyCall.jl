@@ -136,7 +136,7 @@ we could call the Newton solver in scipy.optimize via:
     @pyimport scipy.optimize as so
     so.newton(x -> cos(x) - x, 1)
 
-The biggest diffence from Python is that object attributes/members are
+**Important:** The biggest difference from Python is that object attributes/members are
 accessed with `o[:attribute]` rather than `o.attribute`, and you use
 `get(o, key)` rather than `o[key]`.  (However, you can access integer
 indices via `o[i]` as in Python, albeit with 1-based Julian indices rather
