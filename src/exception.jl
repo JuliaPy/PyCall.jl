@@ -98,7 +98,11 @@ const pyexc = Dict{DataType, PyPtr}()
 type PyIOError <: Exception end
 
 macro pyglobalobjptr(name)
-    :(unsafe_load(cglobal(($name, libpython), Ptr{PyObject_struct})))
+    quote
+        sym = @pyglobal $name
+        ptr = convert(Ptr{PyPtr}, sym)
+        unsafe_load( ptr )
+    end
 end
 
 function pyexc_initialize()
