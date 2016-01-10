@@ -163,9 +163,8 @@ function jl_IO_seek(self_::PyPtr, args_::PyPtr)
         if nargs < 1 || nargs > 2
             throw(ArgumentError("seek cannot accept $nargs arguments"))
         end
-        offset = convert(FileOffset,
-                         PyObject(ccall((@pysym :PySequence_GetItem),
-                                        PyPtr, (PyPtr, Int), args_, 0)))
+        offset = convert(Int64, PyObject(ccall((@pysym :PySequence_GetItem),
+                                               PyPtr, (PyPtr, Int), args_, 0)))
         whence = nargs == 1 ? 0 :
           convert(Int, PyObject(ccall((@pysym :PySequence_GetItem),
                                       PyPtr, (PyPtr, Int), args_, 1)))
@@ -188,7 +187,7 @@ function jl_IO_seek(self_::PyPtr, args_::PyPtr)
     return convert(PyPtr, C_NULL)
 end
 
-isseekable(io) = method_exists(seek, @compat Tuple{typeof(io), FileOffset})
+isseekable(io) = method_exists(seek, @compat Tuple{typeof(io), Int64})
 isseekable(io::IOBuffer) = io.seekable
 
 function jl_IO_seekable(self_::PyPtr, noarg_::PyPtr)
