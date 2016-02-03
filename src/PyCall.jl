@@ -415,8 +415,9 @@ if VERSION < v"0.5.0-dev+9814" # julia PR#13412 deprecated Base.call in 0.5
     # can't use default call(PyAny, o) since it has a ::PyAny typeassert
     Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
 else
-    (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-    (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
+    # need @eval here so that 0.4 does not fail to parse
+    @eval (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+    @eval (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
 end
 
 
