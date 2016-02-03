@@ -17,9 +17,7 @@ import PyCall.pyany_toany
 @test pyany_toany(PyAny) == Any
 @test pyany_toany(@compat Tuple{Int,PyAny}) == @compat Tuple{Int,Any}
 @test pyany_toany(@compat Tuple{Int,Tuple{PyAny,Int8}}) == @compat Tuple{Int,Tuple{Any,Int8}}
-if VERSION >= v"0.4.0-dev+4319"
-    @test pyany_toany(@compat Tuple{PyAny,Int,Vararg{PyAny}}) == @compat Tuple{Any,Int,Vararg{Any}}
-end
+@test pyany_toany(@compat Tuple{PyAny,Int,Vararg{PyAny}}) == @compat Tuple{Any,Int,Vararg{Any}}
 
 @test roundtripeq(17)
 @test roundtripeq(0x39)
@@ -40,6 +38,8 @@ end
 @test roundtripeq(@compat Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
 @test roundtripeq(UInt8[1,3,4,5])
 @test convert(Vector{UInt8}, "hello") == "hello".data
+@test roundtrip(3 => 4) == (3,4)
+@test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 if VERSION >= v"0.4.0-dev+1246" # call overloading

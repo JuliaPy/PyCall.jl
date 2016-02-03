@@ -174,12 +174,12 @@ convert(::Type{Function}, po::PyObject) =
     end
 
 #########################################################################
-# Tuple conversion
+# Tuple conversion.  Julia Pairs are treated as Python tuples.
 
-function PyObject(t::Tuple)
-    o = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,),
-                                 length(t)))
-    for i = 1:length(t)
+function PyObject(t::Union{Tuple,Pair})
+    len = endof(t) # endof, not length, because of julia#14924
+    o = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), len))
+    for i = 1:len
         oi = PyObject(t[i])
         @pycheckz ccall((@pysym :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr),
                          o, i-1, oi)
@@ -188,29 +188,21 @@ function PyObject(t::Tuple)
     return o
 end
 
-if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
-    function convert{N}(tt::NTuple{N, Type}, o::PyObject)
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        if len != length(tt)
-            throw(BoundsError())
-        end
-        ntuple((i ->
-                convert(tt[i], PyObject(ccall((@pysym :PySequence_GetItem),
-                                              PyPtr, (PyPtr, Int), o, i-1)))),
-               len)
+function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
+    len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    if len != length(tt.types)
+        throw(BoundsError())
     end
-else
-    function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        if len != length(tt.types)
-            throw(BoundsError())
-        end
-        ntuple((i ->
-                convert(tt.types[i],
-                        PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
-                                       (PyPtr, Int), o, i-1)))),
-               len)
-    end
+    ntuple((i ->
+            convert(tt.types[i],
+                    PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
+                                   (PyPtr, Int), o, i-1)))),
+           len)
+end
+
+function convert{K,V}(::Type{Pair{K,V}}, o::PyObject)
+    k, v = convert(Tuple{K,V}, o)
+    return Pair(k, v)
 end
 
 #########################################################################
@@ -436,7 +428,7 @@ keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn
 values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pycall(d.o["values"], PyObject))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
-eltype{K,V}(a::PyDict{K,V}) = (pyany_toany(K),pyany_toany(V))
+eltype{K,V}(a::PyDict{K,V}) = Pair{pyany_toany(K),pyany_toany(V)}
 
 function setindex!(d::PyDict, v, k)
     @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
@@ -523,13 +515,12 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
         end
         ko = pyincref(itr.ka[1]) # PyDict_Next returns
         vo = pyincref(itr.va[1]) #   borrowed ref, so incref
-        ((convert(K,ko), convert(V,vo)),
+        (Pair(convert(K,ko), convert(V,vo)),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     else
         # generic Mapping object, use items list
-        (convert(@compat(Tuple{K,V}), PyObject(@pycheckn ccall((@pysym :PySequence_GetItem),
-                                                  PyPtr, (PyPtr,Int),
-                                                  itr.items, itr.i))),
+        (convert(Pair{K,V}, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem),
+                                      PyPtr, (PyPtr,Int), itr.items, itr.i))),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     end
 end
