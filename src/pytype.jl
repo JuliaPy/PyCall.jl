@@ -22,7 +22,7 @@ end
 
 # A PyCFunction is a C function of the form
 #     PyObject *func(PyObject *self, PyObject *args)
-# The first parameter is the "self" function for method, or 
+# The first parameter is the "self" function for method, or
 # for module functions it is the module object.  The second
 # parameter is either a tuple of args (for METH_VARARGS),
 # a single arg (for METH_O), or NULL (for METH_NOARGS).  func
@@ -45,9 +45,9 @@ function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::
                 convert(Cint, flags),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
-    
+
 # used as sentinel value to end method arrays:
-PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL, 
+PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL,
                             convert(Cint, 0), NULL_UInt8_Ptr)
 
 ################################################################
@@ -262,7 +262,7 @@ type PyTypeObject
         # figure out Py_TPFLAGS_DEFAULT, depending on Python version
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch 0; end
-        Py_TPFLAGS_DEFAULT = 
+        Py_TPFLAGS_DEFAULT =
           pyversion >= v"3.0" ?
             (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
              Py_TPFLAGS_HAVE_VERSION_TAG) :
@@ -350,7 +350,7 @@ function pyjlwrap_dealloc(o::PyPtr)
     return nothing
 end
 
-unsafe_pyjlwrap_to_objref(o::PyPtr) = 
+unsafe_pyjlwrap_to_objref(o::PyPtr) =
   unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Void}}, o), 3))
 
 function pyjlwrap_repr(o::PyPtr)
@@ -361,7 +361,7 @@ function pyjlwrap_repr(o::PyPtr)
     return oret
 end
 
-function pyjlwrap_hash(o::PyPtr) 
+function pyjlwrap_hash(o::PyPtr)
     h = hash(unsafe_pyjlwrap_to_objref(o))
     # Python hashes are not permitted to return -1!!
     return h == reinterpret(UInt, -1) ? pysalt::UInt : h::UInt
@@ -370,10 +370,10 @@ end
 # 32-bit hash on 64-bit machines, needed for Python < 3.2 with Windows
 const pysalt32 = 0xb592cd9b # hash("PyCall") % UInt32
 function pyjlwrap_hash32(o::PyPtr)
-    h = ccall(:int64to32hash, UInt32, (UInt64,), 
+    h = ccall(:int64to32hash, UInt32, (UInt64,),
               hash(unsafe_pyjlwrap_to_objref(o)))
     # Python hashes are not permitted to return -1!!
-    return h == reinterpret(UInt32, @compat Int32(-1)) ? pysalt32 : h::UInt32
+    return h == reinterpret(UInt32, Int32(-1)) ? pysalt32 : h::UInt32
 end
 
 # constant strings (must not be gc'ed) for pyjlwrap_members
@@ -396,10 +396,10 @@ end
 
 # use this to create a new jlwrap type, with init to set up custom members
 function pyjlwrap_type(name::AbstractString, init::Function)
-    PyTypeObject(name, 
+    PyTypeObject(name,
                  sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
                  t::PyTypeObject -> begin
-                     t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, 
+                     t.tp_base = ccall(:jl_value_ptr, Ptr{Void},
                                        (Ptr{PyTypeObject},),
                                        &jlWrapType)
                      init(t)
@@ -432,4 +432,3 @@ is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr
 PyObject(x::Any) = pyjlwrap_new(x)
 
 ################################################################
-

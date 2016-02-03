@@ -1,15 +1,6 @@
 # Initializing Python (surprisingly complicated; see also deps/build.jl)
 
 #########################################################################
-
-# Base.with_env in Julia 0.3, withenv in Julia 0.4 (#10914)
-if VERSION >= v"0.4.0-dev+4392"
-    with_env(f::Function, key::AbstractString, val) = withenv(f, key=>val)
-else
-    const with_env = Base.with_env
-end
-
-#########################################################################
 # global constants, initialized to NULL and then overwritten in __init__
 # (eventually, the ability to define global const in __init__ may go away,
 #  and in any case this is better for type inference during precompilation)
@@ -51,10 +42,10 @@ function __init__()
         end
         ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
     end
-   
+
     # cache the Python version as a Julia VersionNumber
     global const pyversion = convert(VersionNumber,
-                                     split(bytestring(ccall(@pysym(:Py_GetVersion), 
+                                     split(bytestring(ccall(@pysym(:Py_GetVersion),
                                                             Ptr{UInt8}, ())))[1])
     if pyversion_build.major != pyversion.major
         error("PyCall built with Python $pyversion_build, but now using Python $pyversion; ",
@@ -63,35 +54,23 @@ function __init__()
 
     copy!(inspect, pyimport("inspect"))
     copy!(builtin, pyimport(pyversion.major < 3 ? "__builtin__" : "builtins"))
-    
+
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
 
     types = pyimport("types")
     copy!(TypeType, pybuiltin("type")) # for pytypeof
 
-    if VERSION < v"0.4.0-dev+1246" # no call overloading
-        # Python has zillions of types that a function be, in addition
-        # to the FunctionType in the C API.  We have to obtain these
-        # at runtime and cache them in globals
-        copy!(BuiltinFunctionType, types["BuiltinFunctionType"])
-        copy!(MethodType, types["MethodType"])
-        copy!(MethodWrapperType, pytypeof(PyObject(PyObject[])["__add__"]))
-        try # may fail if numpy not installed
-            copy!(ufuncType, pyimport("numpy")["ufunc"])
-        end
-    end
-    
     # cache Python None -- PyPtr, not PyObject, to prevent it from
     # being finalized prematurely on exit
     global const pynothing = @pyglobalobj(:_Py_NoneStruct)
-    
+
     # xrange type (or range in Python 3)
     global const pyxrange = @pyglobalobj(:PyRange_Type)
 
     # cache ctypes.c_void_p type and function if available
     vpt, pvp = try
         (pyimport("ctypes")["c_void_p"],
-         p::Ptr -> pycall(c_void_p_Type, PyObject, @compat UInt(p)))
+         p::Ptr -> pycall(c_void_p_Type, PyObject, UInt(p)))
     catch # fallback to CObject
         (@pyglobalobj(:PyCObject_FromVoidPtr),
          p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL)))
@@ -110,7 +89,7 @@ function __init__()
     global const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
     global const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
     global const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
-    
+
     # similarly, any MethodDef calls involve cfunctions
     global const jl_TextIO_methods = make_io_methods(true)
     global const jl_IO_methods = make_io_methods(false)
@@ -129,11 +108,11 @@ function __init__()
 
     init_datetime()
     pyjlwrap_init()
-    
+
     global const jl_FunctionType = pyjlwrap_type("PyCall.jl_Function",
                                                  t -> t.tp_call =
                                                  jl_Function_call_ptr)
-    
+
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
         if pyversion.major < 3
@@ -145,7 +124,7 @@ function __init__()
             argv   = unsafe_convert(Ptr{Cwchar_t}, argv_s)
             ccall(@pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
         end
-        
+
         # Some Python code checks sys.ps1 to see if it is running
         # interactively, and refuses to be interactive otherwise.
         # (e.g. Matplotlib: see PyPlot#79)

@@ -102,7 +102,6 @@ end
 
 # NPY_TYPES:
 
-@compat begin
 const NPY_BOOL = Int32(0)
 const NPY_BYTE = Int32(1)
 const NPY_UBYTE = Int32(2)
@@ -142,7 +141,6 @@ const NPY_ARRAY_FORCECAST = Int32(0x0010)
 const NPY_ARRAY_UPDATEIFCOPY = Int32(0x1000)
 const NPY_ARRAY_NOTSWAPPED = Int32(0x0200)
 const NPY_ARRAY_ELEMENTSTRIDES = Int32(0x0080)
-end
 
 #########################################################################
 # conversion from Julia types to NPY_TYPES constant
@@ -162,18 +160,17 @@ npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-@compat typealias NPY_TYPES Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float32,Float64,Complex64,Complex128,PyPtr}
+typealias NPY_TYPES Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float32,Float64,Complex64,Complex128,PyPtr}
 
 # conversions from __array_interface__ type strings to supported Julia types
-const npy_typestrs = @compat Dict( "b1"=>Bool,
-                                   "i1"=>Int8,      "u1"=>UInt8,
-                                   "i2"=>Int16,     "u2"=>UInt16,
-                                   "i4"=>Int32,     "u4"=>UInt32,
-                                   "i8"=>Int64,     "u8"=>UInt64,
-                                   "f4"=>Float32,   "f8"=>Float64,
-                                   "c8"=>Complex64, "c16"=>Complex128,
-                                   "O"=>PyPtr,
-                                   "O$(div(WORD_SIZE,8))"=>PyPtr )
+const npy_typestrs = Dict( "b1"=>Bool,
+                           "i1"=>Int8,      "u1"=>UInt8,
+                           "i2"=>Int16,     "u2"=>UInt16,
+                           "i4"=>Int32,     "u4"=>UInt32,
+                           "i8"=>Int64,     "u8"=>UInt64,
+                           "f4"=>Float32,   "f8"=>Float64,
+                           "c8"=>Complex64, "c16"=>Complex128,
+                           "O"=>PyPtr, "O$(div(WORD_SIZE,8))"=>PyPtr )
 
 #########################################################################
 # no-copy conversion of Julia arrays to NumPy arrays.
@@ -212,7 +209,7 @@ type PyArray_Info
         ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
         typestr = convert(AbstractString, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
-        datatuple = convert(@compat(Tuple{Int,Bool}), ai["data"])
+        datatuple = convert(Tuple{Int,Bool}, ai["data"])
         sz = convert(Vector{Int}, ai["shape"])
         local st
         try
@@ -383,15 +380,11 @@ end
 
 stride(a::PyArray, i::Integer) = a.st[i]
 
-if VERSION < v"0.4.0-dev+3710"
-    convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
-else
-    Base.unsafe_convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
-end
+Base.unsafe_convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
 
 pointer(a::PyArray, i::Int) = pointer(a, ind2sub(a.dims, i))
 
-function pointer{T}(a::PyArray{T}, is::@compat Tuple{Vararg{Int}})
+function pointer{T}(a::PyArray{T}, is::Tuple{Vararg{Int}})
     offset = 0
     for i = 1:length(is)
         offset += (is[i]-1)*a.st[i]

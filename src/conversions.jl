@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-@compat PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
+PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
 
 # conversions to Julia types from PyObject
 
@@ -32,7 +32,7 @@ convert{T<:Integer}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
 if WORD_SIZE == 32
-  @compat convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
+  convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
     @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
 end
 
@@ -53,7 +53,7 @@ function convert{T<:Complex}(::Type{T}, po_::PyObject)
             end)
 end
 
-@compat convert(::Type{Void}, po::PyObject) = nothing
+convert(::Type{Void}, po::PyObject) = nothing
 
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
@@ -121,7 +121,7 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
-        @compat pynothing_query(v) == Void ? C_NULL :
+        pynothing_query(v) == Void ? C_NULL :
           convert(Ptr{Void}, convert(UInt, po["value"]))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
@@ -133,7 +133,7 @@ function convert(::Type{Ptr{Void}}, po::PyObject)
     end
 end
 
-pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : @compat Union{}
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : Union{}
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
@@ -145,18 +145,10 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 # typealias PyAny Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
 abstract PyAny
 
-if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
-    # I originally implemented this via multiple dispatch, with
-    #   pyany_toany(::Type{PyAny}), pyany_toany(x::Tuple), and pyany_toany(x),
-    # but Julia seemed to get easily confused about which one to call.
-    pyany_toany(x) = isa(x, Type{PyAny}) ? Any : (isa(x, Tuple) ?
-                                                  map(pyany_toany, x) : x)
-else
-    pyany_toany(T::Type) = T
-    pyany_toany(T::Type{PyAny}) = Any
-    pyany_toany(T::Type{Vararg{PyAny}}) = Vararg{Any}
-    pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
-end
+pyany_toany(T::Type) = T
+pyany_toany(T::Type{PyAny}) = Any
+pyany_toany(T::Type{Vararg{PyAny}}) = Vararg{Any}
+pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
 
 # no-op conversions
 for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :AbstractString,
@@ -303,7 +295,7 @@ end
 array2py(A::AbstractArray) = array2py(A, 1, 1)
 
 PyObject(A::AbstractArray) =
-   ndims(A) <= 1 || method_exists(stride, @compat Tuple{typeof(A),Int}) ? array2py(A) :
+   ndims(A) <= 1 || method_exists(stride, Tuple{typeof(A),Int}) ? array2py(A) :
    pyjlwrap_new(A)
 
 function py2array{TA,N}(T, A::Array{TA,N}, o::PyObject,
@@ -398,7 +390,7 @@ type PyDict{K,V} <: Associative{K,V}
     function PyDict(o::PyObject)
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyDict from NULL PyObject"))
-        elseif pydict_query(o) == @compat Union{}
+        elseif pydict_query(o) == Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         new(o, pyisinstance(o, @pyglobalobj :PyDict_Type))
@@ -643,7 +635,7 @@ function convert(::Type{Complex{BigFloat}}, o::PyObject)
     end
 end
 
-pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : @compat Union{}
+pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : Union{}
 
 #########################################################################
 # BigInt conversion to Python "long" integers
@@ -680,35 +672,27 @@ include("pydates.jl")
 pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
   (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
   pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
-  pyisinstance(o, npy_integer) ? Int : @compat Union{}
+  pyisinstance(o, npy_integer) ? Int : Union{}
 
-pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : @compat Union{}
+pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : Union{}
 
 pycomplex_query(o::PyObject) =
-    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : @compat Union{}
+    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : Union{}
 
-pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : @compat Union{}
+pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : Union{}
 
-if VERSION >= v"0.4.0-dev+1246" # call overloading
-    # Given call overloading, all PyObjects are callable already, so
-    # we never automatically convert to Function.
-    pyfunction_query(o::PyObject) = @compat Union{}
-else
-    pyfunction_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFunction_Type) || pyisinstance(o, BuiltinFunctionType::PyObject) || pyisinstance(o, ufuncType::PyObject) || pyisinstance(o, TypeType::PyObject) || pyisinstance(o, MethodType::PyObject) || pyisinstance(o, MethodWrapperType::PyObject) ? Function : Union()
-end
+# Given call overloading, all PyObjects are callable already, so
+# we never automatically convert to Function.
+pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = @compat o.o == pynothing ? Void : Union{}
+pynothing_query(o::PyObject) = o.o == pynothing ? Void : Union{}
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : @compat Union{}
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : Union{}
 
-if VERSION < v"0.4.0-dev+4319" # prior to 0.4 tuple-type changes
-    typetuple(Ts) = tuple(Ts...)
-else
-    typetuple(Ts) = Tuple{Ts...}
-end
+typetuple(Ts) = Tuple{Ts...}
 
 function pysequence_query(o::PyObject)
     # pyquery(:PySequence_Check, o) always succeeds according to the docs,
@@ -733,7 +717,7 @@ function pysequence_query(o::PyObject)
             return Array{T}
         catch
             # only handle PyList for now
-            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : @compat Union{}
+            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
         end
     end
 end
@@ -741,14 +725,14 @@ end
 macro return_not_None(ex)
     quote
         T = $ex
-        if T != @compat Union{}
+        if T != Union{}
             return T
         end
     end
 end
 
 let
-pytype_queries = Array(@compat(Tuple{PyObject,Type}),0)
+pytype_queries = Array(Tuple{PyObject,Type},0)
 global pytype_mapping, pytype_query
 function pytype_mapping(py::PyObject, jl::Type)
     for (i,(p,j)) in enumerate(pytype_queries)

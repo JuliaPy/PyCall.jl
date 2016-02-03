@@ -1,4 +1,4 @@
-VERSION >= v"0.4.0-dev+6521" && __precompile__()
+__precompile__()
 
 module PyCall
 
@@ -22,13 +22,9 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
 # similar long-running (or potentially long-running) code.
 import Base: sigatomic_begin, sigatomic_end
 
-## Compatibility import for v0.3, v0.4
+## Compatibility import for v0.4, v0.5
 using Compat
-if VERSION >= v"0.4.0-dev+3710"
-    import Base.unsafe_convert
-else
-    const unsafe_convert = Base.convert
-end
+import Base.unsafe_convert
 
 #########################################################################
 
@@ -144,7 +140,7 @@ end
 pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-@compat pyisinstance(o::PyObject, t::Union{Ptr{Void},PyPtr}) =
+pyisinstance(o::PyObject, t::Union{Ptr{Void},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Void}, o::PyObject) =
@@ -205,17 +201,10 @@ function show(io::IO, o::PyObject)
     print(io, "PyObject $(pystring(o))")
 end
 
-
-if VERSION < v"0.4.0-dev+6471"
-    function Base.help(o::PyObject)
-        pycall(pybuiltin("help"), PyAny, o)
-    end
-else
-    function Base.Docs.doc(o::PyObject)
-        Base.Docs.Text(haskey(o, "__doc__") ?
-                       convert(AbstractString, o["__doc__"]) :
-                       "Python object (no docstring found)")
-    end
+function Base.Docs.doc(o::PyObject)
+    Base.Docs.Text(haskey(o, "__doc__") ?
+                   convert(AbstractString, o["__doc__"]) :
+                   "Python object (no docstring found)")
 end
 
 #########################################################################
@@ -259,7 +248,7 @@ function ==(o1::PyObject, o2::PyObject)
     else
         val = ccall((@pysym :PyObject_RichCompareBool), Cint,
                     (PyPtr, PyPtr, Cint), o1, o2, Py_EQ)
-        return val == -1 ? o1.o == o2.o : @compat Bool(val)
+        return val == -1 ? o1.o == o2.o : Bool(val)
     end
 end
 
@@ -284,7 +273,7 @@ end
 
 getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
-function setindex!(o::PyObject, v, s::@compat(Union{Symbol,AbstractString}))
+function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     if (o.o == C_NULL)
         throw(ArgumentError("assign of NULL PyObject"))
     end
@@ -296,7 +285,7 @@ function setindex!(o::PyObject, v, s::@compat(Union{Symbol,AbstractString}))
     o
 end
 
-function haskey(o::PyObject, s::@compat(Union{Symbol,AbstractString}))
+function haskey(o::PyObject, s::Union{Symbol,AbstractString})
     if (o.o == C_NULL)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
@@ -307,7 +296,7 @@ end
 #########################################################################
 
 keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
-                                PyVector{@compat(Tuple{Symbol,PyObject})}, o)]
+                                PyVector{Tuple{Symbol,PyObject}}, o)]
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
@@ -317,16 +306,10 @@ keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
 const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
 
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
-    members = convert(Vector{@compat Tuple{AbstractString,PyObject}},
+    members = convert(Vector{Tuple{AbstractString,PyObject}},
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
-    if VERSION >= v"0.4.0-dev+4448"
-        m = Module(mname, false)
-    else
-        # Hack to create an anonymous bare module on older Julia
-        m = Module(:pyimport)
-        m = eval(m, Expr(:toplevel, Expr(:module, false, mname, Expr(:block)), mname))
-    end
+    m = Module(mname, false)
     consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
                   convert(Vector{Symbol}, o["__all__"])
@@ -396,9 +379,9 @@ end
 
 #########################################################################
 
-@compat typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
+typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 
-@compat function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
+function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
     sigatomic_begin()
@@ -425,12 +408,11 @@ end
     end
 end
 
-if VERSION >= v"0.4.0-dev+1246" # call overloading
-    Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
+# call overloading
+Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
 
-    # can't use default call(PyAny, o) since it has a ::PyAny typeassert
-    Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
-end
+# can't use default call(PyAny, o) since it has a ::PyAny typeassert
+Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but

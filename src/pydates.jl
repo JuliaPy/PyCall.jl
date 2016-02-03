@@ -82,11 +82,11 @@ PyDelta_FromDSU(days, seconds, useconds) =
                              days, seconds, useconds,
                              1, PyDateTimeAPI.DeltaType))
 
-PyObject(p::Dates.Day) = PyDelta_FromDSU(@compat(Int(p)), 0, 0)
+PyObject(p::Dates.Day) = PyDelta_FromDSU(Int(p), 0, 0)
 
 function PyObject(p::Dates.Second)
     # normalize to make Cint overflow less likely
-    s = @compat Int(p)
+    s = Int(p)
     d = div(s, 86400)
     s -= d * 86400
     PyDelta_FromDSU(d, s, 0)
@@ -94,7 +94,7 @@ end
 
 function PyObject(p::Dates.Millisecond)
     # normalize to make Cint overflow less likely
-    ms = @compat Int(p)
+    ms = Int(p)
     s = div(ms, 1000)
     ms -= s * 1000
     d = div(s, 86400)
@@ -114,7 +114,7 @@ function pydate_query(o::PyObject)
     elseif PyDelta_Check(o)
         return Dates.Millisecond
     else
-        return @compat Union{}
+        return Union{}
     end
 end
 
@@ -122,15 +122,15 @@ function convert(::Type{Dates.DateTime}, o::PyObject)
     if PyDate_Check(o)
         dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
         if PyDateTime_Check(o)
-            Dates.DateTime(@compat(UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
+            Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
                            unsafe_load(dt,3), unsafe_load(dt,4), # month, day
                            unsafe_load(dt,5), unsafe_load(dt,6), # hour, minute
                            unsafe_load(dt,7), # second
-                           div((@compat(UInt(unsafe_load(dt,8)) << 16)) |
-                               (@compat(UInt(unsafe_load(dt,9)) << 8)) |
+                           div((UInt(unsafe_load(dt,8)) << 16) |
+                               (UInt(unsafe_load(dt,9)) << 8) |
                                unsafe_load(dt,10), 1000)) # μs ÷ 1000
         else
-            Dates.DateTime(@compat(UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
+            Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
                            unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
         end
     else
@@ -141,7 +141,7 @@ end
 function convert(::Type{Dates.Date}, o::PyObject)
     if PyDate_Check(o)
         dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
-        Dates.Date(@compat(UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
+        Dates.Date((UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
                    unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
     else
         throw(ArgumentError("unknown Date type $o"))

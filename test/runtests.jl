@@ -15,9 +15,9 @@ roundtripeq(x) = roundtrip(x) == x
 import PyCall.pyany_toany
 @test pyany_toany(Int) == Int
 @test pyany_toany(PyAny) == Any
-@test pyany_toany(@compat Tuple{Int,PyAny}) == @compat Tuple{Int,Any}
-@test pyany_toany(@compat Tuple{Int,Tuple{PyAny,Int8}}) == @compat Tuple{Int,Tuple{Any,Int8}}
-@test pyany_toany(@compat Tuple{PyAny,Int,Vararg{PyAny}}) == @compat Tuple{Any,Int,Vararg{Any}}
+@test pyany_toany(Tuple{Int,PyAny}) == Tuple{Int,Any}
+@test pyany_toany(Tuple{Int,Tuple{PyAny,Int8}}) == Tuple{Int,Tuple{Any,Int8}}
+@test pyany_toany(Tuple{PyAny,Int,Vararg{PyAny}}) == Tuple{Any,Int,Vararg{Any}}
 
 @test roundtripeq(17)
 @test roundtripeq(0x39)
@@ -35,17 +35,15 @@ import PyCall.pyany_toany
 @test roundtripeq([1 2 3;4 5 6]) && roundtripeq([1. 2 3;4 5 6])
 @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
 @test roundtripeq(Int32)
-@test roundtripeq(@compat Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
+@test roundtripeq(Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
 @test roundtripeq(UInt8[1,3,4,5])
 @test convert(Vector{UInt8}, "hello") == "hello".data
 @test roundtrip(3 => 4) == (3,4)
 @test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
-if VERSION >= v"0.4.0-dev+1246" # call overloading
-    @test PyObject(x -> x + 1)(314158) == 314159
-    @test PyAny(PyObject(3)) == 3
-end
+@test PyObject(x -> x + 1)(314158) == 314159
+@test PyAny(PyObject(3)) == 3
 @test roundtrip(x -> x + 1)(314158) == 314159
 
 testkw(x; y=0) = x + 2*y
@@ -58,9 +56,9 @@ if PyCall.npy_initialized
     @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
 end
 @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
-@test PyDict(PyObject(@compat Dict(1 => "hello", 2 => "goodbye"))) == @compat Dict(1 => "hello", 2 => "goodbye")
+@test PyDict(PyObject(Dict(1 => "hello", 2 => "goodbye"))) == Dict(1 => "hello", 2 => "goodbye")
 
-let d = PyDict(@compat Dict(1 => "hello", 34 => "yes" ))
+let d = PyDict(Dict(1 => "hello", 34 => "yes" ))
     @test get(d.o, 1) == "hello"
     set!(d.o, 34, "goodbye")
     @test d[34] == "goodbye"

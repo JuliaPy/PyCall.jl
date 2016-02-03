@@ -47,20 +47,20 @@ end
 #############################################################################
 # Array-like accessors for PyBuffer.
 
-Base.ndims(b::PyBuffer)  = @compat UInt(b.buf.ndim)
+Base.ndims(b::PyBuffer) = UInt(b.buf.ndim)
 
 # from the Python docs: If shape is NULL as a result of a PyBUF_SIMPLE
 # or a PyBUF_WRITABLE request, the consumer must disregard itemsize
 # and assume itemsize == 1.
-@compat Base.length(b::PyBuffer) = b.buf.shape == C_NULL ? Int(b.buf.len) : Int(div(b.buf.len, b.buf.itemsize))
+Base.length(b::PyBuffer) = b.buf.shape == C_NULL ? Int(b.buf.len) : Int(div(b.buf.len, b.buf.itemsize))
 
-@compat Base.sizeof(b::PyBuffer) = Int(b.buf.len)
+Base.sizeof(b::PyBuffer) = Int(b.buf.len)
 Base.pointer(b::PyBuffer) = b.buf.buf
 
 function Base.size(b::PyBuffer)
     b.buf.ndim <= 1 && return (length(b),)
     @assert b.buf.shape != C_NULL
-    return tuple(Int[unsafe_load(b.buf.shape, i) for i=1:b.buf.ndim]...) 
+    return tuple(Int[unsafe_load(b.buf.shape, i) for i=1:b.buf.ndim]...)
 end
 # specialize size(b, d) for efficiency (avoid tuple construction)
 function Base.size(b::PyBuffer, d::Integer)
@@ -68,7 +68,7 @@ function Base.size(b::PyBuffer, d::Integer)
     d < 0 && throw(BoundsError())
     b.buf.ndim <= 1 && return length(b)
     @assert b.buf.shape != C_NULL
-    return @compat Int(unsafe_load(b.buf.shape, d))
+    return Int(unsafe_load(b.buf.shape, d))
 end
 
 # stride in bytes for i-th dimension
@@ -77,12 +77,12 @@ function Base.stride(b::PyBuffer, d::Integer)
     d < 0 && throw(BoundsError())
     if b.buf.strides == C_NULL
         if b.buf.ndim == 1
-            return b.buf.shape == C_NULL ? 1 : @compat Int(b.buf.itemsize)
+            return b.buf.shape == C_NULL ? 1 : Int(b.buf.itemsize)
         else
             error("unknown buffer strides")
         end
     end
-    return @compat Int(unsafe_load(b.buf.strides, d))
+    return Int(unsafe_load(b.buf.strides, d))
 end
 
 iscontiguous(b::PyBuffer) =
@@ -103,7 +103,7 @@ const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 
 # construct a PyBuffer from a PyObject, if possible
-@compat function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
+function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     b = PyBuffer()
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Ptr{PyBuffer}, Cint), o, &b, flags)
@@ -151,4 +151,4 @@ function Base.write(io::IO, b::PyBuffer)
     end
 end
 
-#############################################################################  
+#############################################################################
