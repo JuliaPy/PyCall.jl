@@ -150,11 +150,8 @@ pyany_toany(T::Type{PyAny}) = Any
 pyany_toany(T::Type{Vararg{PyAny}}) = Vararg{Any}
 pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
 
-# no-op conversions
-for T in (:PyObject, :Int, :Bool, :Float64, :Complex128, :AbstractString,
-          :Function, :Dict, :Tuple, :Array)
-    @eval convert(::Type{PyAny}, x::$T) = x
-end
+# PyAny acts like Any for conversions, except for converting PyObject (below)
+convert(::Type{PyAny}, x) = x
 
 #########################################################################
 # Function conversion (see callback.jl for conversion the other way)
