@@ -409,10 +409,16 @@ function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs
 end
 
 # call overloading
-Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
+if VERSION < v"0.5.0-dev+9814" # julia PR#13412 deprecated Base.call in 0.5
+    Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
 
-# can't use default call(PyAny, o) since it has a ::PyAny typeassert
-Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
+    # can't use default call(PyAny, o) since it has a ::PyAny typeassert
+    Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
+else
+    (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+    (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
+end
+
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
