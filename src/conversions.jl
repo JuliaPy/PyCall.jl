@@ -538,7 +538,7 @@ function filter!(f::Function, d::PyDict)
     # We must use items(d) here rather than (k,v) in d,
     # because PyDict_Next does not permit changing the set of keys
     # during iteration.
-    for (k,v) in items(d)
+    for (k,v) in d
         if !f(k,v)
             delete!(d,k)
         end
