@@ -38,8 +38,8 @@ end
 @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
 @test roundtripeq(Int32)
 @test roundtripeq(@compat Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
-@test roundtripeq(UInt8[1,3,4,5])
-@test convert(Vector{UInt8}, "hello") == "hello".data
+@test roundtripeq(@compat UInt8[1,3,4,5])
+@test convert(Vector{@compat UInt8}, "hello") == "hello".data
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 if VERSION >= v"0.4.0-dev+1246" # call overloading
@@ -148,7 +148,7 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test takebuf_string(buf) == "hello"
     obuf[:writelines](["first\n", "second\n", "third"])
     @test takebuf_string(buf) == "first\nsecond\nthird"
-    obuf[:write](convert(Vector{UInt8}, "möre stuff"))
+    obuf[:write](convert(Vector{@compat UInt8}, "möre stuff"))
     @test takebuf_string(buf) == "möre stuff"
     @test isopen(buf) == !obuf[:closed] == true
     obuf[:close]()
@@ -160,7 +160,7 @@ let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test obuf[:readlines]() == ["hello\n","again"]
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-    @test obuf[:readall]() == convert(Vector{UInt8}, "hello\nagain")
+    @test obuf[:readall]() == convert(Vector{@compat UInt8}, "hello\nagain")
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
     @test obuf[:encoding] == "UTF-8"
