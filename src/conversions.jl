@@ -418,6 +418,10 @@ values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pychec
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = Pair{pyany_toany(K),pyany_toany(V)}
+Base.keytype{K,V}(::PyDict{K,V}) = pyany_toany(K)
+Base.valtype{K,V}(::PyDict{K,V}) = pyany_toany(V)
+Base.keytype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(K)
+Base.valtype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(V)
 
 function setindex!(d::PyDict, v, k)
     @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
@@ -514,16 +518,21 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
     end
 end
 
-function filter!(f::Function, d::PyDict)
-    # We must use items(d) here rather than (k,v) in d,
-    # because PyDict_Next does not permit changing the set of keys
-    # during iteration.
-    for (k,v) in items(d)
-        if !f(k,v)
-            delete!(d,k)
+if VERSION < v"0.5.0-dev+9920" # julia PR #14937
+    # We can't use the Base.filter! implementation because it worked
+    # by `for (k,v) in d; !f(k,v) && delete!(d,k); end`, but the PyDict_Next
+    # iterator function in Python is explicitly documented to say that
+    # you shouldn't modify the dictionary during iteration.
+    function filter!(f::Function, d::PyDict)
+        badkeys = Array(keytype(d), 0)
+        for (k,v) in d
+            f(k,v) || push!(badkeys, k)
         end
+        for k in badkeys
+            delete!(d, k)
+        end
+        return d
     end
-    return d
 end
 
 #########################################################################

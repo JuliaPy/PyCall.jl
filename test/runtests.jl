@@ -65,6 +65,11 @@ let d = PyDict(Dict(1 => "hello", 34 => "yes" ))
     @test sort!(keys(Int, d)) == sort!(collect(d.o[:keys]())) == sort!(collect(keys(d))) == [1, 34]
 end
 
+let d = Dict(zip(1:1000, 1:1000)), f = (k,v) -> iseven(k)
+    @test filter(f, d) == filter(f, PyDict(d)) == filter!(f, PyDict(d)) ==
+          Dict(zip(2:2:1000, 2:2:1000))
+end
+
 @test roundtripeq(Any[1 2 3; 4 5 6])
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject(Any[1 2 3; 4 5 6])) == Any[Any[1,2,3],Any[4,5,6]]
