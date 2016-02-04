@@ -6,6 +6,7 @@
 
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.3.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.3)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.4.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.4)
+[![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
 
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
@@ -20,7 +21,7 @@ call Python functions from the Julia language with type conversions.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.3 or later and Python 2.7 or later are required.
+install the files.  Julia 0.3 or later (0.4 or later is recommended) and Python 2.7 or later are required.
 
 The latest development version of PyCall is avalable from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
