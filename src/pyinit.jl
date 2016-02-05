@@ -14,15 +14,12 @@ const MethodWrapperType = PyNULL()
 const ufuncType = PyNULL()
 const format_traceback = PyNULL()
 
-
 #########################################################################
 
 function __init__()
-    # Check to see if the Python symbols are already defined in the global namespace of the current
-    # process before we try to load them from a dynamic library.
-    if !hassym(get_globaldl(), :Py_GetVersion)
-        Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
-    end
+    # issue #189
+    Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
     if !already_inited
