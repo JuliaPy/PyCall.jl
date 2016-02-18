@@ -435,7 +435,6 @@ PyObject(x::Any) = pyjlwrap_new(x)
 # helper for `def_py_methods`
 function dispatch_to{T}(jl_type::Type{T}, fun::Function,
                         self_::PyPtr, args_::PyPtr)
-    # This code is copied from jl_Function_call. It should be shared.
     args = PyObject(args_)
     try
         obj = unsafe_pyjlwrap_to_objref(self_)::T
@@ -449,6 +448,10 @@ function dispatch_to{T}(jl_type::Type{T}, fun::Function,
     return convert(PyPtr, C_NULL)
 end
 
+# This vector will grow and never free memory on each new type (re-)definition.
+# It's probably not worth the effort to correct, since redefinitions should be
+# rare.
+const all_method_defs = Any[] 
 
 function def_py_methods{T}(jl_type::Type{T}, methods...)
     # Create the PyMethodDef methods
@@ -460,6 +463,11 @@ function def_py_methods{T}(jl_type::Type{T}, methods...)
         end
         push!(method_defs, PyMethodDef(py_name, f, METH_VARARGS))
     end
+    push!(method_defs, PyMethodDef()) # sentinel
+
+    # We have to make sure that the PyMethodDef vector isn't GC'ed by Julia, so
+    # we push them onto a global stack.
+    push!(all_method_defs, method_defs)
 
     # Create the Python type
     typename = jl_type.name.name::Symbol
@@ -471,5 +479,7 @@ function def_py_methods{T}(jl_type::Type{T}, methods...)
     @eval function PyObject(obj::$T)
         pyjlwrap_new($py_typ, obj)
     end
+
+    nothing
 end
  
