@@ -59,7 +59,13 @@ typealias PyPtr Ptr{PyObject_struct} # type for PythonObject* in ccall
 #########################################################################
 # Wrapper around Python's C PyObject* type, with hooks to Python reference
 # counting and conversion routines to/from C and Julia types.
+"""
+This is a reference to a Python Object. Julia objects may be converted to Python Objects using `PyObject(juliavar)` and vice-versa using `convert(T, o::PyObject)`.
 
+Given o::PyObject, `o[:attribute]` is equivalent to `o.attribute` in Python, with automatic type conversion.
+
+Given o::PyObject, `get(o, key)` is equivalent to `o[key]` in Python, with automatic type conversion.
+"""
 type PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
@@ -264,6 +270,13 @@ keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
 # we skip wrapping Julia reserved words (which cannot be type members)
 const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
 
+"""
+pywrap(o::PyObject) returns a wrapper `w` that is an anonymous module which provides (read) access to converted versions of o's members as w.member. 
+
+For example, `@pyimport module as name` is equivalent to `name = pywrap(pyimport("module"))`
+
+If the Python module contains identifiers that are reserved words in Julia (e.g. function), they cannot be accessed as `w.member`; one must instead use `w.pymember(:member)` (for the PyAny conversion) or w.pymember("member") (for the raw PyObject).
+"""
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     members = convert(Vector{Tuple{AbstractString,PyObject}},
                       pycall(inspect["getmembers"], PyObject, o))
@@ -285,7 +298,9 @@ end
 pyimport(name::AbstractString) =
     PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
                              (Cstring,), name))
-
+"""
+Import the Python module `s` (a string or symbol) and return a pointer to it (a PyObject). Functions or other symbols in the module may then be looked up by s[name] where name is a string (for the raw PyObject) or symbol (for automatic type-conversion). Unlike the @pyimport macro, this does not define a Julia module and members cannot be accessed with `s.name`
+"""
 pyimport(name::Symbol) = pyimport(string(name))
 
 # convert expressions like :math or :(scipy.special) into module name strings
@@ -332,6 +347,9 @@ end
 #########################################################################
 
 # look up a global builtin
+"""
+Look up a string or symbol `s` among the global Python builtins. If `s` is a string it returns a PyObject, while if `s` is a symbol it returns the builtin converted to `PyAny`.
+"""
 function pybuiltin(name)
     builtin[name]
 end
@@ -340,6 +358,9 @@ end
 
 typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 
+"""
+Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
+"""
 function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
@@ -538,6 +559,11 @@ function pyeval_(s::AbstractString, locals::PyDict, input_type)
     end
 end
 
+"""
+This evaluates `s` as a Python string and returns the result converted to `rtype` (which defaults to `PyAny`). The remaining arguments are keywords that define local variables to be used in the expression. 
+
+For example, `pyeval("x + y", x=1, y=2)` returns 3. 
+"""
 function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
                 locals=PyDict{AbstractString, PyObject}(),
                 input_type=Py_eval_input; kwargs...)

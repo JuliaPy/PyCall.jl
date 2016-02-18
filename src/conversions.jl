@@ -197,6 +197,13 @@ end
 #########################################################################
 # PyVector: no-copy wrapping of a Julia object around a Python sequence
 
+"""
+This is a wrapper around an arbitrary Python list or sequence object. 
+
+`PyVector(o::PyObject)` returns a PyVector object. 
+
+Alternatively, `PyVector` can be used as the return type for a `pycall` that returns a sequence object (including tuples).
+"""
 type PyVector{T} <: AbstractVector{T}
     o::PyObject
     function PyVector(o::PyObject)
@@ -380,6 +387,13 @@ include("numpy.jl")
 #########################################################################
 # PyDict: no-copy wrapping of a Julia object around a Python dictionary
 
+"""
+This is a no-copy wrapper around a Python dictionary.
+
+`PyDict(o::PyObject)` or `PyDict(d::Dict{K,V})` both return a PyDict.
+
+Alternatively, you can specify the return type of a `pycall` as PyDict. 
+"""
 type PyDict{K,V} <: Associative{K,V}
     o::PyObject
     isdict::Bool # whether this is a Python Dict (vs. generic Mapping object)
