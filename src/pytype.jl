@@ -432,3 +432,44 @@ is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr
 PyObject(x::Any) = pyjlwrap_new(x)
 
 ################################################################
+# helper for `def_py_methods`
+function dispatch_to{T}(jl_type::Type{T}, fun::Function,
+                        self_::PyPtr, args_::PyPtr)
+    # This code is copied from jl_Function_call. It should be shared.
+    args = PyObject(args_)
+    try
+        obj = unsafe_pyjlwrap_to_objref(self_)::T
+        res = fun(obj, convert(PyAny, args)...)
+        return pyincref(PyObject(res)).o
+    catch e
+        pyraise(e)
+    finally
+        args.o = convert(PyPtr, C_NULL) # don't decref
+    end
+    return convert(PyPtr, C_NULL)
+end
+
+
+function def_py_methods{T}(jl_type::Type{T}, methods...)
+    # Create the PyMethodDef methods
+    method_defs = PyMethodDef[]
+    for (py_name, jl_fun) in methods
+        jl_name = gensym(string(jl_fun))
+        f = @eval function $jl_name(self_::PyPtr, args_::PyPtr)
+            dispatch_to($jl_type, $jl_fun, self_, args_)
+        end
+        push!(method_defs, PyMethodDef(py_name, f, METH_VARARGS))
+    end
+
+    # Create the Python type
+    typename = jl_type.name.name::Symbol
+    py_typ = pyjlwrap_type("PyCall.$typename", t -> begin 
+        t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
+        t.tp_methods = pointer(method_defs)
+    end)
+
+    @eval function PyObject(obj::$T)
+        pyjlwrap_new($py_typ, obj)
+    end
+end
+ 
