@@ -432,7 +432,9 @@ is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr
 PyObject(x::Any) = pyjlwrap_new(x)
 
 ################################################################
-# helper for `def_py_methods`
+# helper for `def_py_methods`. This will call
+#    fun(self_::T, args...; kwargs...)
+# where `args` and `kwargs` are parsed from `args_`
 function dispatch_to{T}(jl_type::Type{T}, fun::Function,
                         self_::PyPtr, args_::PyPtr)
     args = PyObject(args_)
@@ -448,12 +450,13 @@ function dispatch_to{T}(jl_type::Type{T}, fun::Function,
     return convert(PyPtr, C_NULL)
 end
 
-# This vector will grow and never free memory on each new type (re-)definition.
-# It's probably not worth the effort to correct, since redefinitions should be
+# This vector will grow on each new type (re-)definition, and never free memory.
+# It might not be worth the effort to correct, since redefinitions should be
 # rare.
 const all_method_defs = Any[] 
 
-function def_py_methods{T}(jl_type::Type{T}, methods...)
+function def_py_methods{T}(jl_type::Type{T}, methods...;
+                           base_type=pybuiltin(:object))
     # Create the PyMethodDef methods
     method_defs = PyMethodDef[]
     for (py_name, jl_fun) in methods
@@ -474,12 +477,15 @@ function def_py_methods{T}(jl_type::Type{T}, methods...)
     py_typ = pyjlwrap_type("PyCall.$typename", t -> begin 
         t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
         t.tp_methods = pointer(method_defs)
+        # Unfortunately, this supports only single-inheritance. See
+        # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
+        t.tp_base = base_type.o # Needs pyincref?
     end)
 
     @eval function PyObject(obj::$T)
         pyjlwrap_new($py_typ, obj)
     end
 
-    nothing
+    py_typ
 end
  
