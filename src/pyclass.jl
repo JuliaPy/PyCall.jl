@@ -32,10 +32,9 @@ function dispatch_to{T}(jl_type::Type{T}, fun::Function,
 end
 
 
-# Dispatching function for getters (what happens when `obj.some_field` is called
-# in Python). `fun` should be a unary regular Julia function that accepts one
-# object of type T, and returns that field's value (doesn't have to be an
-# actual object member). 
+# Dispatching function for getters (what happens when `obj.some_field` is
+# called in Python). `fun` should be a Julia function that accepts (::T), and
+# returns some value (it doesn't have to be an actual field of T)
 function dispatch_get{T}(jl_type::Type{T}, fun::Function, self_::PyPtr)
     try
         obj = unsafe_pyjlwrap_to_objref(self_)::T
@@ -98,30 +97,30 @@ end
 
 # Similar to make_method_defs
 function make_getset_defs(jl_type, getsets::Vector)
+    # getters and setters have a `closure` parameter (here `_`), but it
+    # was ignored in all the examples I've seen.
+    make_getter(getter_fun) = 
+        @eval function $(gensym())(self_::PyPtr, _::Ptr{Void})
+            dispatch_get($jl_type, $getter_fun, self_)
+        end
+    make_setter(setter_fun) = 
+        @eval function $(gensym())(self_::PyPtr, value_::PyPtr, _::Ptr{Void})
+            dispatch_set($jl_type, $setter_fun, self_, value_)
+        end
+
     getset_defs = PyGetSetDef[]
     for getset in getsets
-        if length(getset) == 3
+        # We also support getset tuples of the form
+        #    ("x", some_function, nothing)
+        if (length(getset) == 3 && getset[3] !== nothing)
             (member_name, getter_fun, setter_fun) = getset
-            # getters and setters have a `closure` parameter (here `_`), but it
-            # was ignored in all the examples I've seen
-            getter =
-                @eval function $(gensym())(self_::PyPtr, _::Ptr{Void})
-                    dispatch_get($jl_type, $getter_fun, self_)
-                end
-            setter =
-                @eval function $(gensym())(self_::PyPtr, value_::PyPtr,
-                                           _::Ptr{Void})
-                    dispatch_set($jl_type, $setter_fun, self_, value_)
-                end
-            push!(getset_defs, PyGetSetDef(member_name, getter, setter))
+            push!(getset_defs, PyGetSetDef(member_name, make_getter(getter_fun),
+                                           make_setter(setter_fun)))
         else
             @assert length(getset) == 2 "`getset` argument must be 2 or 3-tuple"
             (member_name, getter_fun) = getset
-            getter =
-                @eval function $(gensym())(self_::PyPtr, _::Ptr{Void})
-                    dispatch_get($jl_type, $getter_fun, self_)
-                end
-            push!(getset_defs, PyGetSetDef(member_name, getter))
+            push!(getset_defs, PyGetSetDef(member_name,
+                                           make_getter(getter_fun)))
         end
     end
     push!(getset_defs, PyGetSetDef()) # sentinel
@@ -134,8 +133,9 @@ end
 Note: `some_python_obj[:x] = 10` does not call the setter at this
 moment. TODO """
 function def_py_methods{T}(jl_type::Type{T}, methods...;
-                           base_type=pybuiltin(:object),
+                           base_class=pybuiltin(:object),
                            getsets=[])
+    if base_class === nothing base_class = pybuiltin(:object) end # temp DELETEME
     method_defs = make_method_defs(jl_type, methods)
     getset_defs = make_getset_defs(jl_type, getsets)
 
@@ -147,7 +147,8 @@ function def_py_methods{T}(jl_type::Type{T}, methods...;
         t.tp_getset = pointer(getset_defs)
         # Unfortunately, this supports only single-inheritance. See
         # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
-        t.tp_base = base_type.o # Needs pyincref?
+        # to add multiple-inheritance support
+        t.tp_base = base_class.o # Needs pyincref?
     end)
 
     @eval function PyObject(obj::$T)
