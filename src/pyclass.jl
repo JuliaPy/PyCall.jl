@@ -65,6 +65,9 @@ function dispatch_set{T}(jl_type::Type{T}, fun::Function, self_::PyPtr,
     return -1 # failure
 end
 
+######################################################################
+# def_py_class definition: this is the core non-macro interface for creating
+# a Python class from a Julia type.
 
 
 # This vector will grow on each new type (re-)definition, and never free memory.
@@ -177,7 +180,7 @@ function parse_pydef(expr)
         @assert(@capture(expr, type type_name_
                     lines__
             end), "Malformed @pydef expression")
-        base_class = nothing
+        base_class = pybuiltin(:object)
     end
     function_defs = Any[]
     methods = Tuple[]
