@@ -81,7 +81,7 @@ function make_method_defs(jl_type, methods)
     method_defs = PyMethodDef[]
     for (py_name, jl_fun) in methods
         # `disp_fun` is really like the closure:
-        #    (self_, args_) -> dispatch_to(jl_type, jl_fun, self_, args_)
+        #  (self_,args_,kw_) -> dispatch_to(jl_type, jl_fun, self_, args_, kw_)
         # but `cfunction` complains if we use that.
         disp_fun =
             @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr,
@@ -141,12 +141,18 @@ function def_py_class{T}(jl_type::Type{T}, methods...;
     # Create the Python type
     typename = jl_type.name.name::Symbol
     py_typ = pyjlwrap_type("PyCall.$typename", t -> begin 
+        # Note: pyjlwrap_init creates a base type for pyjlwrap_new that also
+        # defines `tp_members, t.tp_repr, t.tp_hash`. I'm not sure if we should
+        # bring them here, but I haven't needed them so far - cstjean
         t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
         t.tp_methods = pointer(method_defs)
         t.tp_getset = pointer(getset_defs)
-        # Unfortunately, this supports only single-inheritance. See
+        # Necessary - otherwise we segfault on gc()
+        t.tp_dealloc = pyjlwrap_dealloc_ptr
+        # Unfortunately, tp_base supports only single-inheritance. See
         # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
         # to add multiple-inheritance support.
+        # Not sure if we need `pyincref`
         t.tp_base = pyincref(base_class).o
     end)
 
