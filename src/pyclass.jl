@@ -1,5 +1,8 @@
 # Define Python classes out of Julia types
 
+using MacroTools: @capture
+
+
 ######################################################################
 # Dispatching methods. They convert the PyObject arguments into Julia objects,
 # and passes them to the Julia function `fun`
@@ -112,12 +115,12 @@ function make_getset_defs(jl_type, getsets::Vector)
     for getset in getsets
         # We also support getset tuples of the form
         #    ("x", some_function, nothing)
+        @assert 2<=length(getset)<=3 "`getset` argument must be 2 or 3-tuple"
         if (length(getset) == 3 && getset[3] !== nothing)
             (member_name, getter_fun, setter_fun) = getset
             push!(getset_defs, PyGetSetDef(member_name, make_getter(getter_fun),
                                            make_setter(setter_fun)))
         else
-            @assert length(getset) == 2 "`getset` argument must be 2 or 3-tuple"
             (member_name, getter_fun) = getset
             push!(getset_defs, PyGetSetDef(member_name,
                                            make_getter(getter_fun)))
@@ -129,9 +132,6 @@ function make_getset_defs(jl_type, getsets::Vector)
     return getset_defs
 end
 
-"""
-Note: `some_python_obj[:x] = 10` does not call the setter at this
-moment. TODO """
 function def_py_methods{T}(jl_type::Type{T}, methods...;
                            base_class=pybuiltin(:object),
                            getsets=[])
@@ -158,3 +158,86 @@ function def_py_methods{T}(jl_type::Type{T}, methods...;
     py_typ
 end
  
+
+######################################################################
+# @pydef macro
+
+
+function parse_pydef(expr)
+    # We're not getting that much value out of @capture, we could take it
+    # out and get rid of the MacroTools dependency
+    if !@capture(expr, begin type type_name_ <: base_class_
+                    lines__
+                end end)
+        @assert(@capture(expr, type type_name_
+                    lines__
+            end), "Malformed @pydef expression")
+        base_class = nothing
+    end
+    function_defs = Any[]
+    methods = Tuple[]
+    getter_dict = Dict()
+    setter_dict = Dict()
+    method_syms = Dict()
+    if isa(lines[1], Expr) && lines[1].head == :block 
+        # unfortunately, @capture fails to parse the `type` correctly
+        lines = lines[1].args
+    end
+    for line in lines
+        if !isa(line, LineNumberNode) && line.head != :line # need to skip those
+            @assert line.head == :(=) "Malformed line: $line"
+            lhs, rhs = line.args
+            @assert @capture(lhs,py_f_(args__)) "Malformed left-hand-side: $lhs"
+            if isa(py_f, Symbol)
+                # Method definition
+                # We save the gensym to support multiple dispatch
+                #    readlines(io) = ...
+                #    readlines(io, nlines) = ...
+                # otherwise the first and second `readlines` get different
+                # gensyms, and one of the two gets ignored
+                jl_fun_name = get!(method_syms, py_f, gensym(py_f))
+                push!(function_defs, :(function $jl_fun_name($(args...))
+                    $rhs
+                end))
+                push!(methods, (string(py_f), jl_fun_name))
+            elseif @capture(py_f, attribute_.access_)
+                # Accessor (.get/.set) definition
+                if access == :get
+                    dict = getter_dict
+                elseif access == :set!
+                    dict = setter_dict
+                else
+                    error("Bad accessor type $access; must be either get or set!")
+                end
+                jl_fun_name = gensym(symbol(attribute,:_,access))
+                push!(function_defs, :(function $jl_fun_name($(args...))
+                    $rhs
+                end))
+                dict[string(attribute)] = jl_fun_name
+            else
+                error("Malformed line: $line")
+            end
+        end
+    end
+    @assert(isempty(setdiff(keys(setter_dict), keys(getter_dict))),
+            "All .set attributes must have a .get")
+    type_name, base_class, methods, getter_dict, setter_dict, function_defs
+end
+
+
+macro pydef(type_expr)
+    type_name, base_class, methods_, getter_dict, setter_dict, function_defs =
+        parse_pydef(type_expr)
+    methods = [:($py_name, $(esc(jl_fun::Symbol)))
+               for (py_name, jl_fun) in methods_]
+    getsets = [:($attribute,
+                 $(esc(getter)),
+                 $(esc(get(setter_dict, attribute, nothing))))
+               for (attribute, getter) in getter_dict]
+    :(begin
+        $(map(esc, function_defs)...)
+        def_py_methods($(esc(type_name)), $(methods...);
+                       base_class=$(esc(base_class)),
+                       getsets=[$(getsets...)])
+    end)
+end
