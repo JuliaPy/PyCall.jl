@@ -8,18 +8,27 @@
 #    fun(self_::T, args...; kwargs...)
 # where `args` and `kwargs` are parsed from `args_`
 function dispatch_to{T}(jl_type::Type{T}, fun::Function,
-                        self_::PyPtr, args_::PyPtr)
+                        self_::PyPtr, args_::PyPtr, kw_::PyPtr)
+    # adapted from jl_Function_call
+    ret_ = convert(PyPtr, C_NULL)
     args = PyObject(args_)
     try
-        obj = unsafe_pyjlwrap_to_objref(self_)::T
-        res = fun(obj, convert(PyAny, args)...)
-        return pyincref(PyObject(res)).o
+        self = unsafe_pyjlwrap_to_objref(self_)::T
+        if kw_ == C_NULL
+            ret = PyObject(fun(self, convert(PyAny, args)...))
+        else
+            kw = PyDict{Symbol,PyAny}(PyObject(kw_))
+            kwargs = [ (k,v) for (k,v) in kw ]
+            ret = PyObject(fun(self, convert(PyAny, args)...; kwargs...))
+        end
+        ret_ = ret.o
+        ret.o = convert(PyPtr, C_NULL) # don't decref
     catch e
         pyraise(e)
     finally
         args.o = convert(PyPtr, C_NULL) # don't decref
     end
-    return convert(PyPtr, C_NULL)
+    return ret_::PyPtr
 end
 
 
@@ -30,8 +39,8 @@ end
 function dispatch_get{T}(jl_type::Type{T}, fun::Function, self_::PyPtr)
     try
         obj = unsafe_pyjlwrap_to_objref(self_)::T
-        res = fun(obj)
-        return pyincref(PyObject(res)).o
+        ret = fun(obj)
+        return pyincref(PyObject(ret)).o
     catch e
         pyraise(e)
     end
@@ -73,10 +82,11 @@ function make_method_defs(jl_type, methods)
         #    (self_, args_) -> dispatch_to(jl_type, jl_fun, self_, args_)
         # but `cfunction` complains if we use that.
         disp_fun =
-            @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr)
-                dispatch_to($jl_type, $jl_fun, self_, args_)
+            @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr,
+                                                     kw_::PyPtr)
+                dispatch_to($jl_type, $jl_fun, self_, args_, kw_)
             end
-        push!(method_defs, PyMethodDef(py_name, disp_fun, METH_VARARGS))
+        push!(method_defs, PyMethodDef(py_name, disp_fun, METH_KEYWORDS))
     end
     push!(method_defs, PyMethodDef()) # sentinel
 
