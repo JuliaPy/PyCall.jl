@@ -451,6 +451,38 @@ function dispatch_to{T}(jl_type::Type{T}, fun::Function,
 end
 
 
+# Dispatching function for getters (what happens when `obj.some_field` is called
+# in Python). `fun` should be a unary regular Julia function that accepts one
+# object of type T, and returns that field's value (doesn't have to be an
+# actual object member)
+function dispatch_get{T}(jl_type::Type{T}, fun::Function, self_::PyPtr)
+    try
+        obj = unsafe_pyjlwrap_to_objref(self_)::T
+        res = fun(obj)
+        return pyincref(PyObject(res)).o
+    catch e
+        pyraise(e)
+    end
+    return convert(PyPtr, C_NULL)
+end
+
+function dispatch_set{T}(jl_type::Type{T}, fun::Function, self_::PyPtr,
+                         value_::PyPtr)
+    value = PyObject(value_)
+    try
+        obj = unsafe_pyjlwrap_to_objref(self_)::T
+        fun(obj, convert(PyAny, value))
+        return pyincref(PyObject(0)).o   # success
+    catch e
+        pyraise(e)
+    finally
+        value.o = convert(PyPtr, C_NULL) # don't decref
+    end
+    return pyincref(PyObject(-1)).o   # failure
+end
+
+
+
 # This vector will grow on each new type (re-)definition, and never free memory.
 # FIXME. I'm not sure how to detect if the corresponding Python types have
 # been GC'ed.
@@ -486,16 +518,50 @@ function build_method_defs(jl_type, methods)
     return method_defs
 end
 
+# Similar to build_method_defs
+function build_getset_defs(jl_type, getsets::Vector)
+    getset_defs = PyGetSetDef[]
+    for getset in getsets
+        if length(getset) == 3
+            (member_name, getter_fun, setter_fun) = getset
+            getter =
+                @eval function $(gensym())(self_::PyPtr, _::Ptr{Void})
+                    dispatch_get($jl_type, $getter_fun, self_)
+                end
+            setter =
+                @eval function $(gensym())(self_::PyPtr, value_::PyPtr,
+                                           _::Ptr{Void})
+                    dispatch_set($jl_type, $setter_fun, self_, value_)
+                end
+            push!(getset_defs, PyGetSetDef(member_name, getter, setter))
+        else
+            @assert length(getset) == 2 "`getset` argument must be 2 or 3-tuple"
+            (member_name, getter_fun) = getset
+            getter =
+                @eval function $(gensym())(self_::PyPtr, _::Ptr{Void})
+                    dispatch_get($jl_type, $getter_fun, self_)
+                end
+            push!(getset_defs, PyGetSetDef(member_name, getter))
+        end
+    end
+    push!(getset_defs, PyGetSetDef()) # sentinel
+
+    push!(all_method_defs, getset_defs)    # Make sure it's not GC'ed
+    return getset_defs
+end
 
 function def_py_methods{T}(jl_type::Type{T}, methods...;
-                           base_type=pybuiltin(:object))
+                           base_type=pybuiltin(:object),
+                           getsets=[])
     method_defs = build_method_defs(jl_type, methods)
+    getset_defs = build_getset_defs(jl_type, getsets)
 
     # Create the Python type
     typename = jl_type.name.name::Symbol
     py_typ = pyjlwrap_type("PyCall.$typename", t -> begin 
         t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
         t.tp_methods = pointer(method_defs)
+        t.tp_getset = pointer(getset_defs)
         # Unfortunately, this supports only single-inheritance. See
         # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
         t.tp_base = base_type.o # Needs pyincref?
