@@ -64,7 +64,7 @@ end
 function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
-                cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
+                cfunction(set, Int, (PyPtr,PyPtr,Ptr{Void})),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
@@ -472,13 +472,13 @@ function dispatch_set{T}(jl_type::Type{T}, fun::Function, self_::PyPtr,
     try
         obj = unsafe_pyjlwrap_to_objref(self_)::T
         fun(obj, convert(PyAny, value))
-        return pyincref(PyObject(0)).o   # success
+        return 0 # success
     catch e
         pyraise(e)
     finally
         value.o = convert(PyPtr, C_NULL) # don't decref
     end
-    return pyincref(PyObject(-1)).o   # failure
+    return -1 # failure
 end
 
 
@@ -489,25 +489,20 @@ end
 const all_method_defs = Any[] 
 
 
-# This creates a function like
-#
-# function jl_io_close_gensym(self_::PyPtr, args_::PyPtr)
-#     dispatch_to(IO, jl_io_close, self_, args_)
-# end
-dispatcher_fun(jl_fun, jl_type) = 
-    @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr)
-        dispatch_to($jl_type, $jl_fun, self_, args_)
-    end
-
-
-"""    build_method_defs(jl_type, methods)
+"""    make_method_defs(jl_type, methods)
 
 Create the PyMethodDef methods, stores them permanently (to prevent GC'ing),
 and returns them in a Vector{PyMethodDef} """
-function build_method_defs(jl_type, methods)
+function make_method_defs(jl_type, methods)
     method_defs = PyMethodDef[]
     for (py_name, jl_fun) in methods
-        disp_fun = dispatcher_fun(jl_fun, jl_type)
+        # `disp_fun` is really like the closure:
+        #    (self_, args_) -> dispatch_to(jl_type, jl_fun, self_, args_)
+        # but `cfunction` complains if we use that.
+        disp_fun =
+            @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr)
+                dispatch_to($jl_type, $jl_fun, self_, args_)
+            end
         push!(method_defs, PyMethodDef(py_name, disp_fun, METH_VARARGS))
     end
     push!(method_defs, PyMethodDef()) # sentinel
@@ -518,8 +513,8 @@ function build_method_defs(jl_type, methods)
     return method_defs
 end
 
-# Similar to build_method_defs
-function build_getset_defs(jl_type, getsets::Vector)
+# Similar to make_method_defs
+function make_getset_defs(jl_type, getsets::Vector)
     getset_defs = PyGetSetDef[]
     for getset in getsets
         if length(getset) == 3
@@ -550,11 +545,14 @@ function build_getset_defs(jl_type, getsets::Vector)
     return getset_defs
 end
 
+"""
+Note: `some_python_obj[:x] = 10` does not call the setter at this
+moment. TODO """
 function def_py_methods{T}(jl_type::Type{T}, methods...;
                            base_type=pybuiltin(:object),
                            getsets=[])
-    method_defs = build_method_defs(jl_type, methods)
-    getset_defs = build_getset_defs(jl_type, getsets)
+    method_defs = make_method_defs(jl_type, methods)
+    getset_defs = make_getset_defs(jl_type, getsets)
 
     # Create the Python type
     typename = jl_type.name.name::Symbol
