@@ -7,7 +7,7 @@ using MacroTools: @capture
 # Dispatching methods. They convert the PyObject arguments into Julia objects,
 # and passes them to the Julia function `fun`
 
-# helper for `def_py_methods`. This will call
+# helper for `def_py_class`. This will call
 #    fun(self_::T, args...; kwargs...)
 # where `args` and `kwargs` are parsed from `args_`
 function dispatch_to{T}(jl_type::Type{T}, fun::Function,
@@ -132,10 +132,9 @@ function make_getset_defs(jl_type, getsets::Vector)
     return getset_defs
 end
 
-function def_py_methods{T}(jl_type::Type{T}, methods...;
-                           base_class=pybuiltin(:object),
-                           getsets=[])
-    if base_class === nothing base_class = pybuiltin(:object) end # temp DELETEME
+function def_py_class{T}(jl_type::Type{T}, methods...;
+                         base_class=pybuiltin(:object),
+                         getsets=[])
     method_defs = make_method_defs(jl_type, methods)
     getset_defs = make_getset_defs(jl_type, getsets)
 
@@ -147,8 +146,8 @@ function def_py_methods{T}(jl_type::Type{T}, methods...;
         t.tp_getset = pointer(getset_defs)
         # Unfortunately, this supports only single-inheritance. See
         # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
-        # to add multiple-inheritance support
-        t.tp_base = base_class.o # Needs pyincref?
+        # to add multiple-inheritance support.
+        t.tp_base = pyincref(base_class).o
     end)
 
     @eval function PyObject(obj::$T)
@@ -236,8 +235,8 @@ macro pydef(type_expr)
                for (attribute, getter) in getter_dict]
     :(begin
         $(map(esc, function_defs)...)
-        def_py_methods($(esc(type_name)), $(methods...);
-                       base_class=$(esc(base_class)),
-                       getsets=[$(getsets...)])
+        def_py_class($(esc(type_name)), $(methods...);
+                     base_class=$(esc(base_class)),
+                     getsets=[$(getsets...)])
     end)
 end
