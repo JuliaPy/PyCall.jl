@@ -450,27 +450,46 @@ function dispatch_to{T}(jl_type::Type{T}, fun::Function,
     return convert(PyPtr, C_NULL)
 end
 
+
 # This vector will grow on each new type (re-)definition, and never free memory.
-# It might not be worth the effort to correct, since redefinitions should be
-# rare.
+# FIXME. I'm not sure how to detect if the corresponding Python types have
+# been GC'ed.
 const all_method_defs = Any[] 
 
-function def_py_methods{T}(jl_type::Type{T}, methods...;
-                           base_type=pybuiltin(:object))
-    # Create the PyMethodDef methods
+
+# This creates a function like
+#
+# function jl_io_close_gensym(self_::PyPtr, args_::PyPtr)
+#     dispatch_to(IO, jl_io_close, self_, args_)
+# end
+dispatcher_fun(jl_fun, jl_type) = 
+    @eval function $(gensym(string(jl_fun)))(self_::PyPtr, args_::PyPtr)
+        dispatch_to($jl_type, $jl_fun, self_, args_)
+    end
+
+
+"""    build_method_defs(jl_type, methods)
+
+Create the PyMethodDef methods, stores them permanently (to prevent GC'ing),
+and returns them in a Vector{PyMethodDef} """
+function build_method_defs(jl_type, methods)
     method_defs = PyMethodDef[]
     for (py_name, jl_fun) in methods
-        jl_name = gensym(string(jl_fun))
-        f = @eval function $jl_name(self_::PyPtr, args_::PyPtr)
-            dispatch_to($jl_type, $jl_fun, self_, args_)
-        end
-        push!(method_defs, PyMethodDef(py_name, f, METH_VARARGS))
+        disp_fun = dispatcher_fun(jl_fun, jl_type)
+        push!(method_defs, PyMethodDef(py_name, disp_fun, METH_VARARGS))
     end
     push!(method_defs, PyMethodDef()) # sentinel
 
     # We have to make sure that the PyMethodDef vector isn't GC'ed by Julia, so
     # we push them onto a global stack.
     push!(all_method_defs, method_defs)
+    return method_defs
+end
+
+
+function def_py_methods{T}(jl_type::Type{T}, methods...;
+                           base_type=pybuiltin(:object))
+    method_defs = build_method_defs(jl_type, methods)
 
     # Create the Python type
     typename = jl_type.name.name::Symbol
