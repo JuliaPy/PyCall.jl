@@ -133,6 +133,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")
+include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
 
