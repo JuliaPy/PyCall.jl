@@ -71,7 +71,7 @@ end
 
 
 # This vector will grow on each new type (re-)definition, and never free memory.
-# FIXME. I'm not sure how to detect if the corresponding Python types have
+# FIXME maybe. I'm not sure how to detect if the corresponding Python types have
 # been GC'ed.
 const all_method_defs = Any[] 
 
@@ -135,6 +135,26 @@ function make_getset_defs(jl_type, getsets::Vector)
     return getset_defs
 end
 
+
+"""    def_py_class(jl_type::Type{T}, methods...; base_class=pybuiltin(:object), getsets=[])
+
+`def_py_class` creates a Python class by calling `pyjlwrap_new`, and defines
+the corresponding `PyObject(::T)` method. `@pydef` macros expand into a call to
+this function.
+
+Arguments
+---------
+- `jl_type`: the Julia type (eg. Base.IO)
+- `methods`: a vector of tuples `(py_name::String, jl_fun::Function)`
+   py_name will be a method of the Python class, which will call `jl_function`
+- `getsets`: a vector of tuples of the form
+   `(py_name::String, jl_getter_fun::Function, jl_setter_fun::Function)`.
+   In Python, `obj.x` will call the corresponding getter, and `obj.x = val`
+   will call the setter.
+- `base_class`: the Python base class to inherit from. 
+
+Return value: the created class (::PyTypeObject)
+"""
 function def_py_class{T}(jl_type::Type{T}, methods...;
                          base_class=pybuiltin(:object),
                          getsets=[])
@@ -169,11 +189,12 @@ function def_py_class{T}(jl_type::Type{T}, methods...;
 end
 
 function is_pydef(obj::PyObject)
-    # KLUDGE: before pyclass.jl, all pyjlwrap types would inherit from
-    # PyTypeObject, and this was used in is_pyjlwrap. Since pyclass supports
-    # single-inheritance, this scheme doesn't work anymore. The current
-    # solution is to add a dummy method _is_py_def_ to all pyclass objects, and
-    # check for its presence here. FIXME     - cstjean February 2016
+    # KLUDGE: before pyclass.jl, all pyjlwrap types used to inherit from
+    # PyTypeObject, and this was used to detect Julia-defined types in
+    # is_pyjlwrap. Since pyclass supports single-inheritance, this scheme
+    # doesn't work anymore. The current solution is to add a dummy method
+    # _is_py_def_ to all pyclass objects, and check for its presence
+    # here. FIXME - cstjean February 2016
     try
         obj[:_is_pydef_] # triggers a KeyError if it's not a
                          # @pydef-defined object
@@ -191,9 +212,8 @@ end
 # @pydef macro
 
 
+# Parse the `type ....` definition and returns its elements.
 function parse_pydef(expr)
-    # We're not getting that much value out of @capture, we could take it
-    # out and get rid of the MacroTools dependency
     if !@capture(expr, begin type type_name_ <: base_class_
                     lines__
                 end end)
@@ -202,11 +222,11 @@ function parse_pydef(expr)
             end), "Malformed @pydef expression")
         base_class = pybuiltin(:object)
     end
-    function_defs = Any[]
-    methods = Tuple[]
-    getter_dict = Dict()
-    setter_dict = Dict()
-    method_syms = Dict()
+    function_defs = Expr[] # vector of :(function ...) expressions
+    methods = Tuple{AbstractString, Symbol}[] # (py_name, jl_method_name)
+    getter_dict = Dict{AbstractString, Symbol}() # python_var => jl_getter_name
+    setter_dict = Dict{AbstractString, Symbol}() 
+    method_syms = Dict{Symbol, Symbol}() # see below
     if isa(lines[1], Expr) && lines[1].head == :block 
         # unfortunately, @capture fails to parse the `type` correctly
         lines = lines[1].args
@@ -253,6 +273,52 @@ function parse_pydef(expr)
 end
 
 
+
+""" `@pydef` creates a Python class out of a Julia type. Example:
+
+    type JuliaType
+        xx
+        JuliaType(xx=10) = new(xx)
+    end
+    
+    @pyimport numpy.polynomial as P
+
+    @pydef type JuliaType <: P.Polynomial
+       py_method1(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
+       x.get(self) = self.xx
+       x.set!(self, new_x::Int) = (self.xx = new_x)
+    end
+
+is equivalent to
+
+    class JuliaType(numpy.polynomial.Polynomial):
+       def __init__(self, x=10):
+          self.x = 10
+
+       def pymethod1(self, arg1):
+          return arg1 + 20
+
+Each line in a `@pydef` defines a new method or getter/setter. The right-hand
+side is Julia code. For `py_method1(self, arg1) = arg1 + 20` we create a
+Julia function
+
+    function temp(self, arg1)
+        arg1 + 20
+    end
+
+When Python code calls `py_method1`, its arguments are converted into
+Julia objects and passed to this function `temp`. `temp`'s return value is
+automatically converted back into a PyObject.
+
+`@pydef` allows for single-inheritance of Python types. Multiple-inheritance
+is not supported, but can be simulated by creating a dummy class in Python code
+and inheriting from it with `@pydef`:
+
+    class MixOfClass(BaseClass1, BaseClass):
+         pass
+
+See the PyCall usage guide on Github for more examples.
+"""
 macro pydef(type_expr)
     type_name, base_class, methods_, getter_dict, setter_dict, function_defs =
         parse_pydef(type_expr)
