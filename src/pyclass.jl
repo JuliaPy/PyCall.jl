@@ -4,8 +4,8 @@ using MacroTools: @capture
 
 
 ######################################################################
-# Dispatching methods. They convert the PyObject arguments into Julia objects,
-# and passes them to the Julia function `fun`
+# Dispatching methods. They convert the PyObject arguments in args_ and kw_
+# into Julia objects, and passes them to the Julia function `fun`
 
 # helper for `def_py_class`. This will call
 #    fun(self_::T, args...; kwargs...)
