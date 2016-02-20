@@ -138,6 +138,8 @@ end
 function def_py_class{T}(jl_type::Type{T}, methods...;
                          base_class=pybuiltin(:object),
                          getsets=[])
+    methods = union(methods, (("_is_pydef_", io->true),)) # see is_pydef below
+
     method_defs = make_method_defs(jl_type, methods)
     getset_defs = make_getset_defs(jl_type, getsets)
 
@@ -165,7 +167,25 @@ function def_py_class{T}(jl_type::Type{T}, methods...;
 
     py_typ
 end
- 
+
+function is_pydef(obj::PyObject)
+    # KLUDGE: before pyclass.jl, all pyjlwrap types would inherit from
+    # PyTypeObject, and this was used in is_pyjlwrap. Since pyclass supports
+    # single-inheritance, this scheme doesn't work anymore. The current
+    # solution is to add a dummy method _is_py_def_ to all pyclass objects, and
+    # check for its presence here. FIXME     - cstjean February 2016
+    try
+        obj[:_is_pydef_] # triggers a KeyError if it's not a
+                         # @pydef-defined object
+        return true
+    catch e
+        if isa(e, KeyError)
+            return false
+        end
+        rethrow()
+    end
+end
+        
 
 ######################################################################
 # @pydef macro

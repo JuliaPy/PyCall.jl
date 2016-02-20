@@ -428,7 +428,8 @@ function pyjlwrap_new(x::Any)
     pyjlwrap_new(jlWrapType, x)
 end
 
-is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1
+is_pyjlwrap(o::PyObject) =
+    ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1 || is_pydef(o)
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,
