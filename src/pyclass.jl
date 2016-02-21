@@ -4,12 +4,11 @@ using MacroTools: @capture
 
 
 ######################################################################
-# Dispatching methods. They convert the PyObject arguments in args_ and kw_
-# into Julia objects, and passes them to the Julia function `fun`
+# Dispatching functions. They convert the PyObject arguments we get from CPython
+# into Julia objects, and pass them to the Julia function `fun`
 
-# helper for `def_py_class`. This will call
-#    fun(self_::T, args...; kwargs...)
-# where `args` and `kwargs` are parsed from `args_`
+# For methods. We pass the arguments and keyword-arguments to `fun`, and
+# convert the return value back into a PyObject.
 function dispatch_to{T}(jl_type::Type{T}, fun::Function,
                         self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     # adapted from jl_Function_call
@@ -78,7 +77,7 @@ const all_method_defs = Any[]
 
 """    make_method_defs(jl_type, methods)
 
-Create the PyMethodDef methods, stores them permanently (to prevent GC'ing),
+Creates the PyMethodDef methods, stores them permanently (to prevent GC'ing),
 and returns them in a Vector{PyMethodDef} """
 function make_method_defs(jl_type, methods)
     method_defs = PyMethodDef[]
@@ -177,7 +176,6 @@ function def_py_class{T}(jl_type::Type{T}, methods...;
         # Unfortunately, tp_base supports only single-inheritance. See
         # https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_base
         # to add multiple-inheritance support.
-        # Not sure if we need `pyincref`
         t.tp_base = pyincref(base_class).o
     end)
 
@@ -212,7 +210,6 @@ end
 # @pydef macro
 
 
-# Parse the `type ....` definition and returns its elements.
 function parse_pydef(expr)
     if !@capture(expr, begin type type_name_ <: base_class_
                     lines__
@@ -222,15 +219,16 @@ function parse_pydef(expr)
             end), "Malformed @pydef expression")
         base_class = pybuiltin(:object)
     end
+    if isa(lines[1], Expr) && lines[1].head == :block 
+        # unfortunately, @capture fails to parse the type's fields correctly
+        lines = lines[1].args
+    end
+
     function_defs = Expr[] # vector of :(function ...) expressions
     methods = Tuple{AbstractString, Symbol}[] # (py_name, jl_method_name)
     getter_dict = Dict{AbstractString, Symbol}() # python_var => jl_getter_name
     setter_dict = Dict{AbstractString, Symbol}() 
     method_syms = Dict{Symbol, Symbol}() # see below
-    if isa(lines[1], Expr) && lines[1].head == :block 
-        # unfortunately, @capture fails to parse the `type` correctly
-        lines = lines[1].args
-    end
     for line in lines
         if !isa(line, LineNumberNode) && line.head != :line # need to skip those
             @assert line.head == :(=) "Malformed line: $line"
@@ -242,7 +240,7 @@ function parse_pydef(expr)
                 #    readlines(io) = ...
                 #    readlines(io, nlines) = ...
                 # otherwise the first and second `readlines` get different
-                # gensyms, and one of the two gets ignored
+                # gensyms, and one of the two gets shadowed by the other.
                 jl_fun_name = get!(method_syms, py_f, gensym(py_f))
                 push!(function_defs, :(function $jl_fun_name($(args...))
                     $rhs
