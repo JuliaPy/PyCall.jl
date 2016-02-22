@@ -221,6 +221,8 @@ function parse_pydef(expr)
     end
     if isa(lines[1], Expr) && lines[1].head == :block 
         # unfortunately, @capture fails to parse the type's fields correctly
+        # It's been reported and fixed, we can remove this line on the next
+        # MacroTools release (> v0.2)
         lines = lines[1].args
     end
 
@@ -272,8 +274,8 @@ end
 
 
 
-""" `@pydef` creates a Python class out of a Julia type. Example:
-
+""" `@pydef` creates a Python class out of a Julia type. Example: <br><br>
+    
     type JuliaType
         xx
         JuliaType(xx=10) = new(xx)
@@ -287,8 +289,8 @@ end
        x.set!(self, new_x::Int) = (self.xx = new_x)
     end
 
-is equivalent to
-
+is equivalent to <br><br>
+    
     class JuliaType(numpy.polynomial.Polynomial):
        def __init__(self, x=10):
           self.x = 10
@@ -297,25 +299,20 @@ is equivalent to
           return arg1 + 20
 
 Each line in a `@pydef` defines a new method or getter/setter. The right-hand
-side is Julia code. For `py_method1(self, arg1) = arg1 + 20` we create a
-Julia function
-
+side is Julia code. For example, `py_method1(self, arg1) = arg1 + 20` expands
+into this Julia function <br><br>
+    
     function temp(self, arg1)
         arg1 + 20
     end
 
-When Python code calls `py_method1`, its arguments are converted into
-Julia objects and passed to this function `temp`. `temp`'s return value is
-automatically converted back into a PyObject.
+and when Python code calls `obj.py_method1(some_value)`, its arguments are
+converted into Julia objects and passed to this function `temp`. `temp`'s
+return value is automatically converted back into a PyObject.
 
-`@pydef` allows for single-inheritance of Python types. Multiple-inheritance
-is not supported, but can be simulated by creating a dummy class in Python code
-and inheriting from it with `@pydef`:
-
-    class MixOfClass(BaseClass1, BaseClass):
-         pass
-
-See the PyCall usage guide on Github for more examples.
+`@pydef` allows for single-inheritance of builtin Python types.
+Multiple-inheritance is not supported. **Inheritance of user-defined Python
+types is experimental, and frequently segfaults.**
 """
 macro pydef(type_expr)
     type_name, base_class, methods_, getter_dict, setter_dict, function_defs =
