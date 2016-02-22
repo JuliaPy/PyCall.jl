@@ -263,9 +263,11 @@ c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,
 # with Julia linalg functions etcetera a copy is still required.
 
 """
-This implements a nocopy wrapper to a NumPy array (currently of only numeric types only). 
+PyArray(o::PyObject)
 
-Convert a PyObject to PyArray by calling `PyArray(o::PyObject)` on an `ndarray` object `o`.
+This converts an `ndarray` object `o` to a PyArray.
+
+This implements a nocopy wrapper to a NumPy array (currently of only numeric types only). 
 
 If you are using `pycall` and the function returns an `ndarray`, you can use `PyArray` as the return type to directly receive a `PyArray`. 
 """
