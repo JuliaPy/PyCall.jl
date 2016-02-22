@@ -30,6 +30,8 @@ pygui_works(gui::Symbol) = gui == :default ||
 
 # get or set the default GUI; doesn't affect running GUI
 """
+`pygui()`
+
 Return the current GUI toolkit as a symbol. 
 """
 function pygui()
@@ -150,7 +152,9 @@ end
 const eventloops = Dict{Symbol,Timer}()
 
 """
-Use `pygui_start(gui)` to start the event loop of a certain toolkit. 
+`pygui_start(gui::Symbol = pygui())` 
+
+Start the event loop of a certain toolkit. 
 
 The argument `gui` defaults to the current default GUI, but it could be `:wx`, `:gtk`, `:gtk3`, `:tk`, or `:qt`. 
 
@@ -184,6 +188,8 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
 end
 
 """
+`pygui_stop(gui::Symbol = pygui())`
+
 Stop any running event loop for gui. The `gui` argument defaults to current default GUI. 
 
 """
