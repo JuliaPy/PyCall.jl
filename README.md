@@ -331,6 +331,12 @@ and also by providing more type information to the Julia compiler.
   instead use `w.pymember(:member)` (for the `PyAny` conversion) or
   `w.pymember("member")` (for the raw `PyObject`).
 
+### Creating Python Classes
+
+There is experimental support for interpreting Julia types as Python
+classes. See `?pydef` for documentation and `test/io_2.jl` for an
+example.
+
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),
