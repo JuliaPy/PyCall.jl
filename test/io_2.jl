@@ -2,7 +2,7 @@
 # At the end of this file, we call runtests.jl to check that the tests still
 # pass with this definition.
 
-
+using PyCall
 
 # If we wanted to support TextIO with @pydef, there's a few solutions:
 # A. Create a different Python type for it. That's not really possible with

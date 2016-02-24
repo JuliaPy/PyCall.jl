@@ -186,24 +186,13 @@ function def_py_class{T}(jl_type::Type{T}, methods...;
     py_typ
 end
 
-function is_pydef(obj::PyObject)
-    # KLUDGE: before pyclass.jl, all pyjlwrap types used to inherit from
-    # PyTypeObject, and this was used to detect Julia-defined types in
-    # is_pyjlwrap. Since pyclass supports single-inheritance, this scheme
-    # doesn't work anymore. The current solution is to add a dummy method
-    # _is_py_def_ to all pyclass objects, and check for its presence
-    # here. FIXME - cstjean February 2016
-    try
-        obj[:_is_pydef_] # triggers a KeyError if it's not a
-                         # @pydef-defined object
-        return true
-    catch e
-        if isa(e, KeyError)
-            return false
-        end
-        rethrow()
-    end
-end
+# KLUDGE: before pyclass.jl, all pyjlwrap types used to inherit from
+# PyTypeObject, and this was used to detect Julia-defined types in
+# is_pyjlwrap. Since pyclass supports single-inheritance, this scheme
+# doesn't work anymore. The current solution is to add a dummy method
+# _is_py_def_ to all pyclass objects, and check for its presence
+# here. FIXME
+is_pydef(obj::PyObject) = haskey(obj, :_is_pydef_)
         
 
 ######################################################################
