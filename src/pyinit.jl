@@ -91,8 +91,8 @@ function __init__()
     global const jl_TextIO_methods = make_io_methods(true)
     global const jl_IO_methods = make_io_methods(false)
     global const jl_IO_getset = PyGetSetDef[
-            PyGetSetDef("closed", jl_IO_closed)
-            PyGetSetDef("encoding", jl_IO_encoding)
+            PyGetSetDef("closed", jl_IO_closed),
+            PyGetSetDef("encoding", jl_IO_encoding),
             PyGetSetDef()
     ]
 
