@@ -1,4 +1,4 @@
 julia 0.4
-Compat 0.7.1
+Compat 0.7.9
 Dates
 Conda 0.1.6

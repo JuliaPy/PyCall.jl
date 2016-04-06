@@ -246,7 +246,7 @@ for text in (true, false)
                     nb = typemax(Int)
                 end
 
-                b = $(text ? :(bytestring(readbytes(io, nb))) : :(readbytes(io, nb)))
+                b = $(text ? :(bytestring(read(io, nb))) : :(read(io, nb)))
                 return pyincref(PyObject(b)).o
             catch e
                 ioraise(e)
@@ -257,7 +257,7 @@ for text in (true, false)
         function $jl_IO_readall(self_::PyPtr, noarg_::PyPtr)
             try
                 io = unsafe_pyjlwrap_to_objref(self_)::IO
-                return pyincref(PyObject($(text ? :(readall(io)) : :(readbytes(io))))).o
+                return pyincref(PyObject($(text ? :(readstring(io)) : :(read(io))))).o
             catch e
                 ioraise(e)
             end

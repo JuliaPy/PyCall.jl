@@ -179,7 +179,7 @@ let nm = tempname()
         pf[:write](pyutf8(nm))
         pf[:flush]()
     end
-    @test readall(nm) == nm
+    @test readstring(nm) == nm
 end
 
 # issue #112
