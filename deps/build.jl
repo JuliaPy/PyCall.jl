@@ -22,12 +22,12 @@ ENV["PYTHONIOENCODING"] = "UTF-8"
 
 #########################################################################
 
-pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
+pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readstring(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
 
-pysys(python::AbstractString, var::AbstractString) = chomp(readall(`$python -c "import sys; print(sys.$var)"`))
+pysys(python::AbstractString, var::AbstractString) = chomp(readstring(`$python -c "import sys; print(sys.$var)"`))
 
 #########################################################################
 
