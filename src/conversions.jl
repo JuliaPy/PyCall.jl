@@ -825,5 +825,6 @@ function Base.collect{T}(::Type{T}, o::PyObject)
     end
     return a
 end
+Base.collect(o::PyObject) = collect(Any, o)
 
 #########################################################################
