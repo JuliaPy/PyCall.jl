@@ -331,6 +331,12 @@ and also by providing more type information to the Julia compiler.
   instead use `w.pymember(:member)` (for the `PyAny` conversion) or
   `w.pymember("member")` (for the raw `PyObject`).
 
+Occasionally, you may need to pass a keyword argument to Python that
+is a [reserved word](https://en.wikipedia.org/wiki/Reserved_word) in Julia.
+For example, calling `f(x, function=g)` will fail because `function` is
+a reserved word in Julia. In such cases, you can use the lower-level
+Julia syntax `f(x; :function=>g)`.
+
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),
