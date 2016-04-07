@@ -427,6 +427,37 @@ do so using `ccall`.
   given a Python type object `t`.  `pytypeof(o::PyObject)` returns the
   Python type of `o`, equivalent to `type(o)` in Python.
 
+### Using PyCall from Julia Modules
+
+You can use PyCall from any Julia code, including within Julia modules. However, some care is required when using PyCall from [precompiled Julia modules](http://docs.julialang.org/en/latest/manual/modules/#module-initialization-and-precompilation). The key thing to remember is that *all Python objects* (any `PyObject`) contain *pointers* to memory allocated by the Python runtime, and such pointers *cannot be saved* in precompiled constants.   (When a precompiled library is reloaded, these pointers will not contain valid memory addresses.)
+
+The solution is fairly simple:
+
+* Python objects that you create in functions called *after* the module is loaded are always safe.
+
+* If you want to store a Python object in a global variable that is initialized automatically when the module is loaded, then initialize the variable in your module's `__init__` function.  For a type-safe global constant, initialize the constant to `PyNull()` at the top level, and then use the `copy!` function in your module's `__init__` function to mutate it to its actual value.
+
+For example, suppose your module uses the `scipy.optimize` module, and you want to load this module when your module is loaded and store it in a global constant `scipy_opt`.  You could do:
+
+```jl
+__precompile__() # this module is safe to precompile
+module MyModule
+using PyCall
+
+const scipy_opt = PyNULL()
+
+function __init__()
+    copy!(scipy_opt, pyimport("scipy.optimize"))
+end
+
+end
+```
+Then you can access the `scipy.optimize` functions as `scipy_opt[:newton]`
+and so on.
+
+(Note that you cannot use `@pyimport` safely with precompilation, because
+that declares a global constant that internally has a pointer to the module.)
+
 ## Author
 
 This package was written by [Steven G. Johnson](http://math.mit.edu/~stevenj/).
