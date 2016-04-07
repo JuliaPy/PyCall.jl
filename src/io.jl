@@ -365,6 +365,13 @@ function PyObject(io::IO)
     pyjlwrap_new(jl_IOType, io)
 end
 
+"""
+    PyTextIO(io::IO)
+    PyObject(io::IO)
+
+Julia IO streams are converted into Python objects implementing the RawIOBase interface, 
+so they can be used for binary I/O in Python
+"""
 function PyTextIO(io::IO)
     pyio_initialize()
     pyjlwrap_new(jl_TextIOType, io)

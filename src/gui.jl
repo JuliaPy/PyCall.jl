@@ -29,6 +29,11 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
 
 # get or set the default GUI; doesn't affect running GUI
+"""
+    pygui()
+
+Return the current GUI toolkit as a symbol. 
+"""
 function pygui()
     global gui
     if gui::Symbol != :default && pygui_works(gui::Symbol)
@@ -146,6 +151,14 @@ end
 # cache running event loops (so that we don't start any more than once)
 const eventloops = Dict{Symbol,Timer}()
 
+"""
+    pygui_start(gui::Symbol = pygui())
+
+Start the event loop of a certain toolkit. 
+
+The argument `gui` defaults to the current default GUI, but it could be `:wx`, `:gtk`, `:gtk3`, `:tk`, or `:qt`. 
+
+"""
 function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
     pygui(gui)
     if !haskey(eventloops, gui)
@@ -174,6 +187,12 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
     gui
 end
 
+"""
+    pygui_stop(gui::Symbol = pygui())
+
+Stop any running event loop for gui. The `gui` argument defaults to current default GUI. 
+
+"""
 function pygui_stop(gui::Symbol=pygui())
     if haskey(eventloops, gui)
         Base.close(pop!(eventloops, gui))
