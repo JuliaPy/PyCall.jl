@@ -198,7 +198,7 @@ end
 # PyVector: no-copy wrapping of a Julia object around a Python sequence
 
 """
-`PyVector(o::PyObject)`
+    PyVector(o::PyObject)
 
 This returns a PyVector object, which is a wrapper around an arbitrary Python list or sequence object. 
 
@@ -388,8 +388,8 @@ include("numpy.jl")
 # PyDict: no-copy wrapping of a Julia object around a Python dictionary
 
 """
-`PyDict(o::PyObject)`
-`PyDict(d::Dict{K,V})`
+    PyDict(o::PyObject)
+    PyDict(d::Dict{K,V})
 
 This returns a PyDict, which is a no-copy wrapper around a Python dictionary.
 

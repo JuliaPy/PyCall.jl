@@ -366,8 +366,8 @@ function PyObject(io::IO)
 end
 
 """
-`PyTextIO(io::IO)`
-`PyObject(io::IO)`
+    PyTextIO(io::IO)
+    PyObject(io::IO)
 
 Julia IO streams are converted into Python objects implementing the RawIOBase interface, 
 so they can be used for binary I/O in Python

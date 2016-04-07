@@ -263,7 +263,7 @@ c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,
 # with Julia linalg functions etcetera a copy is still required.
 
 """
-PyArray(o::PyObject)
+    PyArray(o::PyObject)
 
 This converts an `ndarray` object `o` to a PyArray.
 
