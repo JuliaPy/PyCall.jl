@@ -7,7 +7,7 @@ export pycall, pyimport, pybuiltin, PyObject,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
-       pygui_stop_all, @pylab, set!, PyTextIO, @pysym
+       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
