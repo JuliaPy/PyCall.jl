@@ -259,3 +259,8 @@ end
 
 # issue #216:
 @test length(collect(pyimport("itertools")[:combinations]([1,2,3],2))) == 3
+
+# PyNULL and copy!
+let x = PyNULL(), y = copy!(x, PyObject(314159))
+    @test Int(x) == Int(y) == 314159
+end
