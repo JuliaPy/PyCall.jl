@@ -435,7 +435,7 @@ The solution is fairly simple:
 
 * Python objects that you create in functions called *after* the module is loaded are always safe.
 
-* If you want to store a Python object in a global variable that is initialized automatically when the module is loaded, then initialize the variable in your module's `__init__` function.  For a type-stable global constant, initialize the constant to `PyNull()` at the top level, and then use the `copy!` function in your module's `__init__` function to mutate it to its actual value.
+* If you want to store a Python object in a global variable that is initialized automatically when the module is loaded, then initialize the variable in your module's `__init__` function.  For a type-stable global constant, initialize the constant to `PyCall.PyNULL()` at the top level, and then use the `copy!` function in your module's `__init__` function to mutate it to its actual value.
 
 For example, suppose your module uses the `scipy.optimize` module, and you want to load this module when your module is loaded and store it in a global constant `scipy_opt`.  You could do:
 
@@ -444,7 +444,7 @@ __precompile__() # this module is safe to precompile
 module MyModule
 using PyCall
 
-const scipy_opt = PyNULL()
+const scipy_opt = PyCall.PyNULL()
 
 function __init__()
     copy!(scipy_opt, pyimport("scipy.optimize"))
