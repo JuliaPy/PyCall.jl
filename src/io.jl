@@ -18,341 +18,93 @@ function ioraise(e)
     end
 end
 
-function jl_IO_close(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        close(io)
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
-        return pynothing::PyPtr
-    catch e
+macro with_ioraise(expr)
+    :(try
+        $(esc(expr))
+      catch e
         ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
+      end)
 end
 
-# "closed" must be an attribute "for backwards compatibility"
-function jl_IO_closed(self_::PyPtr, closure::Ptr{Void})
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        # Note: isopen is not defined for all IO subclasses in Julia.
-        #       Should we do something different than throwing a MethodError,
-        #       if isopen is not available?
-        return pyincref(PyObject(!isopen(io))).o
-    catch e
-        ioraise(e)
+function jl_io_readline(io::IO, nb)
+    d = readline(io)
+    if length(d) > nb
+        resize!(d, nb)
     end
-    return convert(PyPtr, C_NULL)
+    return d
 end
 
-function jl_IO_fileno(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(fd(io))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_flush(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        if method_exists(flush, Tuple{typeof(io)})
-            flush(io)
-        end
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
-        return pynothing::PyPtr
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_isatty(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(isa(io, Base.TTY))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_readable(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(isreadable(io))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_writable(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(iswritable(io))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_readline(self_::PyPtr, args_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-
-        nargs = ccall((@pysym :PySequence_Size), Int, (PyPtr,), args_)
-        nb = typemax(Int) # max #bytes to return
-        if nargs == 1
-            nb = convert(Int, PyObject(ccall((@pysym :PySequence_GetItem),
-                                              PyPtr, (PyPtr, Int), args_, 0)))
-            if nb < 0
-                nb = typemax(Int)
-            end
-        elseif nargs > 1
-            throw(ArgumentError("readline cannot accept $nargs arguments"))
-        end
-
+function jl_io_readlines(io::IO, nb)
+    ret = Any[]  # should it be some other type?
+    nread = 0
+    while nread < nb && !eof(io)
         d = readline(io)
-        if length(d) > nb
-            resize!(d, nb)
-        end
-        return pyincref(PyObject(d)).o
-    catch e
-        ioraise(e)
+        nread += length(d)
+        push!(ret, PyObject(d))
     end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_readlines(self_::PyPtr, args_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-
-        nargs = ccall((@pysym :PySequence_Size), Int, (PyPtr,), args_)
-        nb = typemax(Int) # max #bytes to return
-        if nargs == 1
-            nb = convert(Int, PyObject(ccall((@pysym :PySequence_GetItem),
-                                              PyPtr, (PyPtr, Int), args_, 0)))
-            if nb < 0
-                nb = typemax(Int)
-            end
-        elseif nargs > 1
-            throw(ArgumentError("readlines cannot accept $nargs arguments"))
-        end
-
-        ret = PyObject[]
-        nread = 0
-        while nread < nb && !eof(io)
-            d = readline(io)
-            nread += length(d)
-            push!(ret, PyObject(d))
-        end
-        return pyincref(PyObject(ret)).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_seek(self_::PyPtr, args_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-
-        nargs = ccall((@pysym :PySequence_Size), Int, (PyPtr,), args_)
-        if nargs < 1 || nargs > 2
-            throw(ArgumentError("seek cannot accept $nargs arguments"))
-        end
-        offset = convert(Int64, PyObject(ccall((@pysym :PySequence_GetItem),
-                                               PyPtr, (PyPtr, Int), args_, 0)))
-        whence = nargs == 1 ? 0 :
-          convert(Int, PyObject(ccall((@pysym :PySequence_GetItem),
-                                      PyPtr, (PyPtr, Int), args_, 1)))
-
-
-        if whence == 0
-            seek(io, offset)
-        elseif whence == 1
-            skip(io, offset)
-        elseif whence == 2
-            seekend(io)
-            skip(io, offset)
-        else
-            throw(ArgumentError("unrecognized whence=$n argument to seek"))
-        end
-        return pyincref(PyObject(position(io))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
+    return ret
 end
 
 isseekable(io) = method_exists(seek, Tuple{typeof(io), Int64})
 isseekable(io::IOBuffer) = io.seekable
 
-function jl_IO_seekable(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(isseekable(io))).o
-    catch e
-        ioraise(e)
+function jl_io_seek(io::IO, offset, whence)
+    if whence == 0
+        seek(io, offset)
+    elseif whence == 1
+        skip(io, offset)
+    elseif whence == 2
+        seekend(io)
+        skip(io, offset)
+    else
+        throw(ArgumentError("unrecognized whence=$n argument to seek"))
     end
-    return convert(PyPtr, C_NULL)
+    return position(io)
 end
 
-function jl_IO_tell(self_::PyPtr, noarg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(position(io))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_writelines(self_::PyPtr, arg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        for s in PyVector{AbstractString}(pyincref(arg_))
-            write(io, s)
-        end
-        ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing::PyPtr)
-        return pynothing::PyPtr
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-##########################################################################
-# RawIOBase/TextIOBase methods:
-
-for text in (true, false)
-    jl_IO_read = text ? :jl_IO_read_text : :jl_IO_read
-    jl_IO_readall = text ? :jl_IO_readall_text : :jl_IO_readall
-    @eval begin
-        function $jl_IO_read(self_::PyPtr, args_::PyPtr)
-            try
-                io = unsafe_pyjlwrap_to_objref(self_)::IO
-
-                nargs = ccall((@pysym :PySequence_Size), Int, (PyPtr,), args_)
-                if nargs > 1
-                    throw(ArgumentError("read cannot accept $nargs arguments"))
-                end
-                nb = nargs == 0 ? -1 :
-                convert(Int, PyObject(ccall((@pysym :PySequence_GetItem),
-                                            PyPtr, (PyPtr, Int), args_, 0)))
-                if nb < 0
-                    nb = typemax(Int)
-                end
-
-                b = $(text ? :(bytestring(read(io, nb))) : :(read(io, nb)))
-                return pyincref(PyObject(b)).o
-            catch e
-                ioraise(e)
-            end
-            return convert(PyPtr, C_NULL)
-        end
-
-        function $jl_IO_readall(self_::PyPtr, noarg_::PyPtr)
-            try
-                io = unsafe_pyjlwrap_to_objref(self_)::IO
-                return pyincref(PyObject($(text ? :(readstring(io)) : :(read(io))))).o
-            catch e
-                ioraise(e)
-            end
-            return convert(PyPtr, C_NULL)
-        end
-    end
-end
-
-function jl_IO_readinto(self_::PyPtr, arg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        b = PyVector{UInt8}(pyincref(arg_))
-        return pyincref(PyObject(readbytes!(io, b))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-function jl_IO_write(self_::PyPtr, arg_::PyPtr)
-    try
-        io = unsafe_pyjlwrap_to_objref(self_)::IO
-        return pyincref(PyObject(write(io, PyBuffer(arg_)))).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-# "encoding" attribute for TextIOBase
-function jl_IO_encoding(self_::PyPtr, closure::Ptr{Void})
-    try
-        return pyincref(PyObject("UTF-8")).o
-    catch e
-        ioraise(e)
-    end
-    return convert(PyPtr, C_NULL)
-end
-
-##########################################################################
-# TODO: support other Python interfaces (e.g. TextIO) when possible?
 
 ##########################################################################
 
-# make method tables for text/binary IO objects (called in __io__)
-make_io_methods(text::Bool) =
-    PyMethodDef[
-                PyMethodDef("close", jl_IO_close, METH_NOARGS),
-                PyMethodDef("fileno", jl_IO_fileno, METH_NOARGS),
-                PyMethodDef("flush", jl_IO_flush, METH_NOARGS),
-                PyMethodDef("isatty", jl_IO_isatty, METH_NOARGS),
-                PyMethodDef("readable", jl_IO_readable, METH_NOARGS),
-                PyMethodDef("writable", jl_IO_writable, METH_NOARGS),
-                PyMethodDef("readline", jl_IO_readline, METH_VARARGS),
-                PyMethodDef("readlines", jl_IO_readlines, METH_VARARGS),
-                PyMethodDef("seek", jl_IO_seek, METH_VARARGS),
-                PyMethodDef("seekable", jl_IO_seekable, METH_NOARGS),
-                PyMethodDef("tell", jl_IO_tell, METH_NOARGS),
-                PyMethodDef("writelines", jl_IO_writelines, METH_O),
-                PyMethodDef("read", text ? jl_IO_read_text : jl_IO_read, METH_VARARGS),
-                PyMethodDef("readall", text ? jl_IO_readall_text : jl_IO_readall, METH_NOARGS),
-                PyMethodDef("readinto", jl_IO_readinto, METH_O),
-                PyMethodDef("write", jl_IO_write, METH_O),
-                PyMethodDef() # sentinel
-    ]
+pyio_jl(self::PyObject) = unsafe_pyjlwrap_to_objref(self["io"].o)::IO
 
-
-function pyio_repr(o::PyPtr)
-    o = PyObject(try string("<PyCall.io ",unsafe_pyjlwrap_to_objref(o),">")
-                 catch "<PyCall.io NULL>"; end)
-    oret = o.o
-    o.o = convert(PyPtr, C_NULL) # don't decref
-    return oret
-end
+const PyIO = PyNULL()
 
 pyio_initialized = false
 function pyio_initialize()
     global pyio_initialized
     if !pyio_initialized::Bool
-        global const jl_IOType =
-            pyjlwrap_type("PyCall.jl_IO",
-                          t -> begin
-                              t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
-                              t.tp_methods = pointer(jl_IO_methods)
-                              t.tp_getset = pointer(jl_IO_getset)
-                              t.tp_repr = pyio_repr_ptr
-                          end)
-        global const jl_TextIOType =
-            pyjlwrap_type("PyCall.jl_TextIO",
-                          t -> begin
-                              t.tp_getattro = @pyglobal(:PyObject_GenericGetAttr)
-                              t.tp_methods = pointer(jl_TextIO_methods)
-                              t.tp_getset = pointer(jl_IO_getset)
-                              t.tp_repr = pyio_repr_ptr
-                          end)
+        copy!(PyIO, @pydef_object type PyIO
+            __init__(self, io::IO; istextio=false) = begin
+                self[:io] = pyjlwrap_new(io) # avoid recursion
+                self[:istextio] = istextio
+            end
+            close(self) = @with_ioraise(close(pyio_jl(self)))
+            closed.get(self) = @with_ioraise(!isopen(pyio_jl(self)))
+            encoding.get(self) = "UTF-8"
+            fileno(self) = @with_ioraise(fd(pyio_jl(self)))
+            flush(self) = @with_ioraise(flush(pyio_jl(self)))
+            isatty(self) = isa(pyio_jl(self), Base.TTY)
+            readable(self) = isreadable(pyio_jl(self))
+            writable(self) = iswritable(pyio_jl(self))
+            readline(self, size=typemax(Int)) =
+                @with_ioraise(jl_io_readline(pyio_jl(self), size))
+            readlines(self, size=typemax(Int)) =
+                @with_ioraise(jl_io_readlines(pyio_jl(self), size))
+            seek(self, offset, whence=1) =
+                @with_ioraise(jl_io_seek(pyio_jl(self), offset, whence))
+            seekable(self) = isseekable(pyio_jl(self))
+            tell(self) = @with_ioraise(position(pyio_jl(self)))
+            writelines(self, seq) =
+                @with_ioraise(for s in seq write(pyio_jl(self), s) end)
+            read(self, nb=typemax) =
+                @with_ioraise(istextio ? bytestring(readbytes(io, nb)) :
+                                         readbytes(io, nb))
+            readall(self) =
+                @with_ioraise(self[:istextio] ? readall(pyio_jl(self)) :
+                                                readbytes(pyio_jl(self)))
+            readinto(self, b) = @with_ioraise(readbytes!(pyio_jl(self), b))
+            write(self, b) = @with_ioraise(write(pyio_jl(self), b))
+        end)
         pyio_initialized::Bool = true
     end
     return
@@ -362,7 +114,8 @@ end
 
 function PyObject(io::IO)
     pyio_initialize()
-    pyjlwrap_new(jl_IOType, io)
+    # pyjlwrap_new is necessary to avoid PyIO(io) calling PyObject(::IO)
+    PyIO(pyjlwrap_new(io))
 end
 
 """
@@ -374,5 +127,6 @@ so they can be used for binary I/O in Python
 """
 function PyTextIO(io::IO)
     pyio_initialize()
-    pyjlwrap_new(jl_TextIOType, io)
+    PyIO(pyjlwrap_new(io); istextio=true)
 end
+
