@@ -1,4 +1,4 @@
-# Define Python classes out of Julia types
+# Define new Python classes from Julia:
 
 using MacroTools: @capture
 
@@ -35,7 +35,6 @@ function def_py_class(type_name::AbstractString, methods::Vector;
     end
     new_type
 end
-        
 
 ######################################################################
 # @pydef macro
@@ -54,10 +53,10 @@ function parse_pydef_toplevel(expr)
         @assert(@capture(expr, type class_name_
                     lines__
             end), "Malformed @pydef expression")
-        
+
         base_classes = []
     end
-    if isa(lines[1], Expr) && lines[1].head == :block 
+    if isa(lines[1], Expr) && lines[1].head == :block
         # unfortunately, @capture fails to parse the type's fields correctly
         # It's been reported and fixed, we can remove this line on the next
         # MacroTools release (> v0.2)
@@ -65,7 +64,6 @@ function parse_pydef_toplevel(expr)
     end
     return class_name::Symbol, base_classes, lines
 end
-    
 
 function parse_pydef(expr)
     class_name, base_classes, lines = parse_pydef_toplevel(expr)
@@ -73,7 +71,7 @@ function parse_pydef(expr)
     function_defs = Expr[] # vector of :(function ...) expressions
     methods = Tuple{Any, Symbol}[] # (py_name, jl_method_name)
     getter_dict = Dict{Any, Symbol}() # python_var => jl_getter_name
-    setter_dict = Dict{Any, Symbol}() 
+    setter_dict = Dict{Any, Symbol}()
     method_syms = Dict{Any, Symbol}() # see below
     for line in lines
         if !isa(line, LineNumberNode) && line.head != :line # need to skip those
@@ -122,15 +120,13 @@ function parse_pydef(expr)
     class_name, base_classes, methods, getter_dict, setter_dict, function_defs
 end
 
-
-
 """ `@pydef` creates a Python class whose methods are implemented in Julia.
 Example: <br><br>
-    
+
     @pyimport numpy.polynomial as P
 
     @pydef type Doubler <: P.Polynomial
-       __init__(self, x=10) = (self[:x] = x) 
+       __init__(self, x=10) = (self[:x] = x)
        my_method(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
        x2.get(self) = self[:x] * 2
        x2.set!(self, new_x::Int) = (self[:x] = new_x / 2)
@@ -139,7 +135,7 @@ Example: <br><br>
     Doubler()[:x2]
 
 is equivalent to <br><br>
-    
+
     class JuliaType(numpy.polynomial.Polynomial):
        def __init__(self, x=10):
           self.x = x
@@ -172,7 +168,6 @@ macro pydef(class_expr)
     class_name, _, _ = parse_pydef_toplevel(class_expr)
     :(const $(esc(class_name)) = @pydef_object($(esc(class_expr))))
 end
-
 
 """ `@pydef_object` is like `@pydef`, but it returns the
 metaclass as a `PyObject` instead of binding it to the class name.
