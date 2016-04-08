@@ -74,16 +74,20 @@ macro doevent(body)
     Expr(:function, :($(esc(:doevent))(async)), body)
 end
 
-# GTK (either GTK2 or GTK3, depending on gtkmodule):
-function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
+# For PyPlot issue #181: recent pygobject releases emit a warning
+# if we don't specify which version we want:
+function gtk_requireversion(gtkmodule::AbstractString, vers::VersionNumber=v"3.0")
     if startswith(gtkmodule, "gi.")
-        # issue #181: recent pygobject releases emit a warning
-        # if we don't specify which version we want:
         gi = pyimport("gi")
         if gi[:get_required_version]("Gtk") === nothing
-            gi[:require_version]("Gtk", "3.0")
+            gi[:require_version]("Gtk", string(vers))
         end
     end
+end
+
+# GTK (either GTK2 or GTK3, depending on gtkmodule):
+function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
+    gtk_requireversion(gtkmodule)
     gtk = pyimport(gtkmodule)
     events_pending = gtk["events_pending"]
     main_iteration = gtk["main_iteration"]
