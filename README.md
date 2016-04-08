@@ -345,20 +345,19 @@ For instance,
     @pyimport numpy.polynomial as P
     @pydef type Doubler <: P.Polynomial
         __init__(self, x=10) = (self[:x] = x)
-        my_method(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
+        my_method(self, arg1::Number) = arg1 + 20
         x2.get(self) = self[:x] * 2
-        x2.set!(self, new_x::Int) = (self[:x] = new_x / 2)
+        x2.set!(self, new_val) = (self[:x] = new_val / 2)
     end
     Doubler()[:x2]
 
-is equivalent to the following Python code:
+is essentially equivalent to the following Python code:
 
     import numpy.polynomial
     class Doubler(numpy.polynomial.Polynomial):
         def __init__(self, x=10):
             self.x = x
-        def my_method(self, arg1):
-            return arg1 + 20
+        def my_method(self, arg1): return arg1 + 20
         @property
         def x2(self): return self.x * 2
         @x2.setter
@@ -366,8 +365,7 @@ is equivalent to the following Python code:
             self.x = new_val / 2
     Doubler().x2
 
-The method arguments and return values are automatically converted. All Python
-special methods are supported (`__len__`, `__add__`, etc.).
+The method arguments and return values are automatically converted between Julia and Python. All Python special methods are supported (`__len__`, `__add__`, etc.).
 
 `@pydef` allows for multiple inheritance of Python types:
 
