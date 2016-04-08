@@ -11,7 +11,8 @@
 This package provides a `@pyimport` macro that mimics a Python
 `import` statement: it imports a Python module and provides Julia
 wrappers for all of the functions and constants therein, including
-automatic conversion of types between Julia and Python.
+automatic conversion of types between Julia and Python and defining
+new Python classes from Julia methods.
 
 It also provides facilities for lower-level manipulation of Python
 objects, including a `PyObject` type for opaque Python objects and a
@@ -367,7 +368,7 @@ is essentially equivalent to the following Python code:
 
 The method arguments and return values are automatically converted between Julia and Python. All Python special methods are supported (`__len__`, `__add__`, etc.).
 
-`@pydef` allows for multiple inheritance of Python types:
+`@pydef` allows for multiple inheritance of Python classes:
 
     @pydef type SomeType <: (BaseClass1, BaseClass2)
         ...
