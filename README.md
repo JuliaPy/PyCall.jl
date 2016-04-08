@@ -337,6 +337,63 @@ For example, calling `f(x, function=g)` will fail because `function` is
 a reserved word in Julia. In such cases, you can use the lower-level
 Julia syntax `f(x; :function=>g)`.
 
+### Defining Python Classes
+
+`@pydef` creates a Python class whose methods are implemented in Julia.
+For instance,
+    
+    @pyimport numpy.polynomial as P
+
+    @pydef type Doubler <: P.Polynomial
+       __init__(self, x=10) = (self[:x] = x) 
+       my_method(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
+       x2.get(self) = self[:x] * 2
+       x2.set!(self, new_x::Int) = (self[:x] = new_x / 2)
+    end
+
+    Doubler()[:x2]
+
+is equivalent to
+    
+    class Doubler(numpy.polynomial.Polynomial):
+       def __init__(self, x=10):
+          self.x = x
+
+       def my_method(self, arg1):
+          return arg1 + 20
+
+       @property
+       def x2(self): return self.x * 2
+
+       @x2.setter
+       def x2(self, new_val):
+           self.x = new_val / 2
+
+The methods' arguments and return values are automatically converted. All Python
+special methods are supported (__len__, __add__, etc.)
+
+`@pydef` allows for multiple-inheritance of Python types:
+
+    @pydef type SomeType <: (BaseClass1, BaseClass2)
+        ...
+    end
+
+Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter)
+
+    using PyCall
+    @pyimport Tkinter as tk
+
+    @pydef type SampleApp <: tk.Tk
+	__init__(self, args...; kwargs...) = begin
+	    tk.Tk[:__init__](self, args...; kwargs...)
+	    self[:label] = tk.Label(text="Hello, world!")
+	    self[:label][:pack](padx=10, pady=10)
+	end
+    end
+
+    app = SampleApp()
+    app[:mainloop]()
+
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),

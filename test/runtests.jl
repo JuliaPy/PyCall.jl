@@ -134,7 +134,7 @@ pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
 pyutf8(s::ByteString) = pyutf8(PyObject(s))
 
 # IO (issue #107)
-@test roundtripeq(STDOUT)
+#@test roundtripeq(STDOUT) # No longer true since #250
 let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test !obuf[:isatty]()
     @test obuf[:writable]()
@@ -171,7 +171,7 @@ let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
 end
 let nm = tempname()
     open(nm, "w") do f
-        @test roundtripeq(f)
+        # @test roundtripeq(f)  # PR #250
         pf = PyObject(f)
         @test pf[:fileno]() == fd(f)
         @test pf[:writable]()

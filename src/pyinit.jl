@@ -13,6 +13,8 @@ const MethodType = PyNULL()
 const MethodWrapperType = PyNULL()
 const ufuncType = PyNULL()
 const format_traceback = PyNULL()
+const pyproperty = PyNULL()
+const jlfun2pyfun = PyNULL()
 
 #########################################################################
 
@@ -51,6 +53,7 @@ function __init__()
 
     copy!(inspect, pyimport("inspect"))
     copy!(builtin, pyimport(pyversion.major < 3 ? "__builtin__" : "builtins"))
+    copy!(pyproperty, pybuiltin(:property))
 
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
 
@@ -81,20 +84,10 @@ function __init__()
     # all cfunctions must be compiled at runtime
     global const jl_Function_call_ptr =
         cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr))
-    global const pyio_repr_ptr = cfunction(pyio_repr, PyPtr, (PyPtr,))
     global const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
     global const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
     global const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
     global const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
-
-    # similarly, any MethodDef calls involve cfunctions
-    global const jl_TextIO_methods = make_io_methods(true)
-    global const jl_IO_methods = make_io_methods(false)
-    global const jl_IO_getset = PyGetSetDef[
-            PyGetSetDef("closed", jl_IO_closed)
-            PyGetSetDef("encoding", jl_IO_encoding)
-            PyGetSetDef()
-    ]
 
     # PyMemberDef stores explicit pointers, hence must be initialized in __init__
     global const pyjlwrap_members =
@@ -109,6 +102,15 @@ function __init__()
     global const jl_FunctionType = pyjlwrap_type("PyCall.jl_Function",
                                                  t -> t.tp_call =
                                                  jl_Function_call_ptr)
+
+    # jl_FunctionType is a class, and when assigning it to an object
+    #    obj[:foo] = some_julia_function
+    # it won't behave like a regular Python method because it's not a Python
+    # function (in particular, `self` won't be passed to it). The solution is:
+    #    obj[:foo] = jlfun2pyfun(some_julia_function)
+    # This is a bit of a kludge, obviously.
+    copy!(jlfun2pyfun,
+          pyeval("""lambda f: lambda *args, **kwargs: f(*args, **kwargs)"""))
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set

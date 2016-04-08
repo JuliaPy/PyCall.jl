@@ -7,7 +7,7 @@ export pycall, pyimport, pybuiltin, PyObject,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
-       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL
+       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -142,6 +142,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")
+include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
 
@@ -593,14 +594,11 @@ end
 # for the reasons described in JuliaLang/julia#12256.
 
 precompile(jl_Function_call, (PyPtr,PyPtr,PyPtr))
-precompile(pyio_repr, (PyPtr,))
 precompile(pyjlwrap_dealloc, (PyPtr,))
 precompile(pyjlwrap_repr, (PyPtr,))
 precompile(pyjlwrap_hash, (PyPtr,))
 precompile(pyjlwrap_hash32, (PyPtr,))
 
-for f in (jl_IO_close, jl_IO_fileno, jl_IO_flush, jl_IO_isatty, jl_IO_readable, jl_IO_writable, jl_IO_readline, jl_IO_readlines, jl_IO_seek, jl_IO_seekable, jl_IO_tell, jl_IO_writelines, jl_IO_read_text, jl_IO_read, jl_IO_readall_text, jl_IO_readall, jl_IO_readinto, jl_IO_write)
-    precompile(f, (PyPtr,PyPtr))
-end
+# TODO: precompilation of the io.jl functions
 
 end # module PyCall
