@@ -16,10 +16,10 @@ using MacroTools: @capture
 Arguments
 ---------
 - `methods`: a vector of tuples `(py_name::String, jl_fun::Function)`
-   py_name will be a method of the Python class, which will call `jl_function`
+   `py_name` will be a method of the Python class, which will call `jl_fun`
 - `base_classes`: the Python base classes to inherit from.
 
-Return value: the created class (::PyTypeObject)
+Return value: the created class (`::PyTypeObject`)
 """
 function def_py_class(type_name::AbstractString, methods::Vector;
                       base_classes=[], getsets::Vector=[])
@@ -120,40 +120,37 @@ function parse_pydef(expr)
     class_name, base_classes, methods, getter_dict, setter_dict, function_defs
 end
 
-""" `@pydef` creates a Python class whose methods are implemented in Julia.
-Example: <br><br>
+"""
+`@pydef` creates a Python class whose methods are implemented in Julia.
+For instance,
 
     @pyimport numpy.polynomial as P
-
     @pydef type Doubler <: P.Polynomial
-       __init__(self, x=10) = (self[:x] = x)
-       my_method(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
-       x2.get(self) = self[:x] * 2
-       x2.set!(self, new_x::Int) = (self[:x] = new_x / 2)
+        __init__(self, x=10) = (self[:x] = x)
+        my_method(self, arg1=5) = arg1 + 20  # the right-hand-side is Julia code
+        x2.get(self) = self[:x] * 2
+        x2.set!(self, new_x::Int) = (self[:x] = new_x / 2)
     end
-
     Doubler()[:x2]
 
-is equivalent to <br><br>
+is equivalent to the following Python code:
 
     class JuliaType(numpy.polynomial.Polynomial):
-       def __init__(self, x=10):
-          self.x = x
+        def __init__(self, x=10):
+            self.x = x
+        def my_method(self, arg1):
+            return arg1 + 20
+        @property
+        def x2(self): return self.x * 2
+        @x2.setter
+        def x2(self, new_val):
+            self.x = new_val / 2
+    Doubler().x2
 
-       def my_method(self, arg1):
-          return arg1 + 20
+The method arguments and return values are automatically converted. All Python
+special methods are supported (`__len__`, `__add__`, etc.)
 
-       @property
-       def x2(self): return self.x * 2
-
-       @x2.setter
-       def x2(self, new_val):
-           self.x = new_val / 2
-
-The methods' arguments and return values are automatically converted. All Python
-special methods are supported (__len__, __add__, etc.)
-
-`@pydef` allows for multiple-inheritance of Python types:
+`@pydef` allows for multiple inheritance of Python types:
 
     @pydef type SomeType <: (BaseClass1, BaseClass2)
         ...
@@ -169,9 +166,11 @@ macro pydef(class_expr)
     :(const $(esc(class_name)) = @pydef_object($(esc(class_expr))))
 end
 
-""" `@pydef_object` is like `@pydef`, but it returns the
+"""
+`@pydef_object` is like `@pydef`, but it returns the
 metaclass as a `PyObject` instead of binding it to the class name.
-It's side-effect-free, except for the definition of the class methods. """
+It's side-effect-free, except for the definition of the class methods.
+"""
 macro pydef_object(class_expr)
     class_name, base_classes, methods_, getter_dict, setter_dict, function_defs=
         parse_pydef(class_expr)

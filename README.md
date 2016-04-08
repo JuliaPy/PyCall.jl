@@ -351,7 +351,7 @@ For instance,
     end
     Doubler()[:x2]
 
-is equivalent to
+is equivalent to the following Python code:
 
     import numpy.polynomial
     class Doubler(numpy.polynomial.Polynomial):
