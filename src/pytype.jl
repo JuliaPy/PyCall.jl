@@ -22,6 +22,8 @@ end
 
 # A PyCFunction is a C function of the form
 #     PyObject *func(PyObject *self, PyObject *args)
+# or
+#     PyObject *func(PyObject *self, PyObject *args, PyObject *kwargs)
 # The first parameter is the "self" function for method, or
 # for module functions it is the module object.  The second
 # parameter is either a tuple of args (for METH_VARARGS),
@@ -31,6 +33,7 @@ end
 
 # ml_flags should be one of:
 const METH_VARARGS = 0x0001 # args are a tuple of arguments
+const METH_KEYWORDS = 0x0002  # two arguments: the varargs and the kwargs
 const METH_NOARGS = 0x0004  # no arguments (NULL argument pointer)
 const METH_O = 0x0008       # single argument (not wrapped in tuple)
 
@@ -41,7 +44,9 @@ const METH_STATIC = 0x0020 # for static methods
 const NULL_UInt8_Ptr = convert(Ptr{UInt8}, C_NULL)
 function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
-                cfunction(meth, PyPtr, (PyPtr,PyPtr)),
+                ((flags & METH_KEYWORDS) == 0 ?
+                 cfunction(meth, PyPtr, (PyPtr,PyPtr)) :
+                 cfunction(meth, PyPtr, (PyPtr,PyPtr,PyPtr))),
                 convert(Cint, flags),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
@@ -64,7 +69,7 @@ end
 function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
                 cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
-                cfunction(set, PyPtr, (PyPtr,Ptr{Void})),
+                cfunction(set, Int, (PyPtr,PyPtr,Ptr{Void})),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
@@ -431,4 +436,3 @@ is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr
 
 PyObject(x::Any) = pyjlwrap_new(x)
 
-################################################################
