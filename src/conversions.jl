@@ -619,7 +619,7 @@ function mpmath_init()
         copy!(mpf, mpmath["mpf"])
         copy!(mpc, mpmath["mpc"])
     end
-    curprec = get_bigfloat_precision()
+    curprec = precision(BigFloat)
     if mpprec[1] != curprec
         mpprec[1] = curprec
         mpmath["mp"]["prec"] = mpprec[1]
