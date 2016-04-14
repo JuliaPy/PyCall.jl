@@ -28,7 +28,6 @@ end
 # and calls it.
 
 function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
-    ret_ = convert(PyPtr, C_NULL)
     args = PyObject(args_) # don't need pyincref because of finally clause below
     try
         f = unsafe_pyjlwrap_to_objref(self_)::Function
@@ -39,14 +38,13 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
             kwargs = [ (k,v) for (k,v) in kw ]
             ret = PyObject(f(convert(PyAny, args)...; kwargs...))
         end
-        ret_ = ret.o
-        ret.o = convert(PyPtr, C_NULL) # don't decref
+        return pystealref!(ret)
     catch e
         pyraise(e)
     finally
-        args.o = convert(PyPtr, C_NULL) # don't decref
+        args.o = PyPtr_NULL # don't decref
     end
-    return ret_::PyPtr
+    return PyPtr_NULL
 end
 
 function pycallback(f::Function)

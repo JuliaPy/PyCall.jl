@@ -358,13 +358,9 @@ end
 unsafe_pyjlwrap_to_objref(o::PyPtr) =
   unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Void}}, o), 3))
 
-function pyjlwrap_repr(o::PyPtr)
-    o = PyObject(try string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
-                 catch "<PyCall.jlwrap NULL>"; end)
-    oret = o.o
-    o.o = convert(PyPtr, C_NULL) # don't decref
-    return oret
-end
+pyjlwrap_repr(o::PyPtr) =
+    pystealref!(PyObject(try string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
+                         catch "<PyCall.jlwrap NULL>"; end))
 
 function pyjlwrap_hash(o::PyPtr)
     h = hash(unsafe_pyjlwrap_to_objref(o))
@@ -435,4 +431,3 @@ is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr
 # just wrap the Julia object in a Python object
 
 PyObject(x::Any) = pyjlwrap_new(x)
-

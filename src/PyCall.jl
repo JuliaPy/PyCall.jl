@@ -56,13 +56,15 @@ end
 
 typealias PyPtr Ptr{PyObject_struct} # type for PythonObject* in ccall
 
+const PyPtr_NULL = PyPtr(C_NULL)
+
 #########################################################################
 # Wrapper around Python's C PyObject* type, with hooks to Python reference
 # counting and conversion routines to/from C and Julia types.
 """
     PyObject(juliavar)
 
-This converts a julia variable to a PyObject, which is a reference to a Python object. 
+This converts a julia variable to a PyObject, which is a reference to a Python object.
 You can convert back to native julia types using `convert(T, o::PyObject)`, or using `PyAny(o)`.
 
 Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute` in Python, with automatic type conversion.
@@ -78,11 +80,11 @@ type PyObject
     end
 end
 
-PyNULL() = PyObject(convert(PyPtr, C_NULL))
+PyNULL() = PyObject(PyPtr_NULL)
 
 function pydecref(o::PyObject)
     ccall(@pysym(:Py_DecRef), Void, (PyPtr,), o.o)
-    o.o = convert(PyPtr, C_NULL)
+    o.o = PyPtr_NULL
     o
 end
 
@@ -97,6 +99,18 @@ end
 function pyincref(o::PyPtr)
     ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
     PyObject(o)
+end
+
+"""
+"Steal" a reference from a PyObject: return the raw PyPtr, while
+setting the corresponding `o.o` field to `NULL` so that no decref
+will be performed when `o` is garbage collected.  (This means that
+you can no longer use `o`.)  Used for passing objects to Python.
+"""
+function pystealref!(o::PyObject)
+    optr = o.o
+    o.o = PyPtr_NULL # don't decref when o is gc'ed
+    return optr
 end
 
 function Base.copy!(dest::PyObject, src::PyObject)
@@ -277,7 +291,7 @@ const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break
 """
     pywrap(o::PyObject)
 
-This returns a wrapper `w` that is an anonymous module which provides (read) access to converted versions of o's members as w.member. 
+This returns a wrapper `w` that is an anonymous module which provides (read) access to converted versions of o's members as w.member.
 
 For example, `@pyimport module as name` is equivalent to `const name = pywrap(pyimport("module"))`
 
@@ -572,12 +586,12 @@ function pyeval_(s::AbstractString, locals::PyDict, input_type)
 end
 
 """
-    pyeval(s::AbstractString, returntype::TypeTuple=PyAny, locals=PyDict{AbstractString, PyObject}(), 
+    pyeval(s::AbstractString, returntype::TypeTuple=PyAny, locals=PyDict{AbstractString, PyObject}(),
                                 input_type=Py_eval_input; kwargs...)
 
-This evaluates `s` as a Python string and returns the result converted to `rtype` (which defaults to `PyAny`). The remaining arguments are keywords that define local variables to be used in the expression. 
+This evaluates `s` as a Python string and returns the result converted to `rtype` (which defaults to `PyAny`). The remaining arguments are keywords that define local variables to be used in the expression.
 
-For example, `pyeval("x + y", x=1, y=2)` returns 3. 
+For example, `pyeval("x + y", x=1, y=2)` returns 3.
 """
 function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
                 locals=PyDict{AbstractString, PyObject}(),
