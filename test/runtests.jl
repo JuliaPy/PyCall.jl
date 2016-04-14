@@ -111,10 +111,6 @@ let x = PyVector(PyAny[])
 end
 
 if pyversion >= v"2.7" && isdefined(PyCall, :PyDateTime_CAPI)
-    # Dates is built-in in Julia 0.4
-    if !isdefined(Base, :Dates)
-        import Dates
-    end
     @test roundtripeq(Dates.Date(2012,3,4))
     @test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
     @test roundtripeq(Dates.Millisecond(typemax(Int32)))

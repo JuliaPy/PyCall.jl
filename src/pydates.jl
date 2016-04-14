@@ -1,11 +1,6 @@
 # Conversion functions for date and time objects in the Python datetime
 # module and the Julia Dates module.
 
-# Dates is built-in in Julia 0.4
-if !isdefined(Base, :Dates)
-    import Dates
-end
-
 # Unfortunately, the Python C API (in Python/Include/datetime.h) is somewhat
 # painful to call from Julia because it consists mainly of macros that
 # translate to lookups in datastructures that are loaded at runtime by
