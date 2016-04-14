@@ -29,13 +29,13 @@ end
 
 function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     ret_ = convert(PyPtr, C_NULL)
-    args = PyObject(args_)
+    args = PyObject(args_) # don't need pyincref because of finally clause below
     try
         f = unsafe_pyjlwrap_to_objref(self_)::Function
         if kw_ == C_NULL
             ret = PyObject(f(convert(PyAny, args)...))
         else
-            kw = PyDict{Symbol,PyAny}(PyObject(kw_))
+            kw = PyDict{Symbol,PyAny}(pyincref(kw_))
             kwargs = [ (k,v) for (k,v) in kw ]
             ret = PyObject(f(convert(PyAny, args)...; kwargs...))
         end
