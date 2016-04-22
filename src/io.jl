@@ -97,11 +97,11 @@ function pyio_initialize()
             writelines(self, seq) =
                 @with_ioraise(for s in seq write(pyio_jl(self), s) end)
             read(self, nb=typemax) =
-                @with_ioraise(istextio ? bytestring(readbytes(io, nb)) :
-                                         readbytes(io, nb))
+                @with_ioraise(istextio ? bytestring(read(io, nb)) :
+                                         read(io, nb))
             readall(self) =
-                @with_ioraise(self[:istextio] ? readall(pyio_jl(self)) :
-                                                readbytes(pyio_jl(self)))
+                @with_ioraise(self[:istextio] ? readstring(pyio_jl(self)) :
+                                                read(pyio_jl(self)))
             readinto(self, b) = @with_ioraise(readbytes!(pyio_jl(self), b))
             write(self, b) = @with_ioraise(write(pyio_jl(self), b))
         end)
@@ -122,11 +122,10 @@ end
     PyTextIO(io::IO)
     PyObject(io::IO)
 
-Julia IO streams are converted into Python objects implementing the RawIOBase interface, 
+Julia IO streams are converted into Python objects implementing the RawIOBase interface,
 so they can be used for binary I/O in Python
 """
 function PyTextIO(io::IO)
     pyio_initialize()
     PyIO(pyjlwrap_new(io); istextio=true)
 end
-

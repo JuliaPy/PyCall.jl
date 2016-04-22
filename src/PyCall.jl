@@ -539,7 +539,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/png", "_repr_png_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
-    T = istext(mime()) ? AbstractString : Vector{UInt8}
+    T = istextmime(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
         function writemime(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
