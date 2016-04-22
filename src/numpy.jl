@@ -175,14 +175,20 @@ const npy_typestrs = Dict( "b1"=>Bool,
 #########################################################################
 # no-copy conversion of Julia arrays to NumPy arrays.
 
-function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
+# In some cases, an array is already in row-major order (e.g., RGB
+# images) and it is useful to reverse the order of dimensions passed
+# to PyArray_New.  In these cases, set revdims=true.
+
+function PyObject{T<:NPY_TYPES}(a::StridedArray{T}, revdims::Bool=false)
     try
         @npyinitialize
+        size_a = revdims ? reverse(size(a)) : size(a)
+        strides_a = revdims ? reverse(strides(a)) : strides(a)
         p = @pycheck ccall(npy_api[:PyArray_New], PyPtr,
               (PyPtr,Cint,Ptr{Int},Cint, Ptr{Int},Ptr{T}, Cint,Cint,PyPtr),
               npy_api[:PyArray_Type],
-              ndims(a), Int[size(a)...], npy_type(T),
-              Int[strides(a)...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
+              ndims(a), Int[size_a...], npy_type(T),
+              Int[strides_a...] * sizeof(eltype(a)), a, sizeof(eltype(a)),
               NPY_ARRAY_ALIGNED | NPY_ARRAY_WRITEABLE,
               C_NULL)
         return PyObject(p, a)
