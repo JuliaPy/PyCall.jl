@@ -2,7 +2,7 @@ __precompile__()
 
 module PyCall
 
-export pycall, pyimport, pybuiltin, PyObject,
+export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,

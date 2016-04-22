@@ -211,7 +211,19 @@ in Python (assuming that the object is callable in Python).  In Julia
 `pycall` form is still useful in Julia 0.4 if you want to specify the
 return type.
 
-#### PyArray
+#### Arrays and PyArray
+
+##### From Julia to Python
+
+Assuming you have NumPy installed (true by default if you use Conda),
+then a Julia `a::Array` of NumPy-compatible elements is converted
+by `PyObject(a)` into a NumPy wrapper for the *same data*, i.e. without
+copying the data.   Julia arrays are stored in [column-major order](https://en.wikipedia.org/wiki/Row-major_order),
+and since NumPy supports column-major arrays this is not a problem.
+
+However, the *default* ordering of NumPy arrays created in *Python* is row-major, and some Python packages will throw an error if you try to pass them column-major NumPy arrays.  To deal with this, you can use `PyReverseDims(a)` to pass a Julia array as a row-major NumPy array with the dimensions *reversed*. For example, if `a` is a 3x4x5 Julia array, then `PyReverseDims(a)` passes it as a 5x4x3 NumPy row-major array (without making a copy of the underlying data).
+
+##### From Python to Julia
 
 Multidimensional NumPy arrays (`ndarray`) are supported and can be
 converted to the native Julia `Array` type, which makes a copy of the data.
