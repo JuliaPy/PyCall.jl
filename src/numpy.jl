@@ -202,9 +202,8 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     end
 end
 
-function PyReverseDims{T<:NPY_TYPES}(a::StridedArray{T})
-    return NpyArray(a, true)
-end
+PyReverseDims{T<:NPY_TYPES}(a::StridedArray{T}) = NpyArray(a, true)
+PyReverseDims(a::BitArray) = PyReverseDims(Array(a))
 
 """
     PyReverseDims(array)

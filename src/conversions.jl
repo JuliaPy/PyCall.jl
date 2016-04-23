@@ -200,7 +200,7 @@ end
 """
     PyVector(o::PyObject)
 
-This returns a PyVector object, which is a wrapper around an arbitrary Python list or sequence object. 
+This returns a PyVector object, which is a wrapper around an arbitrary Python list or sequence object.
 
 Alternatively, `PyVector` can be used as the return type for a `pycall` that returns a sequence object (including tuples).
 """
@@ -381,6 +381,8 @@ end
 convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
 convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
 
+PyObject(a::BitArray) = PyObject(Array(a))
+
 # NumPy conversions (multidimensional arrays)
 include("numpy.jl")
 
@@ -393,7 +395,7 @@ include("numpy.jl")
 
 This returns a PyDict, which is a no-copy wrapper around a Python dictionary.
 
-Alternatively, you can specify the return type of a `pycall` as PyDict. 
+Alternatively, you can specify the return type of a `pycall` as PyDict.
 """
 type PyDict{K,V} <: Associative{K,V}
     o::PyObject
