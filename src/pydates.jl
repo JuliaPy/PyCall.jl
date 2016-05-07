@@ -98,8 +98,8 @@ function PyObject(p::Dates.Millisecond)
 end
 
 for T in (:Date, :DateTime, :Delta)
-    f = symbol(string("Py", T, "_Check"))
-    t = Expr(:., :PyDateTimeAPI, QuoteNode(symbol(string(T, "Type"))))
+    f = Symbol(string("Py", T, "_Check"))
+    t = Expr(:., :PyDateTimeAPI, QuoteNode(Symbol(string(T, "Type"))))
     @eval $f(o::PyObject) = pyisinstance(o, $t)
 end
 

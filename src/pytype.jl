@@ -261,7 +261,7 @@ type PyTypeObject
     # Julia-specific fields, after the end of the Python structure:
 
     # save the tp_name Julia string so that it is not garbage-collected
-    tp_name_save::ASCIIString
+    tp_name_save # This is a gc slot that is never read from
 
     function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
         # figure out Py_TPFLAGS_DEFAULT, depending on Python version
@@ -280,7 +280,8 @@ type PyTypeObject
              Py_TPFLAGS_HAVE_CLASS |
              Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
              Py_TPFLAGS_HAVE_INDEX)
-        name_save = bytestring(name)
+        # This and the `unsafe_convert` below emulate a `ccall`
+        name_save = Base.cconvert(Ptr{UInt8}, name)
         t = new(0,C_NULL,0,
                 unsafe_convert(Ptr{UInt8}, name_save),
                 convert(Int, basicsize), 0,
