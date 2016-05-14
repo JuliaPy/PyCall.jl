@@ -58,14 +58,9 @@ convert(::Type{Void}, po::PyObject) = nothing
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
 
-PyObject(s::UTF8String) =
-  PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
-                           PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
-                           s, sizeof(s), C_NULL))
-
 function PyObject(s::AbstractString)
-    sb = bytestring(s)
-    if pyunicode_literals
+    sb = String(s)
+    if pyunicode_literals || !isascii(sb)
         PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
                                  PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
                                  sb, sizeof(sb), C_NULL))
@@ -92,7 +87,7 @@ end
 # TODO: should symbols be converted to a subclass of Python strings/bytes,
 #       so that PyAny conversion can convert it back to a Julia symbol?
 PyObject(s::Symbol) = PyObject(string(s))
-convert(::Type{Symbol}, po::PyObject) = symbol(convert(AbstractString, po))
+convert(::Type{Symbol}, po::PyObject) = Symbol(convert(AbstractString, po))
 
 #########################################################################
 # ByteArray conversions
@@ -621,7 +616,7 @@ function mpmath_init()
         copy!(mpf, mpmath["mpf"])
         copy!(mpc, mpmath["mpc"])
     end
-    curprec = get_bigfloat_precision()
+    curprec = precision(BigFloat)
     if mpprec[1] != curprec
         mpprec[1] = curprec
         mpmath["mp"]["prec"] = mpprec[1]
@@ -702,7 +697,7 @@ pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyi
 pycomplex_query(o::PyObject) =
     pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : Union{}
 
-pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? UTF8String : Union{}
+pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? String : Union{}
 
 # Given call overloading, all PyObjects are callable already, so
 # we never automatically convert to Function.

@@ -105,7 +105,7 @@ function parse_pydef(expr)
                 else
                     error("$access is not a valid accessor; must be either get or set!")
                 end
-                jl_fun_name = gensym(symbol(attribute,:_,access))
+                jl_fun_name = gensym(Symbol(attribute,:_,access))
                 push!(function_defs, :(function $jl_fun_name($(args...))
                     $rhs
                 end))

@@ -24,6 +24,7 @@ import Base: sigatomic_begin, sigatomic_end
 
 ## Compatibility import for v0.4, v0.5
 using Compat
+import Compat.String
 import Base.unsafe_convert
 
 #########################################################################
@@ -286,7 +287,7 @@ keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
 # and providing access to o's members (converted to PyAny) as w.member.
 
 # we skip wrapping Julia reserved words (which cannot be type members)
-const reserved = Set{ASCIIString}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
+const reserved = Set{String}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
 
 """
     pywrap(o::PyObject)
@@ -302,11 +303,11 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
                       pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     m = Module(mname, false)
-    consts = [Expr(:const, Expr(:(=), symbol(x[1]), convert(PyAny, x[2]))) for x in members]
+    consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
                   convert(Vector{Symbol}, o["__all__"])
               catch
-                  [symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
+                  [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
     eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
                  Expr(:export, exports...)))

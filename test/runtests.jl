@@ -1,4 +1,5 @@
 using Base.Test, PyCall, Compat
+import Compat.String
 
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
@@ -132,7 +133,7 @@ end
 # in Python 3, we need a specific encoding to write strings or bufferize them
 # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
 pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
-pyutf8(s::ByteString) = pyutf8(PyObject(s))
+pyutf8(s::String) = pyutf8(PyObject(s))
 
 # IO (issue #107)
 #@test roundtripeq(STDOUT) # No longer true since #250

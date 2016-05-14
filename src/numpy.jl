@@ -85,7 +85,7 @@ function npyinitialize()
     end
     API = pointer_to_array(PyArray_API, (PyArray_API_length,))
     for m in eachmatch(r, hdr) # build npy_api table
-        npy_api[symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
+        npy_api[Symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
     end
     if !haskey(npy_api, :PyArray_New)
         error("failure parsing NumPy PyArray_API symbol table")
