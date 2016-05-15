@@ -7,7 +7,8 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
-       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef
+       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
+       pyimport_conda
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -24,6 +25,7 @@ import Base: sigatomic_begin, sigatomic_end
 
 ## Compatibility import for v0.4, v0.5
 using Compat
+import Conda
 import Compat.String
 import Base.unsafe_convert
 
@@ -364,6 +366,43 @@ macro pyimport(name, optional_varname...)
             error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
         end
         nothing
+    end
+end
+
+#########################################################################
+
+"""
+    pyimport_conda(modulename, condapkg)
+
+Returns the result of `pyimport(modulename)` if possible.   If the module
+is not found, and PyCall is configured to use the Conda Python distro
+(via the Julia Conda package), then automatically install `condapkg`
+via `Conda.add(condapkg)` and then re-try the `pyimport`.
+
+If PyCall is not using Conda and the `pyimport` fails, throws
+an exception with an error message telling the user how to configure
+PyCall to use Conda for automated installation of the module.
+"""
+function pyimport_conda(modulename::AbstractString, condapkg::AbstractString)
+    try
+        pyimport(modulename)
+    catch e
+        if PyCall.conda
+            info("Installing $modulename via the Conda $condapkg package...")
+            Conda.add(condapkg)
+            pyimport(modulename)
+        else
+            error("""
+                Failed to import required Python module $modulename.
+
+                For automated $modulename installation, try configuring PyCall to use the Conda Python distribution within Julia.  Relaunch Julia and run:
+                    ENV["PYTHON"]=""
+                    Pkg.build("PyCall")
+                before trying again.
+
+                The pyimport exception was: $e
+                """)
+        end
     end
 end
 

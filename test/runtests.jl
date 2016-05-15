@@ -266,3 +266,16 @@ end
 let x = PyNULL(), y = copy!(x, PyObject(314159))
     @test Int(x) == Int(y) == 314159
 end
+
+@test pyimport_conda("inspect", "not a conda package").o != C_NULL
+import Conda
+if PyCall.conda
+    # install the tiny conda-api package as a test
+    let already_installed = "conda-api" ∈ Conda._installed_packages()
+        @test pyimport_conda("conda_api", "conda-api").o != C_NULL
+        @test "conda-api" ∈ Conda._installed_packages()
+        if !already_installed
+            Conda.rm("conda-api")
+        end
+    end
+end
