@@ -372,7 +372,7 @@ end
 #########################################################################
 
 """
-    pyimport_conda(modulename, condapkg)
+    pyimport_conda(modulename, condapkg, [channel])
 
 Returns the result of `pyimport(modulename)` if possible.   If the module
 is not found, and PyCall is configured to use the Conda Python distro
@@ -382,13 +382,19 @@ via `Conda.add(condapkg)` and then re-try the `pyimport`.
 If PyCall is not using Conda and the `pyimport` fails, throws
 an exception with an error message telling the user how to configure
 PyCall to use Conda for automated installation of the module.
+
+The third argument, `channel` is an optional Anaconda "channel" to use
+for installing the package; this is useful for packages that are not
+included in the default Anaconda package listing.
 """
-function pyimport_conda(modulename::AbstractString, condapkg::AbstractString)
+function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
+                        channel::AbstractString="")
     try
         pyimport(modulename)
     catch e
         if PyCall.conda
             info("Installing $modulename via the Conda $condapkg package...")
+            isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
         else

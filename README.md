@@ -520,10 +520,9 @@ end
 Then you can access the `scipy.optimize` functions as `scipy_opt[:newton]`
 and so on.
 
-Here, instead of `pyimport`, we have used the function `pyimport_conda`.   The second argument is the name of the [Anaconda package](https://docs.continuum.io/anaconda/pkg-docs) that provides this module.   This way, if importing `scipy.optimize` fails because the user hasn't installed `scipy`, it will either (a) automatically install `scipy` and retry the `pyimport` if PyCall is configured to use the [Conda](https://github.com/Luthaf/Conda.jl) Python install, or (b) throw an error explaining that `scipy` needs to be installed, and explain how to configure PyCall to use Conda so that it can be installed automatically.
+Here, instead of `pyimport`, we have used the function `pyimport_conda`.   The second argument is the name of the [Anaconda package](https://docs.continuum.io/anaconda/pkg-docs) that provides this module.   This way, if importing `scipy.optimize` fails because the user hasn't installed `scipy`, it will either (a) automatically install `scipy` and retry the `pyimport` if PyCall is configured to use the [Conda](https://github.com/Luthaf/Conda.jl) Python install, or (b) throw an error explaining that `scipy` needs to be installed, and explain how to configure PyCall to use Conda so that it can be installed automatically.   More generally, you can call `pyimport(module, package, channel)` to specify an optional Anaconda "channel" for installing non-standard Anaconda packages.
 
-(Note that you cannot use `@pyimport` safely with precompilation, because
-that declares a global constant that internally has a pointer to the module.)
+(Note that you cannot use `@pyimport` safely with precompilation, because that declares a global constant that internally has a pointer to the module.  You can use `pywrap(pyimport(...))` in your `__init__` function to a assign a global variable using the `.` notation like `@pyimport`, however, albeit without the type stability of the global `const` as above.)
 
 ## Author
 
