@@ -83,6 +83,20 @@ type PyObject
     end
 end
 
+"""
+    PyNULL()
+
+Return a `PyObject` that has a `NULL` underlying pointer, i.e. it doesn't
+actually refer to any Python object.
+
+This is useful for initializing `PyObject` global variables and array elements
+before an actual Python object is available.   For example, you might do `const
+myglobal = PyNULL()` and later on (e.g. in a module `__init__` function),
+reassign `myglobal` to point to an actual object with `copy!(myglobal,
+someobject)`.   This procedure will properly handle Python's reference counting
+(so that the Python object will not be freed until you are done with
+`myglobal`).
+"""
 PyNULL() = PyObject(PyPtr_NULL)
 
 function pydecref(o::PyObject)
