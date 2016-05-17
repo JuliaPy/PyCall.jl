@@ -82,7 +82,14 @@ function pyio_initialize()
             closed.get(self) = @with_ioraise(!isopen(pyio_jl(self)))
             encoding.get(self) = "UTF-8"
             fileno(self) = @with_ioraise(fd(pyio_jl(self)))
-            flush(self) = @with_ioraise(flush(pyio_jl(self)))
+            flush(self) = begin
+                @with_ioraise begin
+                    io = pyio_jl(self)
+                    if method_exists(flush, Tuple{typeof(io)})
+                        flush(io)
+                    end
+                end
+            end
             isatty(self) = isa(pyio_jl(self), Base.TTY)
             readable(self) = isreadable(pyio_jl(self))
             writable(self) = iswritable(pyio_jl(self))
