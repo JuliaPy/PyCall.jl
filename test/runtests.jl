@@ -143,6 +143,7 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test !obuf[:readable]()
     @test obuf[:seekable]()
     obuf[:write](pyutf8("hello"))
+    obuf[:flush]()  # should be a no-op, since there's no flushing IOBuffer
     @test position(buf) == obuf[:tell]() == 5
     let p = obuf[:seek](-2, 1)
         @test p == position(buf) == 3
