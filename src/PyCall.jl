@@ -28,6 +28,7 @@ using Compat
 import Conda
 import Compat.String
 import Base.unsafe_convert
+import MacroTools   # because of issue #270
 
 #########################################################################
 
