@@ -266,7 +266,7 @@ type PyTypeObject
     function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
         # figure out Py_TPFLAGS_DEFAULT, depending on Python version
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
-            Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch 0; end
+            Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch; 0; end
         Py_TPFLAGS_DEFAULT =
           pyversion >= v"3.0" ?
             (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
@@ -361,7 +361,7 @@ unsafe_pyjlwrap_to_objref(o::PyPtr) =
 
 pyjlwrap_repr(o::PyPtr) =
     pystealref!(PyObject(try string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
-                         catch "<PyCall.jlwrap NULL>"; end))
+                         catch; "<PyCall.jlwrap NULL>"; end))
 
 function pyjlwrap_hash(o::PyPtr)
     h = hash(unsafe_pyjlwrap_to_objref(o))
