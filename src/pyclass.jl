@@ -1,6 +1,6 @@
 # Define new Python classes from Julia:
 
-using MacroTools: @capture
+import MacroTools: @capture
 
 ######################################################################
 # def_py_class definition: this is the core non-macro interface for creating
