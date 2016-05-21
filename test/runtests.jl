@@ -166,11 +166,13 @@ let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test obuf[:readlines]() == ["hello\n","again"]
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-    @test obuf[:readall]() == convert(Vector{UInt8}, "hello\nagain")
+    @test obuf[:read](5) == convert(Vector{UInt8}, "hello")
+    @test obuf[:readall]() == convert(Vector{UInt8}, "\nagain")
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
     @test obuf[:encoding] == "UTF-8"
-    @test obuf[:readall]() == "hello\nagain"
+    @test obuf[:read](3) == "hel"
+    @test obuf[:readall]() == "lo\nagain"
 end
 let nm = tempname()
     open(nm, "w") do f

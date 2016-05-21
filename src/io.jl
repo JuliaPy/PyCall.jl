@@ -103,9 +103,10 @@ function pyio_initialize()
             tell(self) = @with_ioraise(position(pyio_jl(self)))
             writelines(self, seq) =
                 @with_ioraise(for s in seq write(pyio_jl(self), s) end)
-            read(self, nb=typemax) =
-                @with_ioraise(istextio ? bytestring(read(io, nb)) :
-                                         read(io, nb))
+            read(self, nb=typemax(Int)) =
+                @with_ioraise(self[:istextio] ?
+                              bytestring(read(pyio_jl(self), nb)) :
+                              read(pyio_jl(self), nb))
             readall(self) =
                 @with_ioraise(self[:istextio] ? readstring(pyio_jl(self)) :
                                                 read(pyio_jl(self)))
