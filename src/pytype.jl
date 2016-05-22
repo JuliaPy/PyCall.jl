@@ -346,12 +346,17 @@ immutable Py_jlWrap
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
     ob_refcnt::Int
     ob_type::PyPtr
-
+    
     jl_value::Any
+    ob_weakreflist::PyPtr #list of weak references
 end
 
 # destructor for jlwrap instance, assuming it was created with pyjlwrap_new
 function pyjlwrap_dealloc(o::PyPtr)
+    #Delete weak reference list
+    ccall((@pysym :PyObject_ClearWeakRefs), Void,
+          (PyPtr,), o)
+    
     delete!(pycall_gc, o)
     return nothing
 end
@@ -381,6 +386,8 @@ end
 # constant strings (must not be gc'ed) for pyjlwrap_members
 const pyjlwrap_membername = "jl_value"
 const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
+const weakreflist_membername = "ob_weakreflist"
+const weakreflist_doc = "List of weak references"
 
 # called in __init__
 function pyjlwrap_init()
@@ -393,6 +400,8 @@ function pyjlwrap_init()
                          t.tp_repr = pyjlwrap_repr_ptr
                          t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
                          pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+                         t.tp_weaklistoffset = fieldoffsets(Py_jlWrap)[4] #set to actual offset
+                         t.tp_flags |= Py_TPFLAGS_HAVE_WEAKREFS #set weak refs bit
                      end)
 end
 
@@ -418,6 +427,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     pycall_gc[o.o] = value
     p = convert(Ptr{Ptr{Void}}, o.o)
     unsafe_store!(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
+    unsafe_store!(p, C_NULL, 4) #initiate weakreflist as NULL
     return o
 end
 
