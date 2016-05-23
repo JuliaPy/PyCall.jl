@@ -1,10 +1,10 @@
 # Initializing Python (surprisingly complicated; see also deps/build.jl)
 
 #########################################################################
-# global constants, initialized to NULL and then overwritten in __init__
+
+# global PyObject constants, initialized to NULL and then overwritten in __init__
 # (eventually, the ability to define global const in __init__ may go away,
 #  and in any case this is better for type inference during precompilation)
-
 const inspect = PyNULL()
 const builtin = PyNULL()
 const BuiltinFunctionType = PyNULL()
@@ -15,6 +15,10 @@ const ufuncType = PyNULL()
 const format_traceback = PyNULL()
 const pyproperty = PyNULL()
 const jlfun2pyfun = PyNULL()
+
+# other global constants initialized at runtime are defined via Ref
+# or are simply left as non-const values
+pyversion = pyversion_build # not a Ref since pyversion is exported
 
 #########################################################################
 
@@ -43,16 +47,15 @@ function __init__()
     end
 
     # cache the Python version as a Julia VersionNumber
-    global const pyversion = convert(VersionNumber,
-                                     split(bytestring(ccall(@pysym(:Py_GetVersion),
-                                                            Ptr{UInt8}, ())))[1])
+    global pyversion = convert(VersionNumber, split(bytestring(ccall(@pysym(:Py_GetVersion),
+                               Ptr{UInt8}, ())))[1])
     if pyversion_build.major != pyversion.major
         error("PyCall built with Python $pyversion_build, but now using Python $pyversion; ",
               "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
     end
 
     copy!(inspect, pyimport("inspect"))
-    copy!(builtin, pyimport(pyversion.major < 3 ? "__builtin__" : "builtins"))
+    copy!(builtin, pyimport(pyversion_build.major < 3 ? "__builtin__" : "builtins"))
     copy!(pyproperty, pybuiltin(:property))
 
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
@@ -114,7 +117,7 @@ function __init__()
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
-        if pyversion.major < 3
+        if pyversion_build.major < 3
             argv_s = bytestring("")
             argv = unsafe_convert(Ptr{UInt8}, argv_s)
             ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{UInt8}},Cint), 1, &argv, 0)

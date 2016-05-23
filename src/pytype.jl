@@ -268,7 +268,7 @@ type PyTypeObject
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch; 0; end
         Py_TPFLAGS_DEFAULT =
-          pyversion >= v"3.0" ?
+          pyversion_build.major >= 3 ?
             (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
              Py_TPFLAGS_HAVE_VERSION_TAG) :
             (Py_TPFLAGS_HAVE_GETCHARBUFFER |
