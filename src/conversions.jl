@@ -567,7 +567,7 @@ end
 # Range: integer ranges are converted to xrange,
 #         while other ranges (<: AbstractVector) are converted to lists
 
-xrange(start, stop, step) = pycall(pyxrange, PyObject,
+xrange(start, stop, step) = pycall(pyxrange[], PyObject,
                                    start, stop, step)
 
 function PyObject{T<:Integer}(r::Range{T})
@@ -720,7 +720,7 @@ function pysequence_query(o::PyObject)
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
-    elseif pyisinstance(o, pyxrange)
+    elseif pyisinstance(o, pyxrange[])
         return Range
     elseif ispybytearray(o)
         return Vector{UInt8}

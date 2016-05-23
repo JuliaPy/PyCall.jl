@@ -20,6 +20,7 @@ const jlfun2pyfun = PyNULL()
 # or are simply left as non-const values
 pyversion = pyversion_build # not a Ref since pyversion is exported
 const pynothing = Ref{PyPtr}()
+const pyxrange = Ref{PyPtr}()
 
 #########################################################################
 
@@ -69,7 +70,7 @@ function __init__()
     pynothing[] = @pyglobalobj(:_Py_NoneStruct)
 
     # xrange type (or range in Python 3)
-    global const pyxrange = @pyglobalobj(:PyRange_Type)
+    pyxrange[] = @pyglobalobj(:PyRange_Type)
 
     # cache ctypes.c_void_p type and function if available
     vpt, pvp = try
