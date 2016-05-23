@@ -387,12 +387,30 @@ end
 #########################################################################
 
 """
+    anaconda_conda()
+
+Return the path of the `conda` program if PyCall is configured to use
+an Anaconda install (but *not* the Conda.jl Python), and the empty
+string otherwise.
+"""
+function anaconda_conda()
+    # Anaconda Python seems to always include "Anaconda" in the version string.
+    if conda || !contains(bytestring(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "Anaconda")
+        return ""
+    end
+    aconda = joinpath(dirname(PyCall.pyprogramname), "conda")
+    return isfile(aconda) ? aconda : ""
+end
+
+"""
     pyimport_conda(modulename, condapkg, [channel])
 
 Returns the result of `pyimport(modulename)` if possible.   If the module
 is not found, and PyCall is configured to use the Conda Python distro
 (via the Julia Conda package), then automatically install `condapkg`
-via `Conda.add(condapkg)` and then re-try the `pyimport`.
+via `Conda.add(condapkg)` and then re-try the `pyimport`.   Other
+Anaconda-based Python installations are also supported as long as
+their `conda` program is functioning.
 
 If PyCall is not using Conda and the `pyimport` fails, throws
 an exception with an error message telling the user how to configure
@@ -407,16 +425,36 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
     try
         pyimport(modulename)
     catch e
-        if PyCall.conda
+        if conda
             info("Installing $modulename via the Conda $condapkg package...")
             isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
         else
+            aconda = anaconda_conda()
+            if !isempty(aconda)
+                try
+                    info("Installing $modulename via Anaconda's $aconda...")
+                    isempty(channel) || run(`$aconda config --add channels $channel --force`)
+                    run(`$aconda install -y $condapkg`)
+                catch e2
+                    error("""
+                    Detected Anaconda Python, but \"$aconda install -y $condapkg\"  failed.
+
+                    You should either install $condapkg manually or fix your Anaconda installation so that $aconda works.   Alternatively, you can reconfigure PyCall to use its own Miniconda installation via the Conda.jl package, by running:
+                        ENV["PYTHON"]=""; Pkg.build("PyCall")
+                    after re-launching Julia.
+
+                    The exception was: $e2
+                    """)
+                end
+                return pyimport(modulename)
+            end
+
             error("""
                 Failed to import required Python module $modulename.
 
-                For automated $modulename installation, try configuring PyCall to use the Conda Python distribution within Julia.  Relaunch Julia and run:
+                For automated $modulename installation, try configuring PyCall to use the Conda.jl package's Python "Miniconda" distribution within Julia. Relaunch Julia and run:
                     ENV["PYTHON"]=""
                     Pkg.build("PyCall")
                 before trying again.
