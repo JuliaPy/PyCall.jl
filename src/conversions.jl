@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
+PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
@@ -703,7 +703,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? Abst
 # we never automatically convert to Function.
 pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = o.o == pynothing ? Void : Union{}
+pynothing_query(o::PyObject) = o.o == pynothing[] ? Void : Union{}
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some

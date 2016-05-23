@@ -19,6 +19,7 @@ const jlfun2pyfun = PyNULL()
 # other global constants initialized at runtime are defined via Ref
 # or are simply left as non-const values
 pyversion = pyversion_build # not a Ref since pyversion is exported
+const pynothing = Ref{PyPtr}()
 
 #########################################################################
 
@@ -65,7 +66,7 @@ function __init__()
 
     # cache Python None -- PyPtr, not PyObject, to prevent it from
     # being finalized prematurely on exit
-    global const pynothing = @pyglobalobj(:_Py_NoneStruct)
+    pynothing[] = @pyglobalobj(:_Py_NoneStruct)
 
     # xrange type (or range in Python 3)
     global const pyxrange = @pyglobalobj(:PyRange_Type)
