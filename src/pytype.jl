@@ -381,18 +381,24 @@ end
 # constant strings (must not be gc'ed) for pyjlwrap_members
 const pyjlwrap_membername = "jl_value"
 const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
+const pyjlwrap_members = PyMemberDef[]
 
 # called in __init__
 function pyjlwrap_init()
+    # PyMemberDef stores explicit pointers, hence must be initialized at runtime
+    push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
+                                        T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
+                                        pyjlwrap_doc),
+                            PyMemberDef(C_NULL,0,0,0,C_NULL))
     global const jlWrapType =
         PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
                      t::PyTypeObject -> begin
                          t.tp_flags |= Py_TPFLAGS_BASETYPE
                          t.tp_members = pointer(pyjlwrap_members);
-                         t.tp_dealloc = pyjlwrap_dealloc_ptr
-                         t.tp_repr = pyjlwrap_repr_ptr
+                         t.tp_dealloc = pyjlwrap_dealloc_ptr[]
+                         t.tp_repr = pyjlwrap_repr_ptr[]
                          t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
-                         pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+                         pyjlwrap_hash32_ptr[] : pyjlwrap_hash_ptr[]
                      end)
 end
 

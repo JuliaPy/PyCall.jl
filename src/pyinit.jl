@@ -21,6 +21,10 @@ const jlfun2pyfun = PyNULL()
 pyversion = pyversion_build # not a Ref since pyversion is exported
 const pynothing = Ref{PyPtr}()
 const pyxrange = Ref{PyPtr}()
+const pyjlwrap_dealloc_ptr = Ref{Ptr{Void}}()
+const pyjlwrap_repr_ptr = Ref{Ptr{Void}}()
+const pyjlwrap_hash_ptr = Ref{Ptr{Void}}()
+const pyjlwrap_hash32_ptr = Ref{Ptr{Void}}()
 
 #########################################################################
 
@@ -87,26 +91,17 @@ function __init__()
     copy!(format_traceback, pyimport("traceback")["format_tb"])
 
     # all cfunctions must be compiled at runtime
-    global const jl_Function_call_ptr =
-        cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr))
-    global const pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
-    global const pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
-    global const pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
-    global const pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
-
-    # PyMemberDef stores explicit pointers, hence must be initialized in __init__
-    global const pyjlwrap_members =
-        PyMemberDef[ PyMemberDef(pyjlwrap_membername,
-                                 T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
-                                 pyjlwrap_doc),
-                     PyMemberDef(C_NULL,0,0,0,C_NULL) ]
+    pyjlwrap_dealloc_ptr[] = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
+    pyjlwrap_repr_ptr[] = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
+    pyjlwrap_hash_ptr[] = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
+    pyjlwrap_hash32_ptr[] = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
 
     init_datetime()
     pyjlwrap_init()
 
     global const jl_FunctionType = pyjlwrap_type("PyCall.jl_Function",
                                                  t -> t.tp_call =
-                                                 jl_Function_call_ptr)
+                                                 cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr)))
 
     # jl_FunctionType is a class, and when assigning it to an object
     #    obj[:foo] = some_julia_function
