@@ -110,7 +110,7 @@ end
 #########################################################################
 # Pointer conversions, using ctypes or PyCapsule
 
-PyObject(p::Ptr) = py_void_p(p)
+PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
 function convert(::Type{Ptr{Void}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)

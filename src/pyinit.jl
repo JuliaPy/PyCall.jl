@@ -15,6 +15,7 @@ const ufuncType = PyNULL()
 const format_traceback = PyNULL()
 const pyproperty = PyNULL()
 const jlfun2pyfun = PyNULL()
+const c_void_p_Type = PyNULL()
 
 # other global constants initialized at runtime are defined via Ref
 # or are simply left as non-const values
@@ -72,16 +73,8 @@ function __init__()
     # xrange type (or range in Python 3)
     pyxrange[] = @pyglobalobj(:PyRange_Type)
 
-    # cache ctypes.c_void_p type and function if available
-    vpt, pvp = try
-        (pyimport("ctypes")["c_void_p"],
-         p::Ptr -> pycall(c_void_p_Type, PyObject, UInt(p)))
-    catch # fallback to CObject
-        (@pyglobalobj(:PyCObject_FromVoidPtr),
-         p::Ptr -> PyObject(ccall(pycobject_new, PyPtr, (Ptr{Void}, Ptr{Void}), p, C_NULL)))
-    end
-    global const c_void_p_Type = vpt
-    global const py_void_p = pvp
+    # ctypes.c_void_p for Ptr types
+    copy!(c_void_p_Type, pyimport("ctypes")["c_void_p"])
 
     # traceback.format_tb function, for show(PyError)
     copy!(format_traceback, pyimport("traceback")["format_tb"])
