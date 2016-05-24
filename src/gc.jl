@@ -7,7 +7,7 @@
 #    * When we wrap a Julia object jo inside a Python object po
 #      (e.g a numpy array), we add jo to the pycall_gc dictionary,
 #      keyed by a weak reference to po.  The Python weak reference
-#      allows us to register a callback function that is called 
+#      allows us to register a callback function that is called
 #      when po is deallocated, and this callback function removes
 #      jo from pycall_gc so that Julia can garbage-collect it.
 
@@ -16,8 +16,8 @@ const pycall_gc = Dict{PyPtr,Any}()
 function weakref_callback(callback::PyPtr, wo::PyPtr)
     delete!(pycall_gc, wo)
     ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
-    ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing)
-    return pynothing
+    ccall((@pysym :Py_IncRef), Void, (PyPtr,), pynothing[])
+    return pynothing[]
 end
 
 const weakref_callback_obj = PyNULL() # weakref_callback Python method
@@ -34,7 +34,7 @@ function pyembed(po::PyObject, jo::Any)
                                                    "weakref_callback",
                                                    METH_O)).o
     end
-    wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr), 
+    wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr),
                          po, weakref_callback_obj)
     pycall_gc[wo] = jo
     return po

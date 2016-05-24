@@ -16,7 +16,7 @@ pyexists(mod) = try
 
 # Tkinter was renamed to tkinter in Python 3
 function tkinter_name()
-    return  pyversion < v"3" ? "Tkinter" : "tkinter"
+    return pyversion_build.major < 3 ? "Tkinter" : "tkinter"
 end
 
 pygui_works(gui::Symbol) = gui == :default ||
@@ -109,7 +109,7 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
     maxtime = PyObject(50)
     @doevent begin
         app = pycall(instance, PyObject)
-        if app.o != pynothing
+        if app.o != pynothing[]
             app["_in_event_loop"] = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
@@ -125,7 +125,7 @@ function wx_eventloop(sec::Real=50e-3)
     EventLoopActivator = wx["EventLoopActivator"]
     @doevent begin
         app = pycall(GetApp, PyObject)
-        if app.o != pynothing
+        if app.o != pynothing[]
             app["_in_event_loop"] = true
             evtloop = pycall(EventLoop, PyObject)
             ea = pycall(EventLoopActivator, PyObject, evtloop)
@@ -146,7 +146,7 @@ function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
     @doevent begin
         root = Tk["_default_root"]
-        if root.o != pynothing
+        if root.o != pynothing[]
             pycall(root["update"], PyObject)
         end
     end

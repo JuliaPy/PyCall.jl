@@ -643,14 +643,14 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
         function writemime(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
                 r = pycall(o[$method], PyObject)
-                r.o != pynothing && return write(io, convert($T, r))
+                r.o != pynothing[] && return write(io, convert($T, r))
             end
             throw(MethodError(writemime, (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
             o.o != C_NULL && haskey(o, $method) && let meth = o[$method]
-                meth.o != pynothing &&
-                pycall(meth, PyObject).o != pynothing
+                meth.o != pynothing[] &&
+                pycall(meth, PyObject).o != pynothing[]
             end
     end
 end

@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing))
+PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
@@ -110,7 +110,7 @@ end
 #########################################################################
 # Pointer conversions, using ctypes or PyCapsule
 
-PyObject(p::Ptr) = py_void_p(p)
+PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
 function convert(::Type{Ptr{Void}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
@@ -567,7 +567,7 @@ end
 # Range: integer ranges are converted to xrange,
 #         while other ranges (<: AbstractVector) are converted to lists
 
-xrange(start, stop, step) = pycall(pyxrange, PyObject,
+xrange(start, stop, step) = pycall(pyxrange[], PyObject,
                                    start, stop, step)
 
 function PyObject{T<:Integer}(r::Range{T})
@@ -703,7 +703,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? Abst
 # we never automatically convert to Function.
 pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = o.o == pynothing ? Void : Union{}
+pynothing_query(o::PyObject) = o.o == pynothing[] ? Void : Union{}
 
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
@@ -720,7 +720,7 @@ function pysequence_query(o::PyObject)
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
-    elseif pyisinstance(o, pyxrange)
+    elseif pyisinstance(o, pyxrange[])
         return Range
     elseif ispybytearray(o)
         return Vector{UInt8}

@@ -263,57 +263,6 @@ type PyTypeObject
     # save the tp_name Julia string so that it is not garbage-collected
     tp_name_save # This is a gc slot that is never read from
 
-    function PyTypeObject(name::AbstractString, basicsize::Integer, init::Function)
-        # figure out Py_TPFLAGS_DEFAULT, depending on Python version
-        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = try pyimport("stackless")
-            Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_; catch; 0; end
-        Py_TPFLAGS_DEFAULT =
-          pyversion >= v"3.0" ?
-            (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
-             Py_TPFLAGS_HAVE_VERSION_TAG) :
-            (Py_TPFLAGS_HAVE_GETCHARBUFFER |
-             Py_TPFLAGS_HAVE_SEQUENCE_IN |
-             Py_TPFLAGS_HAVE_INPLACEOPS |
-             Py_TPFLAGS_HAVE_RICHCOMPARE |
-             Py_TPFLAGS_HAVE_WEAKREFS |
-             Py_TPFLAGS_HAVE_ITER |
-             Py_TPFLAGS_HAVE_CLASS |
-             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION |
-             Py_TPFLAGS_HAVE_INDEX)
-        # This and the `unsafe_convert` below emulate a `ccall`
-        name_save = Base.cconvert(Ptr{UInt8}, name)
-        t = new(0,C_NULL,0,
-                unsafe_convert(Ptr{UInt8}, name_save),
-                convert(Int, basicsize), 0,
-                C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_dealloc ...
-                C_NULL,C_NULL,C_NULL, # tp_as_number...
-                C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_hash ...
-                C_NULL, # tp_as_buffer
-                Py_TPFLAGS_DEFAULT,
-                C_NULL, # tp_doc
-                C_NULL, # tp_traverse,
-                C_NULL, # tp_clear
-                C_NULL, # tp_richcompare
-                0, # tp_weaklistoffset
-                C_NULL,C_NULL, # tp_iter, tp_iternext
-                convert(Ptr{PyMethodDef}, C_NULL), # tp_methods
-                convert(Ptr{PyMemberDef}, C_NULL), # tp_members
-                convert(Ptr{PyGetSetDef}, C_NULL), # tp_getset
-                C_NULL, # tp_base
-                C_NULL,C_NULL,C_NULL,0, # tp_dict...
-                C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_init ...
-                C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL, # tp_bases...
-                0, # tp_version_tag
-                0,0,0,C_NULL,C_NULL, # tp_allocs...
-                name_save)
-        init(t) # initialize any other fields as needed
-        if t.tp_new == C_NULL
-            t.tp_new = @pyglobal :PyType_GenericNew
-        end
-        @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
-        ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
-        return t
-    end
     function PyTypeObject()
         new(0,C_NULL,0,
             C_NULL,
@@ -337,6 +286,42 @@ type PyTypeObject
             0,0,0,C_NULL,C_NULL, # tp_allocs...
             "")
     end
+    PyTypeObject(name::AbstractString, basicsize::Integer, init::Function) =
+        PyTypeObject!(PyTypeObject(), name, basicsize, init)
+end
+
+# Often, PyTypeObject instances are global constants, which we initialize
+# to 0 via PyTypeObject() and then initialize at runtime via PyTypeObject!
+function PyTypeObject!(t::PyTypeObject, name::AbstractString, basicsize::Integer, init::Function)
+    t.tp_basicsize = convert(Int, basicsize)
+
+    # figure out Py_TPFLAGS_DEFAULT, depending on Python version
+    t.tp_flags = # Py_TPFLAGS_DEFAULT =
+      pyversion_build.major >= 3 ?
+        (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] |
+         Py_TPFLAGS_HAVE_VERSION_TAG) :
+        (Py_TPFLAGS_HAVE_GETCHARBUFFER |
+         Py_TPFLAGS_HAVE_SEQUENCE_IN |
+         Py_TPFLAGS_HAVE_INPLACEOPS |
+         Py_TPFLAGS_HAVE_RICHCOMPARE |
+         Py_TPFLAGS_HAVE_WEAKREFS |
+         Py_TPFLAGS_HAVE_ITER |
+         Py_TPFLAGS_HAVE_CLASS |
+         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] |
+         Py_TPFLAGS_HAVE_INDEX)
+
+    # Emulate the rooting behavior of a ccall:
+    name_save = Base.cconvert(Ptr{UInt8}, name)
+    t.tp_name_save = name_save
+    t.tp_name = unsafe_convert(Ptr{UInt8}, name_save)
+
+    init(t) # initialize any other fields as needed
+    if t.tp_new == C_NULL
+        t.tp_new = @pyglobal :PyType_GenericNew
+    end
+    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
+    ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
+    return t
 end
 
 ################################################################
@@ -381,32 +366,61 @@ end
 # constant strings (must not be gc'ed) for pyjlwrap_members
 const pyjlwrap_membername = "jl_value"
 const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
+# other pointer-containing constants that need to be initialized at runtime
+const pyjlwrap_members = PyMemberDef[]
+const jlWrapType = PyTypeObject()
+const jl_FunctionType = PyTypeObject()
+const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = Ref(0x00000000)
 
 # called in __init__
 function pyjlwrap_init()
-    global const jlWrapType =
-        PyTypeObject("PyCall.jlwrap", sizeof(Py_jlWrap),
-                     t::PyTypeObject -> begin
-                         t.tp_flags |= Py_TPFLAGS_BASETYPE
-                         t.tp_members = pointer(pyjlwrap_members);
-                         t.tp_dealloc = pyjlwrap_dealloc_ptr
-                         t.tp_repr = pyjlwrap_repr_ptr
-                         t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
-                         pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
-                     end)
+    # PyMemberDef stores explicit pointers, hence must be initialized at runtime
+    push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
+                                        T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
+                                        pyjlwrap_doc),
+                            PyMemberDef(C_NULL,0,0,0,C_NULL))
+
+    # all cfunctions must be compiled at runtime
+    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
+    pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
+    pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
+    pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
+    jl_Function_call_ptr = cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr))
+
+    # detect at runtime whether we are using Stackless Python
+    try
+        pyimport("stackless")
+        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] = Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_
+    end
+
+    PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap),
+                  t::PyTypeObject -> begin
+                     t.tp_flags |= Py_TPFLAGS_BASETYPE
+                     t.tp_members = pointer(pyjlwrap_members);
+                     t.tp_dealloc = pyjlwrap_dealloc_ptr
+                     t.tp_repr = pyjlwrap_repr_ptr
+                     t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
+                     pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+                  end)
+
+    pyjlwrap_type!(jl_FunctionType, "PyCall.jl_Function",
+                   t -> t.tp_call = jl_Function_call_ptr)
 end
 
 # use this to create a new jlwrap type, with init to set up custom members
-function pyjlwrap_type(name::AbstractString, init::Function)
-    PyTypeObject(name,
-                 sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
-                 t::PyTypeObject -> begin
+function pyjlwrap_type!(to::PyTypeObject, name::AbstractString, init::Function)
+    PyTypeObject!(to, name, sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
+                  t::PyTypeObject -> begin
                      t.tp_base = ccall(:jl_value_ptr, Ptr{Void},
                                        (Ptr{PyTypeObject},),
                                        &jlWrapType)
+                     ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &jlWrapType)
                      init(t)
-                 end)
+                  end)
 end
+
+pyjlwrap_type(name::AbstractString, init::Function) =
+    pyjlwrap_type!(PyTypeObject(), name, init)
 
 # Given a jlwrap type, create a new instance (and save value for gc)
 # (Careful: not sure if this works if value is an isbits type,
@@ -425,7 +439,7 @@ function pyjlwrap_new(x::Any)
     pyjlwrap_new(jlWrapType, x)
 end
 
-is_pyjlwrap(o::PyObject) = ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1
+is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,
