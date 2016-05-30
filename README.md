@@ -51,7 +51,27 @@ As a general rule, we tend to recommend the [Anaconda Python
 distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
 Windows, or using the Julia Conda package, in order to minimize headaches.
 
-## Specifying the Python version
+### Automating Python installation
+
+Unless you are comfortable managing your own Python installation, the
+easiest way to work with PyCall is typically to let the
+[Conda.jl](https://github.com/Luthaf/Conda.jl) package manage Python
+for you.  You can force this to happen, regardless of whether you have
+another Python installed on your system, via:
+
+    ENV["PYTHON"]=""
+    Pkg.build("PyCall")
+
+You only need to do this *once*, and it will be remembered in subsequent Julia sessions and PyCall updates.
+
+The advantage of a Conda-based configuration is particularly
+compelling if you are installing PyCall in order to use packages like
+[PyPlot.jl](https://github.com/stevengj/PyPlot.jl) or
+[SymPy.jl](https://github.com/jverzani/SymPy.jl), as these can then
+automatically install their Python dependencies.  (To exploit this in
+your own packages, use the `pyimport_conda` function described below.)
+
+### Specifying the Python version
 
 The Python version that is used defaults to whatever `python` program is in
 your `PATH`.   If PyCall can't find your Python, then it will install its
@@ -68,7 +88,7 @@ Python distro, or you switch from Python 2 to Python 3).
 
 To force Julia to use its own Python distribution, via Conda, rather
 than whatever is installed on your system, simply set `ENV["PYTHON"]`
-to the empty string `""`.
+to the empty string `""` as described above.
 
 The current Python version being used is stored in the `pyversion`
 global variable of the `PyCall` module.  You can also look at
