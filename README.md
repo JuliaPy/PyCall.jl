@@ -8,16 +8,13 @@
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.4.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.4)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
 
-This package provides a `@pyimport` macro that mimics a Python
-`import` statement: it imports a Python module and provides Julia
-wrappers for all of the functions and constants therein, including
-automatic conversion of types between Julia and Python and defining
-new Python classes from Julia methods.
-
-It also provides facilities for lower-level manipulation of Python
-objects, including a `PyObject` type for opaque Python objects and a
-`pycall` function (similar in spirit to Julia's `ccall` function) to
-call Python functions from the Julia language with type conversions.
+This package provides the ability to directly call and **fully
+interoperate with Python** from [the Julia
+language](http://julialang.org/).  You can import arbitrary Python
+modules from Julia, call Python functions (with automatic conversion
+of types between Julia and Python), define Python classe from Julia
+methods, and share large data structures between Julia and Python
+without copying them.
 
 ## Installation
 
