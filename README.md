@@ -211,6 +211,8 @@ strings.)
 Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a
 `PyObject` without type conversion, do `o["attribute"]` instead.
+The `keys(o::PyObject)` function returns an array of the available
+attribute symbols.
 
 Given `o::PyObject`, `get(o, key)` is equivalent to `o[key]` in
 Python, with automatic type conversion.  To get as a `PyObject`
