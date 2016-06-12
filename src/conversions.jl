@@ -429,7 +429,7 @@ keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn
 values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pycall(d.o["values"], PyObject))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
-eltype{K,V}(a::PyDict{K,V}) = Pair{pyany_toany(K),pyany_toany(V)}
+eltype{K,V}(::Type{PyDict{K,V}}) = Pair{pyany_toany(K),pyany_toany(V)}
 Base.keytype{K,V}(::PyDict{K,V}) = pyany_toany(K)
 Base.valtype{K,V}(::PyDict{K,V}) = pyany_toany(V)
 Base.keytype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(K)
