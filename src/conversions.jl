@@ -31,7 +31,7 @@ asscalar(o::PyObject) = pyisinstance(o, npy_number) ? pycall(o["item"], PyObject
 convert{T<:Integer}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
-if WORD_SIZE == 32
+if Sys.WORD_SIZE == 32
   convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
     @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
 end
@@ -80,7 +80,7 @@ function convert{T<:AbstractString}(::Type{T}, po::PyObject)
         @pycheckz ccall(@pysym(PyString_AsStringAndSize),
                         Cint, (PyPtr, Ptr{Ptr{UInt8}}, Ptr{Int}),
                         po, _ps_ptr, _ps_len)
-        convert(T, bytestring(_ps_ptr[1], _ps_len[1]))
+        convert(T, unsafe_string(_ps_ptr[1], _ps_len[1]))
     end
 end
 
@@ -102,7 +102,7 @@ ispybytearray(po::PyObject) =
 function convert(::Type{Vector{UInt8}}, po::PyObject)
     b = PyBuffer(po)
     iscontiguous(b) || error("a contiguous buffer is required")
-    return copy(pointer_to_array(Ptr{UInt8}(pointer(b)), sizeof(b)))
+    return copy(unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
 end
 
 # TODO: support zero-copy PyByteArray <: AbstractVector{UInt8} object
@@ -661,7 +661,7 @@ pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc)
 function PyObject(i::BigInt)
     PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
                              (Ptr{UInt8}, Ptr{Void}, Cint),
-                             bytestring(string(i)), C_NULL, 10))
+                             Compat.String(string(i)), C_NULL, 10))
 end
 
 function convert(::Type{BigInt}, o::PyObject)
