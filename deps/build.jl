@@ -120,7 +120,7 @@ end
 #########################################################################
 
 # need to be able to get the version before Python is initialized
-Py_GetVersion(libpy) = bytestring(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
+Py_GetVersion(libpy) = unsafe_string(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
 
 const python = try
     let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") : "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
@@ -190,7 +190,7 @@ const Py_hash_t = pyversion < v"3.2" ? Clong:Int
 const pyunicode_literals = pyversion >= v"3.0"
 
 # some arguments changed from char* to wchar_t* in Python 3
-pystring = pyversion.major < 3 ? "bytestring" : "wstring"
+pystring = pyversion.major < 3 ? "Compat.String" : "wstring"
 
 open("deps.jl", "w") do f
     print(f, """

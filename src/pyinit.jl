@@ -50,7 +50,7 @@ function __init__()
     end
 
     # cache the Python version as a Julia VersionNumber
-    global pyversion = convert(VersionNumber, split(bytestring(ccall(@pysym(:Py_GetVersion),
+    global pyversion = convert(VersionNumber, split(unsafe_string(ccall(@pysym(:Py_GetVersion),
                                Ptr{UInt8}, ())))[1])
     if pyversion_build.major != pyversion.major
         error("PyCall built with Python $pyversion_build, but now using Python $pyversion; ",
@@ -94,7 +94,7 @@ function __init__()
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
         if pyversion_build.major < 3
-            argv_s = bytestring("")
+            argv_s = Compat.String("")
             argv = unsafe_convert(Ptr{UInt8}, argv_s)
             ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{UInt8}},Cint), 1, &argv, 0)
         else

@@ -83,7 +83,7 @@ function npyinitialize()
     for m in eachmatch(r, hdr) # search for max index into PyArray_API
         PyArray_API_length = max(PyArray_API_length, parse(Int, m.captures[2])+1)
     end
-    API = pointer_to_array(PyArray_API, (PyArray_API_length,))
+    API = unsafe_wrap(Array, PyArray_API, (PyArray_API_length,))
     for m in eachmatch(r, hdr) # build npy_api table
         npy_api[Symbol(m.captures[1])] = API[parse(Int, m.captures[2])+1]
     end
@@ -170,7 +170,7 @@ const npy_typestrs = Dict( "b1"=>Bool,
                            "i8"=>Int64,     "u8"=>UInt64,
                            "f4"=>Float32,   "f8"=>Float64,
                            "c8"=>Complex64, "c16"=>Complex128,
-                           "O"=>PyPtr, "O$(div(WORD_SIZE,8))"=>PyPtr )
+                           "O"=>PyPtr, "O$(div(Sys.WORD_SIZE,8))"=>PyPtr )
 
 #########################################################################
 # no-copy conversion of Julia arrays to NumPy arrays.
@@ -333,7 +333,7 @@ similar(a::PyArray, T, dims::Dims) = Array(T, dims)
 
 function copy{T,N}(a::PyArray{T,N})
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
-        B = pointer_to_array(a.data, ntuple((n -> a.dims[N - n + 1]), N))
+        B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
     end
     A = Array(T, a.dims)

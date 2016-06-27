@@ -27,6 +27,7 @@ import Base: sigatomic_begin, sigatomic_end
 using Compat
 import Conda
 import Compat.String
+@compat import Base.show
 import Base.unsafe_convert
 import MacroTools   # because of issue #270
 
@@ -395,7 +396,7 @@ string otherwise.
 """
 function anaconda_conda()
     # Anaconda Python seems to always include "Anaconda" in the version string.
-    if conda || !contains(bytestring(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "Anaconda")
+    if conda || !contains(unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "Anaconda")
         return ""
     end
     aconda = joinpath(dirname(PyCall.pyprogramname), "conda")
@@ -502,7 +503,8 @@ function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs
             ret = PyObject(@pycheckn ccall((@pysym :PyObject_Call), PyPtr,
                                           (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
         else
-            kw = PyObject((AbstractString=>Any)[string(k) => v for (k, v) in kwargs])
+            #kw = PyObject((AbstractString=>Any)[string(k) => v for (k, v) in kwargs])
+            kw = PyObject(Dict{AbstractString, Any}([Pair(string(k), v) for (k, v) in kwargs]))
             ret = PyObject(@pycheckn ccall((@pysym :PyObject_Call), PyPtr,
                                             (PyPtr,PyPtr,PyPtr), o, arg, kw))
         end
@@ -513,17 +515,8 @@ function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs
     end
 end
 
-# call overloading
-if VERSION < v"0.5.0-dev+9814" # julia PR#13412 deprecated Base.call in 0.5
-    Base.call(o::PyObject, args...; kws...) = pycall(o, PyAny, args...; kws...)
-
-    # can't use default call(PyAny, o) since it has a ::PyAny typeassert
-    Base.call(::Type{PyAny}, o::PyObject) = convert(PyAny, o)
-else
-    # need @eval here so that 0.4 does not fail to parse
-    @eval (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-    @eval (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
-end
+@compat (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+@compat (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
 
 
 #########################################################################
@@ -640,7 +633,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"text/latex", "_repr_latex_"))
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
-        function writemime(io::IO, mime::$mime, o::PyObject)
+        @compat function show(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))
@@ -661,12 +654,12 @@ const Py_single_input = 256  # from Python.h
 const Py_file_input = 257
 const Py_eval_input = 258
 
-const pyeval_fname = bytestring("PyCall.jl") # filename for pyeval
+const pyeval_fname = Compat.String("PyCall.jl") # filename for pyeval
 
 # evaluate a python string, returning PyObject, given a dictionary
 # (string/symbol => value) of local variables to use in the expression
 function pyeval_(s::AbstractString, locals::PyDict, input_type)
-    sb = bytestring(s) # use temp var to prevent gc before we are done with o
+    sb = Compat.String(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
