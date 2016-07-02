@@ -14,7 +14,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
-       unshift!, shift!, append!, insert!, prepend!, writemime, mimewritable
+       unshift!, shift!, append!, insert!, prepend!, mimewritable
 
 # Python C API is not interrupt-save.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -624,9 +624,13 @@ function append!(a::PyObject, items)
 end
 
 #########################################################################
-# support IPython _repr_foo functions for writemime of PyObjects
+# support IPython _repr_foo functions for MIME output of PyObjects
 
 for (mime, method) in ((MIME"text/html", "_repr_html_"),
+                       (MIME"text/markdown", "_repr_markdown_"),
+                       (MIME"text/json", "_repr_json_"),
+                       (MIME"application/javascript", "_repr_javascript_"),
+                       (MIME"application/pdf", "_repr_pdf_"),
                        (MIME"image/jpeg", "_repr_jpeg_"),
                        (MIME"image/png", "_repr_png_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
@@ -638,7 +642,8 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))
             end
-            throw(MethodError(writemime, (io, mime, o)))
+            throw(MethodError(VERSION < v"0.5.0-dev+4340" ? writemime : show,
+                              (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
             o.o != C_NULL && haskey(o, $method) && let meth = o[$method]
