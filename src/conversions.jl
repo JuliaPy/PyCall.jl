@@ -708,7 +708,7 @@ pynothing_query(o::PyObject) = o.o == pynothing[] ? Void : Union{}
 # we check for "items" attr since PyMapping_Check doesn't do this (it only
 # checks for __getitem__) and PyMapping_Check returns true for some
 # scipy scalar array members, grrr.
-pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Array{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : Union{}
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) || (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items") == 1) ? Dict{PyAny,PyAny} : Union{}
 
 typetuple(Ts) = Tuple{Ts...}
 
