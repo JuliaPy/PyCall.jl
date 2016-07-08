@@ -351,20 +351,28 @@ if is_windows()
     end
     const ActivationContextBasicInformation = 1
     const QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS = 0x10
+    const PyActCtx = Ref{Ptr{Void}}(C_NULL)
+
+    function ComputePyActCtx()
+        if PyActCtx[] == C_NULL
+            some_address_in_libpython = @pyglobal(:PyImport_ImportModule)
+            ActCtxBasicInfo = Ref{ACTIVATION_CONTEXT_BASIC_INFORMATION}()
+            succeeded = ccall(:QueryActCtxW,stdcall,Bool,
+                (UInt32,Ptr{Void},Ptr{Void},Culong,Ptr{Void},Csize_t,Ptr{Csize_t}),
+                QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS, some_address_in_libpython,
+                C_NULL, ActivationContextBasicInformation, ActCtxBasicInfo,
+                sizeof(ActCtxBasicInfo), C_NULL)
+            @assert succeeded
+            PyActCtx[] = ActCtxBasicInfo[].handle
+        end
+        PyActCtx[]
+    end
 
     function ActivatePyActCtx()
-        some_address_in_libpython = @pyglobal(:PyImport_ImportModule)
-        ActCtxBasicInfo = Ref{ACTIVATION_CONTEXT_BASIC_INFORMATION}()
-        succeeded = ccall(:QueryActCtxW,stdcall,Bool,
-            (UInt32,Ptr{Void},Ptr{Void},Culong,Ptr{Void},Csize_t,Ptr{Csize_t}),
-            QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS, some_address_in_libpython,
-            C_NULL, ActivationContextBasicInformation, ActCtxBasicInfo,
-            sizeof(ActCtxBasicInfo), C_NULL)
-        @assert succeeded
         cookie = Ref{Ptr{Void}}()
         succeeded = ccall(:ActivateActCtx,stdcall, Bool,
                           (Ptr{Void}, Ptr{Ptr{Void}}),
-                          ActCtxBasicInfo[].handle, cookie)
+                          ComputePyActCtx(), cookie)
         @assert succeeded
         cookie[]
     end
