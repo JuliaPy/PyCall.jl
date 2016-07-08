@@ -273,12 +273,12 @@ end
 @test pyimport_conda("inspect", "not a conda package").o != C_NULL
 import Conda
 if PyCall.conda
-    # install the tiny conda-api package as a test
-    let already_installed = "conda-api" ∈ Conda._installed_packages()
-        @test pyimport_conda("conda_api", "conda-api").o != C_NULL
-        @test "conda-api" ∈ Conda._installed_packages()
+    # import pyzmq to test PR #294
+    let already_installed = "pyzmq" ∈ Conda._installed_packages()
+        @test pyimport_conda("zmq", "pyzmq").o != C_NULL
+        @test "pyzmq" ∈ Conda._installed_packages()
         if !already_installed
-            Conda.rm("conda-api")
+            Conda.rm("pyzmq")
         end
     end
 end
