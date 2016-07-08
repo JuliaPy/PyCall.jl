@@ -334,14 +334,63 @@ end
 
 #########################################################################
 
+if is_windows()
+    # Many python extensions are linked against a very specific version of the
+    # MSVC runtime library. To load this library, libpython declares an
+    # appropriate manifest, but unfortunately most extensions do not.
+    # Libpython itself does extend its activation context to any extensions it
+    # loads, but some python libraries (e.g. libzmq), load such extensions
+    # through ctypes, which does not have this functionality. Work around
+    # this by manually activating the activation context before any call to
+    # PyImport_ImportModule, since extensions are most likely to be loaded
+    # during import.
+
+    immutable ACTIVATION_CONTEXT_BASIC_INFORMATION
+        handle::Ptr{Void}
+        dwFlags::UInt32
+    end
+    const ActivationContextBasicInformation = 1
+    const QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS = 0x10
+
+    function ActivatePyActCtx()
+        some_address_in_libpython = @pyglobal(:PyImport_ImportModule)
+        ActCtxBasicInfo = Ref{ACTIVATION_CONTEXT_BASIC_INFORMATION}()
+        succeeded = ccall(:QueryActCtxW,stdcall,Bool,
+            (UInt32,Ptr{Void},Ptr{Void},Culong,Ptr{Void},Csize_t,Ptr{Csize_t}),
+            QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS, some_address_in_libpython,
+            C_NULL, ActivationContextBasicInformation, ActCtxBasicInfo,
+            sizeof(ActCtxBasicInfo), C_NULL)
+        @assert succeeded
+        cookie = Ref{Ptr{Void}}()
+        succeeded = ccall(:ActivateActCtx,stdcall, Bool,
+                          (Ptr{Void}, Ptr{Ptr{Void}}),
+                          ActCtxBasicInfo[].handle, cookie)
+        @assert succeeded
+        cookie[]
+    end
+
+    function DeactivatePyActCtx(cookie)
+        succeeded = ccall(:DeactivateActCtx, stdcall, Bool,
+                         (UInt32, Ptr{Void}), 0, cookie)
+        @assert succeeded
+    end
+else
+    ActivatePyActCtx() = nothing
+    DeactivatePyActCtx(cookie) = nothing
+end
+
 """
     pyimport(s::AbstractString)
 
 Import the Python module `s` (a string or symbol) and return a pointer to it (a `PyObject`). Functions or other symbols in the module may then be looked up by s[name] where name is a string (for the raw PyObject) or symbol (for automatic type-conversion). Unlike the @pyimport macro, this does not define a Julia module and members cannot be accessed with `s.name`
 """
-pyimport(name::AbstractString) =
-    PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
+function pyimport(name::AbstractString)
+    cookie = ActivatePyActCtx()
+    obj = PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
                              (Cstring,), name))
+    DeactivatePyActCtx(cookie)
+    obj
+end
 pyimport(name::Symbol) = pyimport(string(name))
 
 # convert expressions like :math or :(scipy.special) into module name strings
