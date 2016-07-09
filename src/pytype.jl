@@ -297,7 +297,7 @@ function PyTypeObject!(t::PyTypeObject, name::AbstractString, basicsize::Integer
 
     # figure out Py_TPFLAGS_DEFAULT, depending on Python version
     t.tp_flags = # Py_TPFLAGS_DEFAULT =
-      pyversion_build.major >= 3 ?
+      pyversion.major >= 3 ?
         (Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] |
          Py_TPFLAGS_HAVE_VERSION_TAG) :
         (Py_TPFLAGS_HAVE_GETCHARBUFFER |

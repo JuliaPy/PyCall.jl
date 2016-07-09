@@ -97,10 +97,6 @@ end
 const pyexc = Dict{DataType, PyPtr}()
 type PyIOError <: Exception end
 
-macro pyglobalobjptr(name)
-    :(unsafe_load(cglobal(($name, libpython), Ptr{PyObject_struct})))
-end
-
 function pyexc_initialize()
     pyexc[Exception] = @pyglobalobjptr :PyExc_RuntimeError
     pyexc[ErrorException] = @pyglobalobjptr :PyExc_RuntimeError

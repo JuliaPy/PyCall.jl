@@ -16,7 +16,7 @@ pyexists(mod) = try
 
 # Tkinter was renamed to tkinter in Python 3
 function tkinter_name()
-    return pyversion_build.major < 3 ? "Tkinter" : "tkinter"
+    return pyversion.major < 3 ? "Tkinter" : "tkinter"
 end
 
 pygui_works(gui::Symbol) = gui == :default ||
