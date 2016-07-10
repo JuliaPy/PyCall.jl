@@ -49,6 +49,9 @@ function __init__()
         ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
     end
 
+    # Will get reinitialized properly on first use
+    is_windows() && (PyActCtx[] = C_NULL)
+
     # cache the Python version as a Julia VersionNumber
     global pyversion = convert(VersionNumber, split(unsafe_string(ccall(@pysym(:Py_GetVersion),
                                Ptr{UInt8}, ())))[1])
