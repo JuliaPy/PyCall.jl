@@ -189,16 +189,25 @@ const Py_hash_t = pyversion < v"3.2" ? Clong:Int
 # whether to use unicode for strings by default, ala Python 3
 const pyunicode_literals = pyversion >= v"3.0"
 
-# some arguments changed from char* to wchar_t* in Python 3
-pystring = pyversion.major < 3 ? "Compat.String" : "wstring"
+# A couple of key strings need to be stored as constants so that
+# they persist throughout the life of the program.  In Python 3,
+# they need to be wchar_t* data.
+wstringconst(s) =
+    VERSION < v"0.5.0-dev+4859" ?
+    string("wstring(\"", escape_string(s), "\")") :
+    string("Base.transcode(Cwchar_t, \"", escape_string(s), "\")")
+
+PYTHONHOMEENV = get(ENV, "PYTHONHOME", "")
 
 open("deps.jl", "w") do f
     print(f, """
           const python = "$(escape_string(python))"
           const libpython = "$(escape_string(libpy_name))"
-          const pyprogramname = $pystring("$(escape_string(programname))")
+          const pyprogramname = "$(escape_string(programname))"
+          const wpyprogramname = $(wstringconst(programname))
           const pyversion_build = $(repr(pyversion))
-          const PYTHONHOME = $pystring("$(escape_string(get(ENV, "PYTHONHOME", "")))")
+          const PYTHONHOME = "$(escape_string(PYTHONHOMEENV))"
+          const wPYTHONHOME = $(wstringconst(PYTHONHOMEENV))
 
           "True if we are using the Python distribution in the Conda package."
           const conda = $use_conda
