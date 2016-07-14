@@ -36,14 +36,14 @@ function __init__()
             if pyversion_build.major < 3
                 ccall((@pysym :Py_SetPythonHome), Void, (Cstring,), PYTHONHOME)
             else
-                ccall((@pysym :Py_SetPythonHome), Void, (Cwstring,), wPYTHONHOME)
+                ccall((@pysym :Py_SetPythonHome), Void, (Ptr{Cwchar_t},), wPYTHONHOME)
             end
         end
         if !isempty(pyprogramname)
             if pyversion_build.major < 3
                 ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)
             else
-                ccall((@pysym :Py_SetProgramName), Void, (Cwstring,), wpyprogramname)
+                ccall((@pysym :Py_SetProgramName), Void, (Ptr{Cwchar_t},), wpyprogramname)
             end
         end
         ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)

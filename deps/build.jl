@@ -195,7 +195,7 @@ const pyunicode_literals = pyversion >= v"3.0"
 wstringconst(s) =
     VERSION < v"0.5.0-dev+4859" ?
     string("wstring(\"", escape_string(s), "\")") :
-    string("Base.transcode(Cwchar_t, \"", escape_string(s), "\")")
+    string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
 
 PYTHONHOMEENV = get(ENV, "PYTHONHOME", "")
 
