@@ -26,19 +26,13 @@ const pyxrange = Ref{PyPtr}()
 
 function __init__()
     # issue #189
-    libpython != nothing &&
+    libpy_handle = libpython === nothing ? C_NULL :
         Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
     if !already_inited
-        if !isempty(PYTHONHOME)
-            if pyversion.major < 3
-                ccall((@pysym :Py_SetPythonHome), Void, (Cstring,), PYTHONHOME)
-            else
-                ccall((@pysym :Py_SetPythonHome), Void, (Ptr{Cwchar_t},), wPYTHONHOME)
-            end
-        end
+        Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion)
         if !isempty(pyprogramname)
             if pyversion.major < 3
                 ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)
@@ -51,7 +45,7 @@ function __init__()
 
     # Will get reinitialized properly on first use
     is_windows() && (PyActCtx[] = C_NULL)
-    
+
     # Make sure python wasn't upgraded underneath us
     new_pyversion = convert(VersionNumber, split(unsafe_string(ccall(@pysym(:Py_GetVersion),
                                Ptr{UInt8}, ())))[1])
