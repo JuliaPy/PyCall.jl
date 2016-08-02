@@ -30,6 +30,7 @@ import Compat.String
 @compat import Base.show
 import Base.unsafe_convert
 import MacroTools   # because of issue #270
+using LegacyStrings
 
 #########################################################################
 
