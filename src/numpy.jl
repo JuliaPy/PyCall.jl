@@ -91,7 +91,7 @@ function npyinitialize()
         error("failure parsing NumPy PyArray_API symbol table")
     end
 
-    npy_initialized::Bool = true
+    npy_initialized = true
     return
 end
 

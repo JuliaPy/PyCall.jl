@@ -113,7 +113,7 @@ function pyio_initialize()
             readinto(self, b) = @with_ioraise(readbytes!(pyio_jl(self), b))
             write(self, b) = @with_ioraise(write(pyio_jl(self), b))
         end)
-        pyio_initialized::Bool = true
+        pyio_initialized = true
     end
     return
 end
