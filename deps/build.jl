@@ -31,7 +31,7 @@ pysys(python::AbstractString, var::AbstractString) = chomp(readstring(`$python -
 
 #########################################################################
 
-const dlprefix = @windows? "" : "lib"
+const dlprefix = is_windows() ? "" : "lib"
 
 # return libpython name, libpython pointer
 function find_libpython(python::AbstractString)
@@ -46,8 +46,10 @@ function find_libpython(python::AbstractString)
 
     # it is ridiculous that it is this hard to find the path of libpython
     libpaths = [pyconfigvar(python, "LIBDIR"),
-                (@windows ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
-    @osx_only push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
+                (is_windows() ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
+    if is_apple()
+        push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
+    end
 
     # `prefix` and `exec_prefix` are the path prefixes where python should look for python only and compiled libraries, respectively.
     # These are also changed when run in a virtualenv.
@@ -64,7 +66,7 @@ function find_libpython(python::AbstractString)
         # documentation recommends.  However, they are documented
         # to always be the same on Windows, where it causes
         # problems if we try to include both.
-        ENV["PYTHONHOME"] = @windows? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+        ENV["PYTHONHOME"] = is_windows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
         # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro?
         try
             run(pipeline(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
@@ -117,7 +119,7 @@ const python = try
 catch e1
     info( "No system-wide Python was found; got the following error:\n",
           "$e1\nusing the Python distribution in the Conda package")
-    abspath(Conda.PYTHONDIR, "python" * (@windows? ".exe" : ""))
+    abspath(Conda.PYTHONDIR, "python" * ( is_windows() ? ".exe" : ""))
 end
 
 use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
