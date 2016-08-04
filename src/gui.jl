@@ -41,7 +41,7 @@ function pygui()
     else
         for g in (:tk, :qt, :wx, :gtk, :gtk3)
             if pygui_works(g)
-                gui::Symbol = g
+                gui = g
                 return gui::Symbol
             end
         end
@@ -56,9 +56,9 @@ function pygui(g::Symbol)
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
         end
-        gui::Symbol = g
+        gui = g
     end
-    return g
+    return g::Symbol
 end
 
 ############################################################################
