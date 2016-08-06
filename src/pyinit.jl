@@ -19,8 +19,8 @@ const c_void_p_Type = PyNULL()
 
 # other global constants initialized at runtime are defined via Ref
 # or are simply left as non-const values
-const pynothing = Ref{PyPtr}()
-const pyxrange = Ref{PyPtr}()
+const pynothing = Ref{PyPtr}(0)
+const pyxrange = Ref{PyPtr}(0)
 
 #########################################################################
 
