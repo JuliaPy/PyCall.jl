@@ -48,12 +48,12 @@ end
 const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
 
 # called from __init__
-const DateType = Ref{PyPtr}()
-const DateTimeType = Ref{PyPtr}()
-const DeltaType = Ref{PyPtr}()
-const Date_FromDate = Ref{Ptr{Void}}()
-const DateTime_FromDateAndTime = Ref{Ptr{Void}}()
-const Delta_FromDelta = Ref{Ptr{Void}}()
+const DateType = Ref{PyPtr}(0)
+const DateTimeType = Ref{PyPtr}(0)
+const DeltaType = Ref{PyPtr}(0)
+const Date_FromDate = Ref{Ptr{Void}}(0)
+const DateTime_FromDateAndTime = Ref{Ptr{Void}}(0)
+const Delta_FromDelta = Ref{Ptr{Void}}(0)
 function init_datetime()
     # emulate PyDateTime_IMPORT:
     PyDateTimeAPI = unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
