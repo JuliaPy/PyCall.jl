@@ -323,7 +323,7 @@ end
 
 #########################################################################
 
-if is_windows()
+@static if is_windows()
     # Many python extensions are linked against a very specific version of the
     # MSVC runtime library. To load this library, libpython declares an
     # appropriate manifest, but unfortunately most extensions do not.
