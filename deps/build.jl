@@ -58,6 +58,8 @@ function find_libpython(python::AbstractString)
     push!(libpaths, exec_prefix)
     push!(libpaths, joinpath(exec_prefix, "lib"))
 
+    error_strings = Compat.String[]
+
     if !haskey(ENV, "PYTHONHOME")
         # PYTHONHOME tells python where to look for both pure python
         # and binary modules.  When it is set, it replaces both
@@ -70,7 +72,8 @@ function find_libpython(python::AbstractString)
         # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro?
         try
             run(pipeline(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
-        catch
+        catch e
+            push(error_strings, string(e))
             pop!(ENV, "PYTHONHOME")
         end
     end
@@ -86,6 +89,8 @@ function find_libpython(python::AbstractString)
                     return (Libdl.dlopen(libpath_lib,
                                          Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
                             libpath_lib)
+                catch e
+                    push(error_strings, string(e))
                 end
             end
         end
@@ -99,8 +104,32 @@ function find_libpython(python::AbstractString)
         try
             return (Libdl.dlopen(lib, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
                     lib)
+        catch e
+            push(error_strings, string(e))
         end
     end
+
+    if "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no") # print out extra info to help with remote debugging
+        println(STDERR, "------------------------------------- exceptions -----------------------------------------")
+        for s in error_strings
+            print(s, "\n\n")
+        end
+        println(STDERR, "---------------------------------- get_config_vars ---------------------------------------")
+        print(STDERR, readstring(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`))
+        println(STDERR, "--------------------------------- directory contents -------------------------------------")
+        for libpath in libpaths
+            if isdir(libpath)
+                print(libpath, ":\n")
+                for file in readdir(libpath)
+                    if contains(file, "pyth")
+                        println("    ", file)
+                    end
+                end
+            end
+        end
+        println(STDERR, "------------------------------------------------------------------------------------------")
+    end
+    
     error("""
         Couldn't find libpython; check your PYTHON environment variable.
         
