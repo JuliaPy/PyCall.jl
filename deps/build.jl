@@ -101,7 +101,13 @@ function find_libpython(python::AbstractString)
                     lib)
         end
     end
-    error("Couldn't find libpython; check your PYTHON environment variable")
+    error("""
+        Couldn't find libpython; check your PYTHON environment variable.
+        
+        The python executable we tried was $python (= version $v);
+        the library names we tried were $libs
+        and the library paths we tried were $libpaths
+""")
 end
 
 #########################################################################
