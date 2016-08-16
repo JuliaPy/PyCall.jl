@@ -37,9 +37,9 @@ const dlprefix = is_windows() ? "" : "lib"
 function find_libpython(python::AbstractString)
     # it is ridiculous that it is this hard to find the name of libpython
     v = pyconfigvar(python,"VERSION","")
-    libs = [ dlprefix*"python"*v*"."*Libdl.dlext, dlprefix*"python."*Libdl.dlext ]
+    libs = [ dlprefix*"python"*v, dlprefix*"python" ]
     lib = pyconfigvar(python, "LIBRARY")
-    lib != "None" && unshift!(libs, splitext(lib)[1]*"."*Libdl.dlext)
+    lib != "None" && unshift!(libs, splitext(lib)[1])
     lib = pyconfigvar(python, "LDLIBRARY")
     lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
     libs = unique(libs)
@@ -81,7 +81,7 @@ function find_libpython(python::AbstractString)
     for lib in libs
         for libpath in libpaths
             libpath_lib = joinpath(libpath, lib)
-            if isfile(libpath_lib)
+            if isfile(libpath_lib*"."*Libdl.dlext)
                 try
                     return (Libdl.dlopen(libpath_lib,
                                          Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
