@@ -73,7 +73,7 @@ function find_libpython(python::AbstractString)
         try
             run(pipeline(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
         catch e
-            push(error_strings, string(e))
+            push!(error_strings, string("$python -c \"import site\" ==> ", e))
             pop!(ENV, "PYTHONHOME")
         end
     end
@@ -90,7 +90,7 @@ function find_libpython(python::AbstractString)
                                          Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
                             libpath_lib)
                 catch e
-                    push(error_strings, string(e))
+                    push!(error_strings, string("dlopen($libpath_lib) ==> ", e))
                 end
             end
         end
@@ -105,7 +105,7 @@ function find_libpython(python::AbstractString)
             return (Libdl.dlopen(lib, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
                     lib)
         catch e
-            push(error_strings, string(e))
+            push!(error_strings, string("dlopen($lib) ==> ", e))
         end
     end
 
