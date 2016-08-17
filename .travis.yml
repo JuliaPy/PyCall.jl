@@ -11,13 +11,10 @@ env:
     - PYTHON="python"  # python 2.7
     - PYTHON="python3" # python 3.5
     - PYTHON="python-dev" # not actually a python version, here to test Conda
-    - PYTHON="python3.1"
-    - PYTHON="python3.2"
-    - PYTHON="python3.3"
-    - PYTHON="python3.4"
 before_install:
-    - sudo apt-add-repository ppa:fkrull/deadsnakes -y
     - sudo apt-get -qq update
     - sudo apt-get install -y $PYTHON
+after_success:
+    - julia -e 'cd(Pkg.dir("PyCall")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 notifications:
     email: false
