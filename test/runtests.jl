@@ -53,6 +53,9 @@ testkw(x; y=0) = x + 2*y
 @test roundtrip(testkw)(314157) == 314157
 @test roundtrip(testkw)(314157, y=1) == 314159
 
+# check type stability of pycall with an explicit return type
+@inferred pycall(PyObject(1)[:__add__], Int, 2)
+
 if PyCall.npy_initialized
     @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
     let A = rand(Int, 2,3,4), B = rand(Bool, 2,3,4)

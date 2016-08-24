@@ -529,11 +529,9 @@ end
 typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 
 """
-    pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
-
-Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
+Low-level version of `pycall(o, ...)` that always returns `PyObject`.
 """
-function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
+function _pycall(o::Union{PyObject,PyPtr}, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
     sigatomic_begin()
@@ -554,12 +552,22 @@ function pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs
             ret = PyObject(@pycheckn ccall((@pysym :PyObject_Call), PyPtr,
                                             (PyPtr,PyPtr,PyPtr), o, arg, kw))
         end
-        jret = convert(returntype, ret)
-        return jret
+        return ret::PyObject
     finally
         sigatomic_end()
     end
 end
+
+"""
+    pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
+
+Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
+"""
+pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
+    return convert(returntype, _pycall(o, args...; kwargs...))::returntype
+
+pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
+    return convert(PyAny, _pycall(o, args...; kwargs...))
 
 @compat (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
 @compat (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
