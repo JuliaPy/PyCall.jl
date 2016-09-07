@@ -161,6 +161,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
+typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")
@@ -525,8 +526,6 @@ function pybuiltin(name)
 end
 
 #########################################################################
-
-typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
 
 """
 Low-level version of `pycall(o, ...)` that always returns `PyObject`.

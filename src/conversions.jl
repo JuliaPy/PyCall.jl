@@ -749,9 +749,13 @@ macro return_not_None(ex)
     end
 end
 
-let
-pytype_queries = Array(Tuple{PyObject,Type},0)
-global pytype_mapping, pytype_query
+const pytype_queries = Array(Tuple{PyObject,Type},0)
+"""
+    pytype_mapping(pytype, jltype)
+
+Given a Python type object `pytype`, tell PyCall to convert it to
+`jltype` in `PyAny(object)` conversions.
+"""
 function pytype_mapping(py::PyObject, jl::Type)
     for (i,(p,j)) in enumerate(pytype_queries)
         if p == py
@@ -761,7 +765,14 @@ function pytype_mapping(py::PyObject, jl::Type)
     end
     push!(pytype_queries, (py,jl))
 end
-function pytype_query(o::PyObject, default::Type)
+"""
+    pytype_query(o::PyObject, default=PyObject)
+
+Given a Python object `o`, return the corresponding
+native Julia type (defaulting to `default`) that we convert
+`o` to in `PyAny(o)` conversions.
+"""
+function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)
     @return_not_None pyint_query(o)
@@ -782,9 +793,6 @@ function pytype_query(o::PyObject, default::Type)
     end
     return default
 end
-end
-
-pytype_query(o::PyObject) = pytype_query(o, PyObject)
 
 function convert(::Type{PyAny}, o::PyObject)
     if (o.o == C_NULL)
