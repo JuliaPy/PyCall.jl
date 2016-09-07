@@ -285,3 +285,9 @@ if PyCall.conda
         end
     end
 end
+
+# Float16 support:
+if PyCall.npy_initialized
+   @test roundtripeq(Float16[17 18 Inf -Inf -0.0 0.0])
+   @test isa(roundtrip(Float16[17]), Vector{Float16})
+end
