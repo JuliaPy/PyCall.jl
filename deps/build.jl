@@ -5,9 +5,6 @@
 # As a result, if you switch to a different version or path of Python, you
 # will probably need to re-run Pkg.build("PyCall").
 
-# remove deps.jl if it exists, in case build.jl fails
-isfile("deps.jl") && rm("deps.jl")
-
 using Compat
 import Conda
 
@@ -129,10 +126,10 @@ function find_libpython(python::AbstractString)
         end
         println(STDERR, "------------------------------------------------------------------------------------------")
     end
-    
+
     error("""
         Couldn't find libpython; check your PYTHON environment variable.
-        
+
         The python executable we tried was $python (= version $v);
         the library names we tried were $libs
         and the library paths we tried were $libpaths
@@ -184,27 +181,41 @@ wstringconst(s) =
 
 PYTHONHOMEENV = get(ENV, "PYTHONHOME", "")
 
-open("deps.jl", "w") do f
-    print(f, """
-          const python = "$(escape_string(python))"
-          const libpython = "$(escape_string(libpy_name))"
-          const pyprogramname = "$(escape_string(programname))"
-          const wpyprogramname = $(wstringconst(programname))
-          const pyversion_build = $(repr(pyversion))
-          const PYTHONHOME = "$(escape_string(PYTHONHOMEENV))"
-          const wPYTHONHOME = $(wstringconst(PYTHONHOMEENV))
-
-          "True if we are using the Python distribution in the Conda package."
-          const conda = $use_conda
-          """)
+# we write configuration files only if they change, both
+# to prevent unnecessary recompilation and to minimize
+# problems in the unlikely event of read-only directories.
+function writeifchanged(filename, str)
+    if !isfile(filename) || readstring(filename) != str
+        info(abspath(filename), " has been updated")
+        write(filename, str)
+    else
+        info(abspath(filename), " has not changed")
+    end
 end
+
+writeifchanged("deps.jl", """
+    const python = "$(escape_string(python))"
+    const libpython = "$(escape_string(libpy_name))"
+    const pyprogramname = "$(escape_string(programname))"
+    const wpyprogramname = $(wstringconst(programname))
+    const pyversion_build = $(repr(pyversion))
+    const PYTHONHOME = "$(escape_string(PYTHONHOMEENV))"
+    const wPYTHONHOME = $(wstringconst(PYTHONHOMEENV))
+
+    "True if we are using the Python distribution in the Conda package."
+    const conda = $use_conda
+    """)
 
 # Make subsequent builds (e.g. Pkg.update) use the same Python by default:
-open("PYTHON", "w") do f
-    println(f, isfile(programname) ? programname : python)
-end
+writeifchanged("PYTHON", isfile(programname) ? programname : python)
 
 #########################################################################
+
+catch
+
+# remove deps.jl (if it exists) on an error, so that PyCall will
+# not load until it is properly configured.
+isfile("deps.jl") && rm("deps.jl")
 
 finally # restore env vars
 
