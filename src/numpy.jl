@@ -123,6 +123,7 @@ const NPY_OBJECT = Int32(17)
 const NPY_STRING = Int32(18)
 const NPY_UNICODE = Int32(19)
 const NPY_VOID = Int32(20)
+const NPY_HALF = Int32(23)
 
 # NPY_ORDER:
 const NPY_ANYORDER = Int32(-1)
@@ -154,23 +155,25 @@ npy_type(::Type{Int32}) = NPY_INT
 npy_type(::Type{UInt32}) = NPY_UINT
 npy_type(::Type{Int64}) = NPY_LONGLONG
 npy_type(::Type{UInt64}) = NPY_ULONGLONG
+npy_type(::Type{Float16}) = NPY_HALF
 npy_type(::Type{Float32}) = NPY_FLOAT
 npy_type(::Type{Float64}) = NPY_DOUBLE
 npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-typealias NPY_TYPES Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float32,Float64,Complex64,Complex128,PyPtr}
+typealias NPY_TYPES Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,Complex64,Complex128,PyPtr}
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = Dict( "b1"=>Bool,
-                           "i1"=>Int8,      "u1"=>UInt8,
-                           "i2"=>Int16,     "u2"=>UInt16,
-                           "i4"=>Int32,     "u4"=>UInt32,
-                           "i8"=>Int64,     "u8"=>UInt64,
-                           "f4"=>Float32,   "f8"=>Float64,
-                           "c8"=>Complex64, "c16"=>Complex128,
-                           "O"=>PyPtr, "O$(div(Sys.WORD_SIZE,8))"=>PyPtr )
+                           "i1"=>Int8,        "u1"=>UInt8,
+                           "i2"=>Int16,       "u2"=>UInt16,
+                           "i4"=>Int32,       "u4"=>UInt32,
+                           "i8"=>Int64,       "u8"=>UInt64,
+                           "f2"=>Float16,     "f4"=>Float32,
+                           "f8"=>Float64,     "c8"=>Complex64,
+                           "c16"=>Complex128, "O"=>PyPtr,
+                           "O$(div(Sys.WORD_SIZE,8))"=>PyPtr)
 
 #########################################################################
 # no-copy conversion of Julia arrays to NumPy arrays.
