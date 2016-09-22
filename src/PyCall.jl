@@ -443,7 +443,7 @@ string otherwise.
 """
 function anaconda_conda()
     # Anaconda Python seems to always include "Anaconda" in the version string.
-    if conda || !contains(unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "Anaconda")
+    if conda || !contains(unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "conda")
         return ""
     end
     aconda = joinpath(dirname(PyCall.pyprogramname), "conda")
