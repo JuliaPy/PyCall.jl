@@ -1,6 +1,6 @@
 # GUI event loops and toolkit integration for Python, most importantly
 # to support plotting in a window without blocking.  Currently, we
-# support wxWidgets, Qt4, and GTK+.
+# support wxWidgets, Qt5, Qt4, and GTK+.
 
 ############################################################################
 
@@ -24,9 +24,11 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :gtk && pyexists("gtk")) ||
      (gui == :gtk3 && pyexists("gi")) ||
      (gui == :tk && pyexists(tkinter_name())) ||
+     ((gui == :qt5 || gui == :qt_pyqt5) && pyexists("PyQt5")) ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
      (gui == :qt_pyside && pyexists("PySide")) ||
-     (gui == :qt && (pyexists("PyQt4") || pyexists("PySide"))))
+     (gui == :qt4 && (pyexists("PyQt4") || pyexists("PySide"))) ||
+     (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide"))))
 
 # get or set the default GUI; doesn't affect running GUI
 """
@@ -51,7 +53,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if !(g in (:wx,:gtk,:gtk3,:tk,:qt,:qt_pyqt4,:qt_pyside,:default))
+        if !(g in (:wx,:gtk,:gtk3,:tk,:qt,:qt4,:qt5,:qt_pyqt5,:qt_pyqt4,:qt_pyside,:default))
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -101,8 +103,7 @@ function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
 end
 
 # Qt4: (PyQt4 or PySide module)
-function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
-    QtCore = pyimport("$QtModule.QtCore")
+function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     instance = QtCore["QCoreApplication"]["instance"]
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
@@ -115,6 +116,18 @@ function qt_eventloop(QtModule="PyQt4", sec::Real=50e-3)
         end
     end
     install_doevent(doevent, sec)
+end
+
+qt_eventloop(QtModule::AbstractString, sec::Real=50e-3) =
+    qt_eventloop(pyimport("$QtModule.QtCore"), sec)
+
+function qt_eventloop(sec::Real=50e-3)
+    for QtModule in ("PyQt5", "PyQt4", "PySide")
+        try
+            return qt_eventloop(QtModule, sec)
+        end
+    end
+    error("no Qt module found")
 end
 
 # wx:  (based on IPython/lib/inputhookwx.py, which is 3-clause BSD-licensed)
@@ -174,16 +187,20 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
             eventloops[gui] = gtk_eventloop("gi.repository.Gtk", sec)
         elseif gui == :tk
             eventloops[gui] = Tk_eventloop(sec)
+        elseif gui == :qt_pyqt5 || gui == :qt5
+            eventloops[gui] = qt_eventloop("PyQt5", sec)
         elseif gui == :qt_pyqt4
             eventloops[gui] = qt_eventloop("PyQt4", sec)
         elseif gui == :qt_pyside
             eventloops[gui] = qt_eventloop("PySide", sec)
-        elseif gui == :qt
+        elseif gui == :qt4
             try
                 eventloops[gui] = qt_eventloop("PyQt4", sec)
             catch
                 eventloops[gui] = qt_eventloop("PySide", sec)
             end
+        elseif gui == :qt
+            eventloops[gui] = qt_eventloop(sec)
         else
             throw(ArgumentError("unsupported GUI type $gui"))
         end
