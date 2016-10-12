@@ -152,7 +152,7 @@ catch e1
     if Sys.ARCH in (:i686, :x86_64)
         info( "No system-wide Python was found; got the following error:\n",
               "$e1\nusing the Python distribution in the Conda package")
-        abspath(Conda.PYTHONDIR, "python" * ( is_windows() ? ".exe" : ""))
+        abspath(Conda.PYTHONDIR, "python" * (is_windows() ? ".exe" : ""))
     else
         error("No system-wide Python was found; got the following error:\n",
               "$e1")
