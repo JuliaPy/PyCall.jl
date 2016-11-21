@@ -419,18 +419,77 @@ function pyimport_name(name, optional_varname)
     end
 end
 
-macro pyimport(name, optional_varname...)
-    mname = modulename(name)
-    Name = pyimport_name(name, optional_varname)
-    quote
-        if !isdefined($(Expr(:quote, Name)))
-            const $(esc(Name)) = pywrap(pyimport($mname))
-        elseif !isa($(esc(Name)), Module)
-            error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
+# Helper for pyimport
+function pyimport_object_or_submodule(mod, member)
+    try
+        # Try to import member as a submodule of `mod`
+        return pywrap(pyimport(mod[:__name__] * "." * string(member)))
+    catch e
+        # Then it must be a variable/function
+        if isa(e, PyCall.PyError)
+            return mod[member]
+        else
+            rethrow()
         end
-        nothing
     end
 end
+
+"""
+`@pyimport` imports a Python module. Examples:
+
+```julia
+@pyimport scipy
+@pyimport scipy.stats: (betaprime, distributions)   # note the parentheses
+@pyimport scipy.stats as sstats
+
+println(scipy.average([1,2,3]))
+```
+"""
+macro pyimport(expr, optional_varname...)
+    if isa(expr, Expr)
+        # We could support `@pyimport module: a, b` but it's awkward because
+        # it parses as `((module:a), b)
+        @assert expr.head != :tuple "@pyimport requires parentheses, eg. @pyimport module_name: (a, b)"
+    end
+    if @capture(expr, mod_sym_:what_)
+        # Handle `@pyimport module_name: (a, b, c)`
+        @assert isempty(optional_varname) "Bad @pyimport syntax. See ?@pyimport"
+        if isa(what, Symbol)
+            members = [what]
+        else
+            @assert @capture(what, ((members__),)) "Bad @pyimport statement"
+        end
+        mod = gensym()
+        esc(quote
+            $mod = $PyCall.pyimport($(modulename(mod_sym)))
+            $([quote
+                  if !isdefined($(Expr(:quote, member)))
+                      const $member =
+                          $PyCall.pyimport_object_or_submodule($mod, $(Expr(:quote, member)))
+                  elseif !isa($member, Union{Module, PyObject})
+                      error("Cannot @pyimport ", $(Expr(:quote, member)),
+                            ". It is already defined in the current module.")
+                  end
+               end
+               for member in members]...)
+            nothing
+            end)
+    else
+        # Handle `@pyimport module_name` and `@pyimport module_name as bar`
+        mname = modulename(expr)
+        name = pyimport_name(expr, optional_varname)
+        quote
+            if !isdefined($(Expr(:quote, name)))
+                const $(esc(name)) = pywrap(pyimport($mname))
+            elseif !isa($(esc(name)), Module)
+                error("Cannot @pyimport ", $(Expr(:quote, name)),
+                      ". It is already defined in the current module.")
+            end
+            nothing
+        end
+    end
+end
+
 
 #########################################################################
 

@@ -117,6 +117,10 @@ compare it to the built-in Julia `sin`:
     @pyimport math
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
+    # Alternative syntax
+    @pyimport math: (pow, radians)
+    pow(radians(180), 2)                 # returns pi²
+
 Type conversions are automatically performed for numeric, boolean,
 string, IO stream, date/period, and function types, along with tuples,
 arrays/lists, and dictionaries of these types. (Python functions can
