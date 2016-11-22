@@ -695,7 +695,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))
             end
-            throw(MethodError(VERSION < v"0.5.0-dev+4340" ? writemime : show,
+            throw(MethodError($(VERSION < v"0.5.0-dev+4340") ? writemime : show,
                               (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
