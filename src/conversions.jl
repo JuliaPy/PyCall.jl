@@ -742,7 +742,7 @@ end
 
 macro return_not_None(ex)
     quote
-        T = $ex
+        T = $(esc(ex))
         if T != Union{}
             return T
         end

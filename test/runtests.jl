@@ -154,11 +154,11 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     let p = obuf[:seek](0, 0)
         @test p == position(buf) == 0
     end
-    @test takebuf_string(buf) == "hello"
+    @test String(take!(buf)) == "hello"
     obuf[:writelines](["first\n", "second\n", "third"])
-    @test takebuf_string(buf) == "first\nsecond\nthird"
+    @test String(take!(buf)) == "first\nsecond\nthird"
     obuf[:write](convert(Vector{UInt8}, "möre stuff"))
-    @test takebuf_string(buf) == "möre stuff"
+    @test String(take!(buf)) == "möre stuff"
     @test isopen(buf) == !obuf[:closed] == true
     obuf[:close]()
     @test isopen(buf) == !obuf[:closed] == false
