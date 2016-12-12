@@ -12,7 +12,7 @@ This package provides the ability to directly call and **fully
 interoperate with Python** from [the Julia
 language](http://julialang.org/).  You can import arbitrary Python
 modules from Julia, call Python functions (with automatic conversion
-of types between Julia and Python), define Python classe from Julia
+of types between Julia and Python), define Python classes from Julia
 methods, and share large data structures between Julia and Python
 without copying them.
 
@@ -42,8 +42,7 @@ installed along with Python, but [pyenv on
 MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you
 to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
 pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
-currently [not
-supported](https://github.com/stevengj/PyCall.jl/issues/42).
+currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
 As a general rule, we tend to recommend the [Anaconda Python
 distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
 Windows, or using the Julia Conda package, in order to minimize headaches.
