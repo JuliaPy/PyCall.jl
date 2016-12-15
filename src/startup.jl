@@ -116,28 +116,28 @@ const pyunicode_literals = pyversion >= v"3.0"
 
 if libpython == nothing
     macro pysym(func)
-        :($func)
+        esc(func)
     end
     macro pyglobal(name)
-        :(cglobal($name))
+        :(cglobal($(esc(name))))
     end
     macro pyglobalobj(name)
-        :(cglobal($name, PyObject_struct))
+        :(cglobal($(esc(name)), PyObject_struct))
     end
     macro pyglobalobjptr(name)
-        :(unsafe_load(cglobal($name, Ptr{PyObject_struct})))
+        :(unsafe_load(cglobal($(esc(name)), Ptr{PyObject_struct})))
     end
 else
     macro pysym(func)
-        :(($func, libpython))
+        :(($(esc(func)), libpython))
     end
     macro pyglobal(name)
-        :(cglobal(($name, libpython)))
+        :(cglobal(($(esc(name)), libpython)))
     end
     macro pyglobalobj(name)
-        :(cglobal(($name, libpython), PyObject_struct))
+        :(cglobal(($(esc(name)), libpython), PyObject_struct))
     end
     macro pyglobalobjptr(name)
-        :(unsafe_load(cglobal(($name, libpython), Ptr{PyObject_struct})))
+        :(unsafe_load(cglobal(($(esc(name)), libpython), Ptr{PyObject_struct})))
     end
 end

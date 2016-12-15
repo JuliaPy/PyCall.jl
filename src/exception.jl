@@ -69,14 +69,14 @@ callsym(ex::Expr) = isexpr(ex,:macrocall,2) ? callsym(ex.args[2]) : isexpr(ex,:c
 
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
 macro pycheck(ex)
-    :(pyerr_check($(string(callsym(ex))), $ex))
+    :(pyerr_check($(string(callsym(ex))), $(esc(ex))))
 end
 
 # Macros to check that ccall((@pysym :Foo), ...) returns value != bad
 macro pycheckv(ex, bad)
     quote
-        val = $ex
-        if val == $bad
+        val = $(esc(ex))
+        if val == $(esc(bad))
             # throw a PyError if available, otherwise throw ErrorException
             pyerr_check($(string(callsym(ex))))
             error($(string(callsym(ex))), " failed")
@@ -85,10 +85,10 @@ macro pycheckv(ex, bad)
     end
 end
 macro pycheckn(ex)
-    :(@pycheckv $ex C_NULL)
+    :(@pycheckv $(esc(ex)) C_NULL)
 end
 macro pycheckz(ex)
-    :(@pycheckv $ex -1)
+    :(@pycheckv $(esc(ex)) -1)
 end
 
 #########################################################################

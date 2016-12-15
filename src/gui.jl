@@ -67,13 +67,8 @@ end
 # Event loops for various toolkits.
 
 # call doevent(status) every sec seconds
-function install_doevent(doevent::Function, sec::Real)
-    timeout = Base.Timer(doevent,sec,sec)
-    return timeout
-end
-
-macro doevent(body)
-    Expr(:function, :($(esc(:doevent))(async)), body)
+function install_doevent(doevent, sec::Real)
+    return Base.Timer(doevent, sec, sec)
 end
 
 # For PyPlot issue #181: recent pygobject releases emit a warning
@@ -93,13 +88,12 @@ function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
     gtk = pyimport(gtkmodule)
     events_pending = gtk["events_pending"]
     main_iteration = gtk["main_iteration"]
-    @doevent begin
+    install_doevent(sec) do async
         # handle all pending
         while pycall(events_pending, Bool)
             pycall(main_iteration, PyObject)
         end
     end
-    install_doevent(doevent, sec)
 end
 
 # Qt4: (PyQt4 or PySide module)
@@ -108,14 +102,13 @@ function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
     maxtime = PyObject(50)
-    @doevent begin
+    install_doevent(sec) do async
         app = pycall(instance, PyObject)
         if app.o != pynothing[]
             app["_in_event_loop"] = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
     end
-    install_doevent(doevent, sec)
 end
 
 qt_eventloop(QtModule::AbstractString, sec::Real=50e-3) =
@@ -136,7 +129,7 @@ function wx_eventloop(sec::Real=50e-3)
     GetApp = wx["GetApp"]
     EventLoop = wx["EventLoop"]
     EventLoopActivator = wx["EventLoopActivator"]
-    @doevent begin
+    install_doevent(sec) do async
         app = pycall(GetApp, PyObject)
         if app.o != pynothing[]
             app["_in_event_loop"] = true
@@ -151,19 +144,17 @@ function wx_eventloop(sec::Real=50e-3)
             pycall(app["ProcessIdle"], PyObject)
         end
     end
-    install_doevent(doevent, sec)
 end
 
 # Tk: (Tkinter/tkinter module)
 function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
-    @doevent begin
+    install_doevent(sec) do async
         root = Tk["_default_root"]
         if root.o != pynothing[]
             pycall(root["update"], PyObject)
         end
     end
-    install_doevent(doevent, sec)
 end
 # cache running event loops (so that we don't start any more than once)
 const eventloops = Dict{Symbol,Timer}()
