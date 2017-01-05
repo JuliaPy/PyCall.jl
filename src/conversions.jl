@@ -392,9 +392,9 @@ This returns a PyDict, which is a no-copy wrapper around a Python dictionary.
 
 Alternatively, you can specify the return type of a `pycall` as PyDict.
 """
-type PyDict{K,V} <: Associative{K,V}
+type PyDict{K,V,isdict} <: Associative{K,V}
     o::PyObject
-    isdict::Bool # whether this is a Python Dict (vs. generic Mapping object)
+    # isdict = true for python dict, otherwise is a generic Mapping object
 
     function PyDict(o::PyObject)
         if o.o == C_NULL
@@ -402,12 +402,12 @@ type PyDict{K,V} <: Associative{K,V}
         elseif pydict_query(o) == Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
-        new(o, pyisinstance(o, @pyglobalobj :PyDict_Type))
-    end
-    function PyDict()
-        new(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())), true)
+        return new(o)
     end
 end
+
+@compat (::Type{PyDict{K,V}}){K,V}(o::PyObject) = PyDict{K,V,pyisinstance(o, @pyglobalobj :PyDict_Type)}(o)
+@compat (::Type{PyDict{K,V}}){K,V}() = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())))
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
 PyObject(d::PyDict) = d.o
@@ -420,13 +420,13 @@ convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
-haskey(d::PyDict, key) = 1 == (d.isdict ?
-                               ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)) :
-                               ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
+haskey{K,V}(d::PyDict{K,V,true}, key) = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
+keys{T,K,V}(::Type{T}, d::PyDict{K,V,true}) = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
+values{T,K,V}(::Type{T}, d::PyDict{K,V,true}) = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
 
-keys{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)) : pycall(d.o["keys"], PyObject))
-
-values{T}(::Type{T}, d::PyDict) = convert(Vector{T}, d.isdict ? PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)) : pycall(d.o["values"], PyObject))
+keys{T,K,V}(::Type{T}, d::PyDict{K,V,false}) = convert(Vector{T}, pycall(d.o["keys"], PyObject))
+values{T,K,V}(::Type{T}, d::PyDict{K,V,false}) = convert(Vector{T}, pycall(d.o["values"], PyObject))
+haskey{K,V}(d::PyDict{K,V,false}, key) = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype{K,V}(a::PyDict{K,V}) = Pair{pyany_toany(K),pyany_toany(V)}
@@ -443,10 +443,14 @@ end
 
 get{K,V}(d::PyDict{K,V}, k, default) = get(d.o, V, k, default)
 
-function pop!(d::PyDict, k)
+function pop!{K,V}(d::PyDict{K,V,true}, k)
     v = d[k]
-    @pycheckz (d.isdict ? ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
-                : ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k)))
+    @pycheckz ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+    return v
+end
+function pop!{K,V}(d::PyDict{K,V,false}, k)
+    v = d[k]
+    @pycheckz ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     return v
 end
 
@@ -458,73 +462,65 @@ function pop!(d::PyDict, k, default)
     end
 end
 
-function delete!(d::PyDict, k)
-    e = (d.isdict ? ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
-         : ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k)))
-    if e == -1
-        pyerr_clear() # delete! ignores errors in Julia
+function delete!{K,V}(d::PyDict{K,V,true}, k)
+    e = ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+    e == -1 && pyerr_clear() # delete! ignores errors in Julia
+    return d
+end
+function delete!{K,V}(d::PyDict{K,V,false}, k)
+    e = ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+    e == -1 && pyerr_clear() # delete! ignores errors in Julia
+    return d
+end
+
+function empty!{K,V}(d::PyDict{K,V,true})
+    @pycheck ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
+    return d
+end
+function empty!{K,V}(d::PyDict{K,V,false})
+    # for generic Mapping items we must delete keys one by one
+    for k in keys(d)
+        delete!(d, k)
     end
     return d
 end
 
-function empty!(d::PyDict)
-    if d.isdict
-        @pycheck ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
-    else
-        # for generic Mapping items we must delete keys one by one
-        for k in keys(d)
-            delete!(d, k)
-        end
-    end
-    return d
-end
-
-length(d::PyDict) = @pycheckz (d.isdict ? ccall(@pysym(:PyDict_Size), Int, (PyPtr,), d)
-                               : ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d))
+length{K,V}(d::PyDict{K,V,true}) = @pycheckz ccall(@pysym(:PyDict_Size), Int, (PyPtr,), d)
+length{K,V}(d::PyDict{K,V,false}) = @pycheckz ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d)
 isempty(d::PyDict) = length(d) == 0
+
 
 immutable PyDict_Iterator
     # arrays to pass key, value, and pos pointers to PyDict_Next
     ka::Ref{PyPtr}
     va::Ref{PyPtr}
     pa::Ref{Int}
-
-    items::PyObject # items list, for generic Mapping objects
-
     i::Int # current position in items list (0-based)
     len::Int # length of items list
 end
-
-function start(d::PyDict)
-    if d.isdict
-        PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0),
-                        PyNULL(), 0, length(d))
-    else
-        items = pycall(d.o["items"], PyObject)
-        PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0),
-                        items, 0, length(items))
+start{K,V}(d::PyDict{K,V,true}) = PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))
+done{K,V}(d::PyDict{K,V,true}, itr::PyDict_Iterator) = itr.i >= itr.len
+function next{K,V}(d::PyDict{K,V,true}, itr::PyDict_Iterator)
+    if 0 == ccall((@pysym :PyDict_Next), Cint,
+                  (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
+                  d, itr.pa, itr.ka, itr.va)
+        error("unexpected end of PyDict_Next")
     end
-end
+    ko = pyincref(itr.ka[]) # PyDict_Next returns
+    vo = pyincref(itr.va[]) #   borrowed ref, so incref
+    (Pair(convert(K,ko), convert(V,vo)),
+     PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.i+1, itr.len))
+ end
 
-done(d::PyDict, itr::PyDict_Iterator) = itr.i >= itr.len
-
-function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
-    if itr.items.o == C_NULL
-        # Dict object, use PyDict_Next
-        if 0 == ccall((@pysym :PyDict_Next), Cint,
-                      (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
-                      d, itr.pa, itr.ka, itr.va)
-            error("unexpected end of PyDict_Next")
-        end
-        ko = pyincref(itr.ka[]) # PyDict_Next returns
-        vo = pyincref(itr.va[]) #   borrowed ref, so incref
-        (Pair(convert(K,ko), convert(V,vo)),
-         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
-    else
-        # generic Mapping object, use items list
-        (convert(Pair{K,V}, _getindex(itr.items, itr.i+1, PyObject)),
-         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
-    end
+# Iterator for generic mapping, using Python items iterator.
+# To strictly use the Julia iteration protocol, we should pass
+# d.o["items"] rather than d.o to done and next, but the PyObject
+# iterator functions only look at the state s, so we are okay.
+start{K,V}(d::PyDict{K,V,false}) = start(pycall(d.o["items"], PyObject))
+done{K,V}(d::PyDict{K,V,false}, s) = done(d.o, s)
+function next{K,V}(d::PyDict{K,V,false}, s)
+    nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+    return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
 end
 
 if VERSION < v"0.5.0-dev+9920" # julia PR #14937
