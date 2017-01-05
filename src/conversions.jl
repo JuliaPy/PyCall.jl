@@ -483,11 +483,11 @@ length(d::PyDict) = @pycheckz (d.isdict ? ccall(@pysym(:PyDict_Size), Int, (PyPt
                                : ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d))
 isempty(d::PyDict) = length(d) == 0
 
-type PyDict_Iterator
+immutable PyDict_Iterator
     # arrays to pass key, value, and pos pointers to PyDict_Next
-    ka::Array{PyPtr}
-    va::Array{PyPtr}
-    pa::Vector{Int}
+    ka::Ref{PyPtr}
+    va::Ref{PyPtr}
+    pa::Ref{Int}
 
     items::PyObject # items list, for generic Mapping objects
 
@@ -497,14 +497,12 @@ end
 
 function start(d::PyDict)
     if d.isdict
-        PyDict_Iterator(Array(PyPtr,1), Array(PyPtr,1), zeros(Int,1),
+        PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0),
                         PyNULL(), 0, length(d))
     else
-        items = convert(Vector{PyObject}, pycall(d.o["items"], PyObject))
-        PyDict_Iterator(Array(PyPtr,0), Array(PyPtr,0), zeros(Int,0),
-                        items, 0,
-                        @pycheckz ccall((@pysym :PySequence_Size),
-                                        Int, (PyPtr,), items))
+        items = pycall(d.o["items"], PyObject)
+        PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0),
+                        items, 0, length(items))
     end
 end
 
@@ -514,18 +512,17 @@ function next{K,V}(d::PyDict{K,V}, itr::PyDict_Iterator)
     if itr.items.o == C_NULL
         # Dict object, use PyDict_Next
         if 0 == ccall((@pysym :PyDict_Next), Cint,
-                      (PyPtr, Ptr{Int}, Ptr{PyPtr}, Ptr{PyPtr}),
+                      (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
                       d, itr.pa, itr.ka, itr.va)
             error("unexpected end of PyDict_Next")
         end
-        ko = pyincref(itr.ka[1]) # PyDict_Next returns
-        vo = pyincref(itr.va[1]) #   borrowed ref, so incref
+        ko = pyincref(itr.ka[]) # PyDict_Next returns
+        vo = pyincref(itr.va[]) #   borrowed ref, so incref
         (Pair(convert(K,ko), convert(V,vo)),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     else
         # generic Mapping object, use items list
-        (convert(Pair{K,V}, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem),
-                                      PyPtr, (PyPtr,Int), itr.items, itr.i))),
+        (convert(Pair{K,V}, _getindex(itr.items, itr.i+1, PyObject)),
          PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.items, itr.i+1, itr.len))
     end
 end

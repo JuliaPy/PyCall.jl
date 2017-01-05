@@ -291,3 +291,6 @@ if PyCall.npy_initialized
    @test roundtripeq(Float16[17 18 Inf -Inf -0.0 0.0])
    @test isa(roundtrip(Float16[17]), Vector{Float16})
 end
+
+# issue #345
+@test pyimport("weakref")["WeakValueDictionary"](Dict(3=>[4,5])) == Dict(3 => [4,5])

@@ -614,12 +614,13 @@ end
 # Index conversion: Python is zero-based.  It also has -1 based
 # backwards indexing, but we don't support this, in favor of the
 # Julian syntax o[end-1] etc.
-function ind2py(i)
+function ind2py(i::Integer)
     i <= 0 && throw(BoundsError())
     return i-1
 end
 
-getindex(o::PyObject, i::Integer) = convert(PyAny, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
+_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
+getindex(o::PyObject, i::Integer) = _getindex(o, i, PyAny)
 function setindex!(o::PyObject, v, i::Integer)
     @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
     v
