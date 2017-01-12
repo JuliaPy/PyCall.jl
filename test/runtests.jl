@@ -38,7 +38,6 @@ import PyCall.pyany_toany
 @test roundtripeq(Int32)
 @test roundtripeq(Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
 @test roundtripeq(UInt8[1,3,4,5])
-@test convert(Vector{UInt8}, "hello") == "hello".data
 @test roundtrip(3 => 4) == (3,4)
 @test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
 
