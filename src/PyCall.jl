@@ -8,7 +8,7 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
-       pyimport_conda
+       pyimport_conda, @py_str
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -709,49 +709,7 @@ end
 
 #########################################################################
 
-const Py_single_input = 256  # from Python.h
-const Py_file_input = 257
-const Py_eval_input = 258
-
-const pyeval_fname = Compat.String("PyCall.jl") # filename for pyeval
-
-# evaluate a python string, returning PyObject, given a dictionary
-# (string/symbol => value) of local variables to use in the expression
-function pyeval_(s::AbstractString, locals::PyDict, input_type)
-    sb = Compat.String(s) # use temp var to prevent gc before we are done with o
-    sigatomic_begin()
-    try
-        o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                     (Cstring, Cstring, Cint),
-                                     sb, pyeval_fname, input_type))
-        main = @pycheckn ccall((@pysym :PyImport_AddModule),
-                                PyPtr, (Cstring,), "__main__")
-        maindict = @pycheckn ccall((@pysym :PyModule_GetDict), PyPtr,
-                                    (PyPtr,), main)
-        return PyObject(@pycheckn ccall((@pysym :PyEval_EvalCode),
-                                         PyPtr, (PyPtr, PyPtr, PyPtr),
-                                         o, maindict, locals))
-    finally
-        sigatomic_end()
-    end
-end
-
-"""
-    pyeval(s::AbstractString, returntype::TypeTuple=PyAny, locals=PyDict{AbstractString, PyObject}(),
-                                input_type=Py_eval_input; kwargs...)
-
-This evaluates `s` as a Python string and returns the result converted to `rtype` (which defaults to `PyAny`). The remaining arguments are keywords that define local variables to be used in the expression.
-
-For example, `pyeval("x + y", x=1, y=2)` returns 3.
-"""
-function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
-                locals=PyDict{AbstractString, PyObject}(),
-                input_type=Py_eval_input; kwargs...)
-    for (k, v) in kwargs
-        locals[string(k)] = v
-    end
-    return convert(returntype, pyeval_(s, locals, input_type))
-end
+include("pyeval.jl")
 
 #########################################################################
 # Precompilation: just an optimization to speed up initialization.

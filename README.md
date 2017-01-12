@@ -343,15 +343,24 @@ and also by providing more type information to the Julia compiler.
   type-conversion).  Unlike the `@pyimport` macro, this does not
   define a Julia module and members cannot be accessed with `s.name`.
 
-* `pyeval(s::AbstractString, rtype=PyAny; locals...)` evaluates `s`
-  as a Python string and returns the result converted to `rtype`
-  (which defaults to `PyAny`).  The remaining arguments are keywords
-  that define local variables to be used in the expression.  For
-  example, `pyeval("x + y", x=1, y=2)` returns `3`.
+* `py"..."` evaluates `"..."` as a Python string and returns the result
+  converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
+  (which can then be manually converted if desired).   You can interpolate
+  Julia variables and other expressions into the Python code with `$`,
+  which interpolates the *value* (converted to `PyObject`) of the given
+  expression---data is not passed as a string, so this is different from
+  ordinary Julia string interpolation.  e.g. `py"sum($([1,2,3]))"` calls the
+  Python `sum` function on the Julia array `[1,2,3]`, returning `6`.
+  If you use `py"""..."""` to pass a *multi-line* string, the string can
+  contain arbitrary Python code (not just a single expression) to be evaluated,
+  but the return value is `nothing`; this is useful e.g. to define pure-Python
+  functions.  (If you define a Python global `g` in a multiline `py"""..."""`
+  string, you can retrieve it in Julia by subsequently evaluating `py"g"`.)
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
-  symbol it returns the builtin converted to `PyAny`.
+  symbol it returns the builtin converted to `PyAny`.  (You can also use `py"s"`
+  to look up builtins or other Python globas.)
 
 * `pywrap(o::PyObject)` returns a wrapper `w` that is an anonymous
   module which provides (read) access to converted versions of `o`'s
@@ -360,7 +369,10 @@ and also by providing more type information to the Julia compiler.
   module contains identifiers that are reserved words in Julia
   (e.g. `function`), they cannot be accessed as `w.member`; one must
   instead use `w.pymember(:member)` (for the `PyAny` conversion) or
-  `w.pymember("member")` (for the raw `PyObject`).
+  `w.pymember("member")` (for the raw `PyObject`).  `pywrap` is rather
+  inefficient since it converts *every* member of `o` at once; you
+  are generally encouraged to simply access members via `o[:member]`
+  rather than using `pywrap`.
 
 Occasionally, you may need to pass a keyword argument to Python that
 is a [reserved word](https://en.wikipedia.org/wiki/Reserved_word) in Julia.

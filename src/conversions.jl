@@ -397,9 +397,7 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     # isdict = true for python dict, otherwise is a generic Mapping object
 
     function PyDict(o::PyObject)
-        if o.o == C_NULL
-            throw(ArgumentError("cannot make PyDict from NULL PyObject"))
-        elseif pydict_query(o) == Union{}
+        if o.o != C_NULL && pydict_query(o) == Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         return new(o)

@@ -115,7 +115,7 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 
 # issue #92:
 let x = PyVector(PyAny[])
-    pyeval("lambda x: x.append(\"bar\")")(x)
+    py"lambda x: x.append(\"bar\")"(x)
     @test x == ["bar"]
 end
 
@@ -284,6 +284,17 @@ if PyCall.conda
             Conda.rm("pyzmq")
         end
     end
+end
+
+let x = 7
+    py"""
+    def myfun(x):
+        return x + $x
+    """
+    @test py"1 + 2" == 3
+    @test py"1 + $x" == 8
+    @test py"1 + $(x^2)" == 50
+    @test py"myfun"(10) == 17
 end
 
 # Float16 support:
