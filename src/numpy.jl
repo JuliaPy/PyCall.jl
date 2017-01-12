@@ -261,7 +261,7 @@ type PyArray_Info
 end
 
 aligned(i::PyArray_Info) = #  FIXME: also check pointer alignment?
-  all(m -> m == 0, mod(i.st, sizeof(i.T))) # strides divisible by elsize
+  @compat all(m -> m == 0, mod.(i.st, sizeof(i.T))) # strides divisible by elsize
 
 # whether a contiguous array in column-major (Fortran, Julia) order
 function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
@@ -318,7 +318,7 @@ type PyArray{T,N} <: AbstractArray{T,N}
         elseif length(info.sz) != N || length(info.st) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
         end
-        return new(o, info, tuple(info.sz...), div(info.st, sizeof(T)),
+        return new(o, info, tuple(info.sz...), @compat(div.(info.st, sizeof(T))),
                    f_contiguous(info), c_contiguous(info),
                    convert(Ptr{T}, info.data))
     end
