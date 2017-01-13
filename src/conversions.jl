@@ -427,7 +427,7 @@ values{T,K,V}(::Type{T}, d::PyDict{K,V,false}) = convert(Vector{T}, pycall(d.o["
 haskey{K,V}(d::PyDict{K,V,false}, key) = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
 
 similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
-eltype{K,V}(a::PyDict{K,V}) = Pair{pyany_toany(K),pyany_toany(V)}
+eltype{K,V}(::Type{PyDict{K,V}}) = Pair{pyany_toany(K),pyany_toany(V)}
 Base.keytype{K,V}(::PyDict{K,V}) = pyany_toany(K)
 Base.valtype{K,V}(::PyDict{K,V}) = pyany_toany(V)
 Base.keytype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(K)
