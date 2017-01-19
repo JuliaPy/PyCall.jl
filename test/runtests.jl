@@ -303,6 +303,19 @@ if PyCall.npy_initialized
     @test isa(roundtrip(Float16[17]), Vector{Float16})
 end
 
+"""
+foobar doc
+"""
+foobar(x) = x+1
+
+# function attributes
+let o = PyObject(foobar)
+    @test o[:__name__] == o[:func_name] == string(foobar)
+    @test o[:__doc__] == o[:func_doc] == "foobar doc\n"
+    @test o[:__module__] == o[:__defaults__] == o[:func_defaults] ==
+          o[:__closure__] == o[:func_closure] == nothing
+end
+
 # issue #345
 let weakdict = pyimport("weakref")["WeakValueDictionary"]
     # (use weakdict for the value, since Python supports

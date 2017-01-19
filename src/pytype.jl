@@ -386,6 +386,7 @@ function pyjlwrap_init()
     pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
     pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
     jl_Function_call_ptr = cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr))
+    jl_Function_getattr_ptr = cfunction(jl_Function_getattr, PyPtr, (PyPtr,PyPtr))
 
     # detect at runtime whether we are using Stackless Python
     try
@@ -404,7 +405,10 @@ function pyjlwrap_init()
                   end)
 
     pyjlwrap_type!(jl_FunctionType, "PyCall.jl_Function",
-                   t -> t.tp_call = jl_Function_call_ptr)
+                   t -> begin
+                            t.tp_call = jl_Function_call_ptr
+                            t.tp_getattro = jl_Function_getattr_ptr
+                        end)
 end
 
 # use this to create a new jlwrap type, with init to set up custom members
