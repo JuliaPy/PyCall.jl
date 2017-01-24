@@ -332,14 +332,14 @@ end
 size(a::PyArray) = a.dims
 ndims{T,N}(a::PyArray{T,N}) = N
 
-similar(a::PyArray, T, dims::Dims) = Array(T, dims)
+similar(a::PyArray, T, dims::Dims) = Array{T}(dims)
 
 function copy{T,N}(a::PyArray{T,N})
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
     end
-    A = Array(T, a.dims)
+    A = Array{T}(a.dims)
     if a.f_contig
         ccall(:memcpy, Void, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
         return A
@@ -444,7 +444,7 @@ function convert{T<:NPY_TYPES}(::Type{Array{T, 1}}, o::PyObject)
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        A = Array(pyany_toany(T), len)
+        A = Array{pyany_toany(T)}(len)
         py2array(T, A, o, 1, 1)
     end
 end
@@ -455,7 +455,7 @@ function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
         try
             copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
         catch
-            return py2array(T, Array(pyany_toany(T), info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(info.sz...), o, 1, 1)
         end
     catch
         py2array(T, o)
@@ -472,7 +472,7 @@ function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
             if nd != N
                 throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
             end
-            return py2array(T, Array(pyany_toany(T), info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(info.sz...), o, 1, 1)
         end
     catch
         A = py2array(T, o)

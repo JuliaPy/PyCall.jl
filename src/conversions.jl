@@ -218,7 +218,7 @@ PyVector(a::PyVector) = a
 PyVector{T}(a::AbstractVector{T}) = PyVector{T}(array2py(a))
 
 # when a PyVector is copied it is converted into an ordinary Julia Vector
-similar(a::PyVector, T, dims::Dims) = Array(T, dims)
+similar(a::PyVector, T, dims::Dims) = Array{T}(dims)
 similar{T}(a::PyVector{T}) = similar(a, pyany_toany(T), size(a))
 similar{T}(a::PyVector{T}, dims::Dims) = similar(a, pyany_toany(T), dims)
 similar{T}(a::PyVector{T}, dims::Int...) = similar(a, pyany_toany(T), dims)
@@ -359,7 +359,7 @@ end
 
 function py2array(T, o::PyObject)
     dims = pyarray_dims(o)
-    A = Array(pyany_toany(T), dims)
+    A = Array{pyany_toany(T)}(dims)
     py2array(T, A, o, 1, 1)
 end
 
@@ -370,7 +370,7 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
         pyerr_clear()
         throw(ArgumentError("expected Python sequence"))
     end
-    py2array(T, Array(pyany_toany(T), len), o, 1, 1)
+    py2array(T, Array{pyany_toany(T)}(len), o, 1, 1)
 end
 
 convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
@@ -527,7 +527,7 @@ if VERSION < v"0.5.0-dev+9920" # julia PR #14937
     # iterator function in Python is explicitly documented to say that
     # you shouldn't modify the dictionary during iteration.
     function filter!(f::Function, d::PyDict)
-        badkeys = Array(keytype(d), 0)
+        badkeys = Array{keytype(d)}(0)
         for (k,v) in d
             f(k,v) || push!(badkeys, k)
         end
@@ -740,7 +740,7 @@ macro return_not_None(ex)
     end
 end
 
-const pytype_queries = Array(Tuple{PyObject,Type},0)
+const pytype_queries = Array{Tuple{PyObject,Type}}(0)
 """
     pytype_mapping(pytype, jltype)
 
@@ -830,7 +830,7 @@ done(po::PyObject, s) = s[1].o == C_NULL
 
 # issue #216
 function Base.collect{T}(::Type{T}, o::PyObject)
-    a = Array(T, 0)
+    a = Array{T}(0)
     for x in o
         push!(a, x)
     end
