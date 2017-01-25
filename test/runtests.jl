@@ -297,6 +297,15 @@ let x = 7
     @test py"myfun"(10) == 17
 end
 
+# issue #352
+let x = "1+1"
+    @test py"$x" == "1+1"
+    @test py"$$x" == py"$$(x)" == 2
+    @test py"7 - $$x - 7" == 0 # evaluates "7 - 1 + 1 - 7"
+    @test py"7 - ($$x) - 7" == -2 # evaluates "7 - (1 + 1) - 7"
+    @test py"1 + $$(x[1:2]) 3" == 5 # evals 1 + 1+ 3
+end
+
 # Float16 support:
 if PyCall.npy_initialized
     @test roundtripeq(Float16[17 18 Inf -Inf -0.0 0.0])
