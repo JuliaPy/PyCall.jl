@@ -351,6 +351,11 @@ and also by providing more type information to the Julia compiler.
   expression---data is not passed as a string, so this is different from
   ordinary Julia string interpolation.  e.g. `py"sum($([1,2,3]))"` calls the
   Python `sum` function on the Julia array `[1,2,3]`, returning `6`.
+  In contrast, if you use `$$` before the interpolated expression, then
+  the value of the expression is inserted as a string into the Python code,
+  allowing you to generate Python code itself via Julia expressions.
+  For example, if `x="1+1"` in Julia, then `py"$x"` returns the string `"1+1"`,
+  but `py"$$x"` returns `2`.
   If you use `py"""..."""` to pass a *multi-line* string, the string can
   contain arbitrary Python code (not just a single expression) to be evaluated,
   but the return value is `nothing`; this is useful e.g. to define pure-Python
