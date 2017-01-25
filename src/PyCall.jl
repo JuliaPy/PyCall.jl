@@ -708,6 +708,14 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
 end
 
 #########################################################################
+# Expose Python docstrings to Julia doc system
+
+if isdefined(Docs, :getdoc)  # Introduced in Julia .6
+    Docs.getdoc(o::PyObject) = Markdown.parse(o[:__doc__])
+end
+
+
+#########################################################################
 
 include("pyeval.jl")
 
