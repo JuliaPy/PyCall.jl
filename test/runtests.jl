@@ -83,9 +83,9 @@ end
 @test roundtripeq([])
 @test convert(Array{PyAny,1}, PyObject(Any[1 2 3; 4 5 6])) == Any[Any[1,2,3],Any[4,5,6]]
 if PyCall.npy_initialized
-    @test roundtripeq(begin A = Array(Int); A[1] = 3; A; end)
+    @test roundtripeq(begin A = Array{Int}(); A[1] = 3; A; end)
 end
-@test convert(PyAny, PyObject(begin A = Array(Any); A[1] = 3; A; end)) == 3
+@test convert(PyAny, PyObject(begin A = Array{Any}(); A[1] = 3; A; end)) == 3
 
 array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test array2py2arrayeq(rand(3))
