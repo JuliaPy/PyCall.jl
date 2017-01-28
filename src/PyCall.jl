@@ -31,6 +31,10 @@ import Compat.String
 import Base.unsafe_convert
 import MacroTools   # because of issue #270
 
+if isdefined(Base, :Iterators)
+    import Base.Iterators: filter
+end
+
 #########################################################################
 
 include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))

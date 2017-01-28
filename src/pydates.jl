@@ -88,11 +88,11 @@ PyDelta_FromDSU(days, seconds, useconds) =
                              days, seconds, useconds,
                              1, DeltaType[]))
 
-PyObject(p::Dates.Day) = PyDelta_FromDSU(Int(p), 0, 0)
+PyObject(p::Dates.Day) = PyDelta_FromDSU(Dates.value(p), 0, 0)
 
 function PyObject(p::Dates.Second)
     # normalize to make Cint overflow less likely
-    s = Int(p)
+    s = Dates.value(p)
     d = div(s, 86400)
     s -= d * 86400
     PyDelta_FromDSU(d, s, 0)
@@ -100,7 +100,7 @@ end
 
 function PyObject(p::Dates.Millisecond)
     # normalize to make Cint overflow less likely
-    ms = Int(p)
+    ms = Dates.value(p)
     s = div(ms, 1000)
     ms -= s * 1000
     d = div(s, 86400)
