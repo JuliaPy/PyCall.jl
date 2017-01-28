@@ -1,6 +1,11 @@
 using Base.Test, PyCall, Compat
 import Compat.String
 
+if isdefined(Base, :Iterators)
+    filter(f, itr) = collect(Iterators.filter(f, itr))
+    filter(f, d::Associative) = Base.filter(f, d)
+end
+
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
@@ -96,11 +101,13 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test roundtrip(2:2.0:10) == convert(Vector{Float64}, 2:2.0:10)
 
 @pyimport math
-@test_approx_eq math.sin(3) sin(3)
+@test math.sin(3) ≈ sin(3)
 
 @test collect(PyObject([1,"hello",5])) == [1,"hello",5]
 
-@test try @eval (@pyimport os.path) catch ex isa(ex, ArgumentError) end
+@test try @eval (@pyimport os.path) catch ex
+    isa(ex, ArgumentError)
+end
 
 @test PyObject("hello") == PyObject("hello")
 @test PyObject("hello") != PyObject("hellö")
@@ -166,7 +173,7 @@ end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test !obuf[:writable]()
     @test obuf[:readable]()
-    @test obuf[:readlines]() == ["hello\n","again"]
+    @test obuf[:readlines]() == readlines(IOBuffer("hello\nagain"))
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test obuf[:read](5) == convert(Vector{UInt8}, "hello")

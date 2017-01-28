@@ -192,7 +192,9 @@ macro py_str(code, options...)
     code, locals = interpolate_pycode(code)
     input_type = '\n' in code ? Py_file_input : Py_eval_input
     fname = make_fname(@__FILE__)
-    assignlocals = Expr(:block, [:(m[$v] = PyObject($(esc(ex)))) for (v,ex) in locals if isa(v,String)]...)
+    assignlocals = Expr(:block, [(isa(v,String) ?
+                                  :(m[$v] = PyObject($(esc(ex)))) :
+                                  nothing) for (v,ex) in locals]...)
     code_expr = Expr(:call, esc(:(Base.string)))
     i0 = start(code)
     for i in sort!(collect(filter(k -> isa(k,Integer), keys(locals))))

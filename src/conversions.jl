@@ -33,7 +33,7 @@ convert{T<:Integer}(::Type{T}, po::PyObject) =
 
 if Sys.WORD_SIZE == 32
   convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
-    @pycheck ccall((@pysym :PyLong_AsLongLong), T, (PyPtr,), asscalar(po))
+    @pycheck(ccall((@pysym :PyLong_AsLongLong), UInt64, (PyPtr,), asscalar(po))) % T
 end
 
 convert(::Type{Bool}, po::PyObject) =
@@ -140,9 +140,10 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 # typealias PyAny Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
 abstract PyAny
 
-pyany_toany(T::Type) = T
-pyany_toany(T::Type{PyAny}) = Any
-pyany_toany(T::Type{Vararg{PyAny}}) = Vararg{Any}
+function pyany_toany(T::Type)
+    T === Vararg{PyAny} ? Vararg{Any} : T
+end
+pyany_toany(::Type{PyAny}) = Any
 pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
 
 # PyAny acts like Any for conversions, except for converting PyObject (below)
