@@ -338,3 +338,15 @@ let weakdict = pyimport("weakref")["WeakValueDictionary"]
     #  weak references to type objects)
     @test weakdict(Dict(3=>weakdict)) == Dict(3=>weakdict)
 end
+
+# Expose python docs to Julia doc system
+if isdefined(Docs, :getdoc)
+    py"""
+    def foo():
+        "foo docstring"
+        return 0
+    """
+    foo = py"foo"
+    # use 'content' since `Text` objects test equality by object identity
+    @test @doc(foo).content == "foo docstring"
+end
