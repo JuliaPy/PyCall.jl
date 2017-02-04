@@ -10,6 +10,7 @@ import Conda
 
 PYTHONIOENCODING = get(ENV, "PYTHONIOENCODING", nothing)
 PYTHONHOME = get(ENV, "PYTHONHOME", nothing)
+immutable UseCondaPython <: Exception end
 
 try # save/restore environment vars
 
@@ -142,16 +143,27 @@ include("depsutils.jl")
 #########################################################################
 
 const python = try
-    let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") : "python"), vers = convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
+    let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
+                 is_linux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
+        vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
         if vers < v"2.7"
-            error("Python version $vers < 2.7 is not supported")
+            if isempty(py)
+                throw(UseCondaPython())
+            else
+                error("Python version $vers < 2.7 is not supported")
+            end
         end
         py
     end
 catch e1
     if Sys.ARCH in (:i686, :x86_64)
-        info( "No system-wide Python was found; got the following error:\n",
-              "$e1\nusing the Python distribution in the Conda package")
+        if isa(e1, UseCondaPython)
+            info("Using the Python distribution in the Conda package by default.\n",
+                 "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
+        else
+            info( "No system-wide Python was found; got the following error:\n",
+                  "$e1\nusing the Python distribution in the Conda package")
+        end
         abspath(Conda.PYTHONDIR, "python" * (is_windows() ? ".exe" : ""))
     else
         error("No system-wide Python was found; got the following error:\n",

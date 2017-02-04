@@ -19,13 +19,13 @@ without copying them.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.4 or later and Python 2.7 or later are required.
+install the files.  Julia 0.4 is required.
 
 The latest development version of PyCall is available from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
 this after installing the package, run `Pkg.checkout("PyCall"); Pkg.build("PyCall")`.
 
-If a `python` executable is not found (see below), `Pkg.add("PyCall")`
+By default on Mac and Windows systems, `Pkg.add("PyCall")`
 or `Pkg.build("PyCall")` will use the
 [Conda.jl](https://github.com/Luthaf/Conda.jl) package to install a
 minimal Python distribution (via
@@ -33,32 +33,8 @@ minimal Python distribution (via
 private to Julia (not in your `PATH`).  You can use the `Conda` Julia
 package to install more Python packages, and `import Conda` to print
 the `Conda.PYTHONDIR` directory where `python` was installed.
-
-Alternatively, you can make sure Python is already installed before
-adding (or building) PyCall, and that a `python` executable is in your
-`PATH` (or be specified manually as described below), to make PyCall
-link to that version of Python.  Usually, the necessary libraries are
-installed along with Python, but [pyenv on
-MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you
-to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
-pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
-currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
-As a general rule, we tend to recommend the [Anaconda Python
-distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
-Windows, or using the Julia Conda package, in order to minimize headaches.
-
-### Automating Python installation
-
-Unless you are comfortable managing your own Python installation, the
-easiest way to work with PyCall is typically to let the
-[Conda.jl](https://github.com/Luthaf/Conda.jl) package manage Python
-for you.  You can force this to happen, regardless of whether you have
-another Python installed on your system, via:
-
-    ENV["PYTHON"]=""
-    Pkg.build("PyCall")
-
-You only need to do this *once*, and it will be remembered in subsequent Julia sessions and PyCall updates.
+On GNU/Linux systems, PyCall will default to using
+the `python` program (if any) in your PATH.
 
 The advantage of a Conda-based configuration is particularly
 compelling if you are installing PyCall in order to use packages like
@@ -69,11 +45,7 @@ your own packages, use the `pyimport_conda` function described below.)
 
 ### Specifying the Python version
 
-The Python version that is used defaults to whatever `python` program is in
-your `PATH`.   If PyCall can't find your Python, then it will install its
-own via Conda as described above.
-
-If you want to use a different version of Python on your system, you can change the Python version by setting the `PYTHON` environment variable to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.  In Julia:
+If you want to use a different version of Python than the default, you can change the Python version by setting the `PYTHON` environment variable to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.  In Julia:
 
     ENV["PYTHON"] = "... path of the python program you want ..."
     Pkg.build("PyCall")
@@ -82,18 +54,16 @@ Note also that you will need to re-run `Pkg.build("PyCall")` if your
 `python` program changes significantly (e.g. you switch to a new
 Python distro, or you switch from Python 2 to Python 3).
 
-To force Julia to use its own Python distribution, via Conda, rather
-than whatever is installed on your system, simply set `ENV["PYTHON"]`
-to the empty string `""` as described above.
+To force Julia to use its own Python distribution, via Conda, simply set `ENV["PYTHON"]` to the empty string `""` and re-run `Pkg.build("PyCall")`.
 
 The current Python version being used is stored in the `pyversion`
 global variable of the `PyCall` module.  You can also look at
 `PyCall.libpython` to find the name of the Python library or
-`PyCall.pyprogramname` for the `python` program name.
+`PyCall.pyprogramname` for the `python` program name.  If it is
+using the Conda Python, `PyCall.conda` will be `true`.
 
 (Technically, PyCall does not use the `python` program per se: it links
-directly to the `libpython` library.  But it finds the location of `libpython`
-by running `python` during `Pkg.build`.)
+directly to the `libpython` library.  But it finds the location of `libpython` by running `python` during `Pkg.build`.)
 
 Subsequent builds of PyCall (e.g. when you update the package via
 `Pkg.update`) will use the same Python executable name by default,
@@ -106,6 +76,16 @@ then be aware that PyCall *uses the virtualenv it was built with*, even
 if you switch virtualenvs.  If you want to switch PyCall to use a
 different virtualenv, then you should switch virtualenvs and run
 `rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
+
+**Note:** Usually, the necessary libraries are
+installed along with Python, but [pyenv on
+MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you
+to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
+pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
+currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
+As a general rule, we tend to recommend the [Anaconda Python
+distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
+Windows, or using the Julia Conda package, in order to minimize headaches.
 
 ## Usage
 
