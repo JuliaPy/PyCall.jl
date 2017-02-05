@@ -19,12 +19,7 @@ function tkinter_name()
     return pyversion.major < 3 ? "Tkinter" : "tkinter"
 end
 
-function pygui_works(gui::Symbol)
-    if gui in (:qt, :qt4, :qt5, :qt_pyqt4, :qt_pyqt5, :qt_pyside)
-        # may need to set this ENV var before loading the Qt library
-        fixqtpath()
-    end
-    return gui == :default ||
+pygui_works(gui::Symbol) = gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
      (gui == :gtk3 && pyexists("gi")) ||
@@ -34,7 +29,6 @@ function pygui_works(gui::Symbol)
      (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt4 && (pyexists("PyQt4") || pyexists("PySide"))) ||
      (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide"))))
- end
 
 # get or set the default GUI; doesn't affect running GUI
 """
@@ -146,6 +140,7 @@ function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     instance = QtCore["QCoreApplication"]["instance"]
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
+    pop!(ENV, "QT_PLUGIN_PATH") # clean up environment
     maxtime = PyObject(50)
     install_doevent(sec) do async
         app = pycall(instance, PyObject)
