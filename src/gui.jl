@@ -123,6 +123,9 @@ function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
             m = match(r"^\s*prefix\s*=(.*)$"i, line)
             if m !== nothing
                 dir = strip(m.captures[1])
+                if startswith(dir, '"') && endswith(dir, '"')
+                    dir = dir[2:end-1]
+                end
                 plugin_path = joinpath(dir, "plugins")
                 if isdir(plugin_path)
                     ENV["QT_PLUGIN_PATH"] = realpath(plugin_path)
