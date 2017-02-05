@@ -19,7 +19,12 @@ function tkinter_name()
     return pyversion.major < 3 ? "Tkinter" : "tkinter"
 end
 
-pygui_works(gui::Symbol) = gui == :default ||
+function pygui_works(gui::Symbol)
+    if gui in (:qt, :qt4, :qt5, :qt_pyqt4, :qt_pyqt5, :qt_pyside)
+        # may need to set this ENV var before loading the Qt library
+        fixqtpath()
+    end
+    return gui == :default ||
     ((gui == :wx && pyexists("wx")) ||
      (gui == :gtk && pyexists("gtk")) ||
      (gui == :gtk3 && pyexists("gi")) ||
@@ -29,6 +34,7 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt4 && (pyexists("PyQt4") || pyexists("PySide"))) ||
      (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide"))))
+ end
 
 # get or set the default GUI; doesn't affect running GUI
 """
@@ -108,24 +114,24 @@ end
 # seems to be no way to change this.  However, we can at least
 # use set QT_PLUGIN_PATH by parsing qt.conf ourselves, and
 # this seems to fix some of the path-related problems on Windows.
+# ... unfortunately, it seems fixqtpath has to be called before
+# the Qt library is loaded.
 function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
-    haskey(ENV, "QT_PLUGIN_PATH") && return nothing
+    haskey(ENV, "QT_PLUGIN_PATH") && return false
     if isfile(qtconf)
-        libdir = ""
         for line in eachline(qtconf)
-            m = match(r"^\s*libraries\s*=(.*)$"i, line)
+            m = match(r"^\s*prefix\s*=(.*)$"i, line)
             if m !== nothing
-                libdir = strip(m.captures[1])
+                dir = strip(m.captures[1])
+                plugin_path = joinpath(dir, "plugins")
+                if isdir(plugin_path)
+                    ENV["QT_PLUGIN_PATH"] = plugin_path
+                    return true
+                end
             end
         end
-        # this seems to be the directory on Windows at least,
-        # which is the only system where we are encountering problems:
-        plugin_path = joinpath(libdir, "plugins")
-        if isdir(plugin_path)
-            ENV["QT_PLUGIN_PATH"] = plugin_path
-        end
     end
-    return nothing
+    return false
 end
 
 # Qt: (PyQt5, PyQt4, or PySide module)
