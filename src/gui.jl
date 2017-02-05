@@ -96,8 +96,41 @@ function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
     end
 end
 
-# Qt4: (PyQt4 or PySide module)
+# As discussed in PyPlot.jl#278, Qt looks for a file qt.conf in
+# the same path as the running executable, which tells it where
+# to find plugins etcetera.  For Python's Qt, however, this will
+# be in the path of the python executable, not julia.  Furthermore,
+# we can't copy it to the location of julia (even if that location
+# is writable) because that would assume that all julia programs
+# use the same version of Qt (e.g. via the same Python), which
+# is not necessarily the case, and even then it wouldn't work
+# for other programs linking libjulia.  Unfortunately, there
+# seems to be no way to change this.  However, we can at least
+# use set QT_PLUGIN_PATH by parsing qt.conf ourselves, and
+# this seems to fix some of the path-related problems on Windows.
+function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
+    haskey(ENV, "QT_PLUGIN_PATH") && return nothing
+    if isfile(qtconf)
+        libdir = ""
+        for line in eachline(qtconf)
+            m = match(r"^\s*libraries\s*=(.*)$"i, line)
+            if m !== nothing
+                libdir = strip(m.captures[1])
+            end
+        end
+        # this seems to be the directory on Windows at least,
+        # which is the only system where we are encountering problems:
+        plugin_path = joinpath(libdir, "plugins")
+        if isdir(plugin_path)
+            ENV["QT_PLUGIN_PATH"] = plugin_path
+        end
+    end
+    return nothing
+end
+
+# Qt: (PyQt5, PyQt4, or PySide module)
 function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
+    fixqtpath()
     instance = QtCore["QCoreApplication"]["instance"]
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
