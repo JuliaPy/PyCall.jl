@@ -140,7 +140,7 @@ function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     instance = QtCore["QCoreApplication"]["instance"]
     AllEvents = QtCore["QEventLoop"]["AllEvents"]
     processEvents = QtCore["QCoreApplication"]["processEvents"]
-    pop!(ENV, "QT_PLUGIN_PATH") # clean up environment
+    pop!(ENV, "QT_PLUGIN_PATH", "") # clean up environment
     maxtime = PyObject(50)
     install_doevent(sec) do async
         app = pycall(instance, PyObject)
