@@ -125,7 +125,7 @@ function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
                 dir = strip(m.captures[1])
                 plugin_path = joinpath(dir, "plugins")
                 if isdir(plugin_path)
-                    ENV["QT_PLUGIN_PATH"] = plugin_path
+                    ENV["QT_PLUGIN_PATH"] = realpath(plugin_path)
                     return true
                 end
             end
