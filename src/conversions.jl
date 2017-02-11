@@ -202,11 +202,11 @@ Alternatively, `PyVector` can be used as the return type for a `pycall` that ret
 """
 type PyVector{T} <: AbstractVector{T}
     o::PyObject
-    function PyVector(o::PyObject)
+    @compat function (::Type{PyVector{T}}){T}(o::PyObject)
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyVector from NULL PyObject"))
         end
-        new(o)
+        new{T}(o)
     end
 end
 
@@ -397,11 +397,11 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     o::PyObject
     # isdict = true for python dict, otherwise is a generic Mapping object
 
-    function PyDict(o::PyObject)
+    @compat function (::Type{PyDict{K,V,isdict}}){K,V,isdict}(o::PyObject)
         if o.o != C_NULL && pydict_query(o) == Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
-        return new(o)
+        return new{K,V,isdict}(o)
     end
 end
 

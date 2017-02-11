@@ -308,7 +308,7 @@ type PyArray{T,N} <: AbstractArray{T,N}
     c_contig::Bool
     data::Ptr{T}
 
-    function PyArray(o::PyObject, info::PyArray_Info)
+    @compat function (::Type{PyArray{T,N}}){T,N}(o::PyObject, info::PyArray_Info)
         if !aligned(info)
             throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
         elseif !info.native
@@ -318,9 +318,9 @@ type PyArray{T,N} <: AbstractArray{T,N}
         elseif length(info.sz) != N || length(info.st) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
         end
-        return new(o, info, tuple(info.sz...), @compat(div.(info.st, sizeof(T))),
-                   f_contiguous(info), c_contiguous(info),
-                   convert(Ptr{T}, info.data))
+        return new{T,N}(o, info, tuple(info.sz...), @compat(div.(info.st, sizeof(T))),
+                        f_contiguous(info), c_contiguous(info),
+                        convert(Ptr{T}, info.data))
     end
 end
 
