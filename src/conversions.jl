@@ -137,7 +137,7 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 
 # I want to use a union, but this seems to confuse Julia's method
 # dispatch for the convert function in some circumstances
-# typealias PyAny Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
+# const PyAny = Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
 @compat abstract type PyAny end
 
 function pyany_toany(T::Type)
