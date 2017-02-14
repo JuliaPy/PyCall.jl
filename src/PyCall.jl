@@ -52,7 +52,7 @@ immutable PyObject_struct
     ob_type::Ptr{Void}
 end
 
-typealias PyPtr Ptr{PyObject_struct} # type for PythonObject* in ccall
+const PyPtr = Ptr{PyObject_struct} # type for PythonObject* in ccall
 
 const PyPtr_NULL = PyPtr(C_NULL)
 
@@ -165,7 +165,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
-typealias TypeTuple{N} Union{Type,NTuple{N, Type}}
+@compat TypeTuple{N} = Union{Type,NTuple{N, Type}}
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")

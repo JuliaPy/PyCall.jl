@@ -162,7 +162,7 @@ npy_type(::Type{Complex64}) = NPY_CFLOAT
 npy_type(::Type{Complex128}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-typealias NPY_TYPES Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,Complex64,Complex128,PyPtr}
+const NPY_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,Complex64,Complex128,PyPtr}
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = Dict( "b1"=>Bool,
