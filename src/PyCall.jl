@@ -147,6 +147,7 @@ unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
 
 # use constructor for generic conversions to PyObject
 convert(::Type{PyObject}, o) = PyObject(o)
+convert(::Type{PyObject}, o::PyObject) = o
 PyObject(o::PyObject) = o
 
 #########################################################################
