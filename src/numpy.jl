@@ -337,7 +337,7 @@ similar(a::PyArray, T, dims::Dims) = Array{T}(dims)
 function copy{T,N}(a::PyArray{T,N})
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
-        return N == 2 ? transpose(B) : permutedims(B, (N:-1:1))
+        return permutedims(B, (N:-1:1))
     end
     A = Array{T}(a.dims)
     if a.f_contig
