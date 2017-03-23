@@ -8,7 +8,7 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
-       pyimport_conda, @py_str
+       pyimport_conda, @py_str, @with
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -434,6 +434,59 @@ macro pyimport(name, optional_varname...)
         nothing
     end
 end
+
+#########################################################################
+
+"""
+    @with
+
+Mimics a Python 'with' statement. Usage:
+
+@with EXPR as VAR begin
+    BLOCK
+end
+
+or 
+
+@with EXPR begin
+    BLOCK
+end
+"""
+macro with(EXPR,as,VAR,BLOCK)
+    @assert as==:as "usage: @with EXPR as VAR BLOCK."
+    _with(EXPR,VAR,BLOCK)
+end
+macro with(EXPR,BLOCK)
+    _with(EXPR,nothing,BLOCK)
+end
+        
+function _with(EXPR,VAR,BLOCK)        
+    quote
+        mgr = $(esc(EXPR))
+        exit = pybuiltin("type")(mgr)[:__exit__]  # Not calling it yet
+        value = pybuiltin("type")(mgr)[:__enter__](mgr)
+        exc = true
+        try
+            try
+                $(VAR==nothing ? :() : :($(esc(VAR)) = value))
+                $(esc(BLOCK))
+            catch err
+                # The exceptional case is handled here
+                exc = false
+                if !(pybuiltin("bool")(exit(mgr, pyimport(:sys)[:exc_info]()...)))
+                    throw(err)
+                end
+                # The exception is swallowed if exit() returns true
+            end
+        finally
+            # The normal and non-local-goto cases are handled here
+            if exc
+                exit(mgr, nothing, nothing, nothing)
+            end
+        end
+    end
+end
+
 
 #########################################################################
 

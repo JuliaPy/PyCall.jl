@@ -134,6 +134,13 @@ we could call the Newton solver in scipy.optimize via:
     @pyimport scipy.optimize as so
     so.newton(x -> cos(x) - x, 1)
 
+A macro exists for mimicking Python's "with statement". For example:
+    
+    @with pybuiltin("open")("file.txt","w") as f begin
+        f[:write]("hello")
+    end
+
+
 **Important:** The biggest difference from Python is that object attributes/members are
 accessed with `o[:attribute]` rather than `o.attribute`, so that `o.method(...)` in
 Python is replaced by `o[:method](...)` in Julia.  Also, you use
