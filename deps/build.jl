@@ -8,24 +8,40 @@
 using Compat
 import Conda
 
-PYTHONIOENCODING = get(ENV, "PYTHONIOENCODING", nothing)
-PYTHONHOME = get(ENV, "PYTHONHOME", nothing)
 immutable UseCondaPython <: Exception end
 
-try # save/restore environment vars
-
-# set PYTHONIOENCODING when running python executable, so that
-# we get UTF-8 encoded text as output (this is not the default on Windows).
-ENV["PYTHONIOENCODING"] = "UTF-8"
+try # make sure deps.jl file is removed on error
 
 #########################################################################
 
-pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readstring(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`))
+# Fix the environment for running `python`, and setts IO encoding to UTF-8.
+# If cmd is the Conda python, then additionally removes all PYTHON* and
+# CONDA* environment variables.
+function pythonenv(cmd::Cmd)
+    env = copy(ENV)
+    if dirname(cmd.exec[1]) == abspath(Conda.PYTHONDIR)
+        pythonvars = Compat.UTF8String[]
+        for var in keys(env)
+            if startswith(var, "CONDA") || startswith(var, "PYTHON")
+                push!(pythonvars, var)
+            end
+        end
+        for var in pythonvars
+            pop!(env, var)
+        end
+    end
+    # set PYTHONIOENCODING when running python executable, so that
+    # we get UTF-8 encoded text as output (this is not the default on Windows).
+    env["PYTHONIOENCODING"] = "UTF-8"
+    setenv(cmd, env)
+end
+
+pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`)))
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
 
-pysys(python::AbstractString, var::AbstractString) = chomp(readstring(`$python -c "import sys; print(sys.$var)"`))
+pysys(python::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import sys; print(sys.$var)"`)))
 
 #########################################################################
 
@@ -57,24 +73,6 @@ function find_libpython(python::AbstractString)
     push!(libpaths, joinpath(exec_prefix, "lib"))
 
     error_strings = Compat.String[]
-
-    if !haskey(ENV, "PYTHONHOME")
-        # PYTHONHOME tells python where to look for both pure python
-        # and binary modules.  When it is set, it replaces both
-        # `prefix` and `exec_prefix` and we thus need to set it to
-        # both in case they differ. This is also what the
-        # documentation recommends.  However, they are documented
-        # to always be the same on Windows, where it causes
-        # problems if we try to include both.
-        ENV["PYTHONHOME"] = is_windows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
-        # Unfortunately, setting PYTHONHOME screws up Canopy's Python distro?
-        try
-            run(pipeline(`$python -c "import site"`, stdout=DevNull, stderr=DevNull))
-        catch e
-            push!(error_strings, string("$python -c \"import site\" ==> ", e))
-            pop!(ENV, "PYTHONHOME")
-        end
-    end
 
     # TODO: other paths? python-config output? pyconfigvar("LDFLAGS")?
 
@@ -133,13 +131,13 @@ function find_libpython(python::AbstractString)
 
         The python executable we tried was $python (= version $v);
         the library names we tried were $libs
-        and the library paths we tried were $libpaths
-""")
+        and the library paths we tried were $libpaths""")
 end
 
 #########################################################################
 
 include("depsutils.jl")
+
 #########################################################################
 
 const python = try
@@ -179,8 +177,26 @@ end
 const (libpython, libpy_name) = find_libpython(python)
 const programname = pysys(python, "executable")
 
+# Get PYTHONHOME, either from the environment or from Python
+# itself (if it is not in the environment or if we are using Conda)
+PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
+    # PYTHONHOME tells python where to look for both pure python
+    # and binary modules.  When it is set, it replaces both
+    # `prefix` and `exec_prefix` and we thus need to set it to
+    # both in case they differ. This is also what the
+    # documentation recommends.  However, they are documented
+    # to always be the same on Windows, where it causes
+    # problems if we try to include both.
+    exec_prefix = pysys(python, "exec_prefix")
+    is_windows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+else
+    ENV["PYTHONHOME"]
+end
+
 # cache the Python version as a Julia VersionNumber
-const pyversion = convert(VersionNumber, split(Py_GetVersion(libpython))[1])
+const pyversion = withenv("PYTHONHOME"=>PYTHONHOME) do
+    convert(VersionNumber, split(Py_GetVersion(libpython))[1])
+end
 
 info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
 
@@ -195,8 +211,6 @@ wstringconst(s) =
     VERSION < v"0.5.0-dev+4859" ?
     string("wstring(\"", escape_string(s), "\")") :
     string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
-
-PYTHONHOMEENV = get(ENV, "PYTHONHOME", "")
 
 # we write configuration files only if they change, both
 # to prevent unnecessary recompilation and to minimize
@@ -216,8 +230,8 @@ writeifchanged("deps.jl", """
     const pyprogramname = "$(escape_string(programname))"
     const wpyprogramname = $(wstringconst(programname))
     const pyversion_build = $(repr(pyversion))
-    const PYTHONHOME = "$(escape_string(PYTHONHOMEENV))"
-    const wPYTHONHOME = $(wstringconst(PYTHONHOMEENV))
+    const PYTHONHOME = "$(escape_string(PYTHONHOME))"
+    const wPYTHONHOME = $(wstringconst(PYTHONHOME))
 
     "True if we are using the Python distribution in the Conda package."
     const conda = $use_conda
@@ -233,10 +247,6 @@ catch
 # remove deps.jl (if it exists) on an error, so that PyCall will
 # not load until it is properly configured.
 isfile("deps.jl") && rm("deps.jl")
-
-finally # restore env vars
-
-PYTHONIOENCODING != nothing ? (ENV["PYTHONIOENCODING"] = PYTHONIOENCODING) : pop!(ENV, "PYTHONIOENCODING")
-PYTHONHOME != nothing ? (ENV["PYTHONHOME"] = PYTHONHOME) : pop!(ENV, "PYTHONHOME", "")
+rethrow()
 
 end
