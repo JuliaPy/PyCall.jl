@@ -151,6 +151,14 @@ const python = try
                 error("Python version $vers < 2.7 is not supported")
             end
         end
+
+        # check word size of Python via sys.maxsize, since a common error
+        # on Windows is to link a 64-bit Julia to a 32-bit Python.
+        pywordsize = parse(UInt64, pysys(py, "maxsize")) > (UInt64(1)<<32) ? 64 : 32
+        if pywordsize != Sys.WORD_SIZE
+            error("$py is $(pywordsize)-bit, but Julia is $(Sys.WORD_SIZE)-bit")
+        end
+
         py
     end
 catch e1
