@@ -8,7 +8,7 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
-       pyimport_conda, @py_str, @with
+       pyimport_conda, @py_str, @pywith, @pycall
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -438,33 +438,40 @@ end
 #########################################################################
 
 """
-    @with
+    @pywith
 
 Mimics a Python 'with' statement. Usage:
 
-@with EXPR as VAR begin
+@pywith EXPR[::TYPE_EXPR] [as VAR[::TYPE_VAR]] begin
     BLOCK
 end
 
-or 
+TYPE_EXPR and TYPE_VAR can optionally be used to override automatic conversion
+to Julia types in cases where this is not desired. 
 
-@with EXPR begin
-    BLOCK
-end
 """
-macro with(EXPR,as,VAR,BLOCK)
-    @assert as==:as "usage: @with EXPR as VAR BLOCK."
-    _with(EXPR,VAR,BLOCK)
+macro pywith(EXPR,as,VAR,BLOCK)
+    if isa(VAR,Expr) && (VAR.head==:(::))
+        VAR,TYPE = VAR.args
+    else
+        TYPE = PyAny
+    end
+    @assert (as==:as) && isa(VAR,Symbol) "usage: @pywith EXPR [as VAR[::TYPE]] BLOCK."
+    _pywith(EXPR,VAR,TYPE,BLOCK)
 end
-macro with(EXPR,BLOCK)
-    _with(EXPR,nothing,BLOCK)
+macro pywith(EXPR,BLOCK)
+    _pywith(EXPR,nothing,PyObject,BLOCK)
 end
         
-function _with(EXPR,VAR,BLOCK)        
+        
+function _pywith(EXPR,VAR,TYPE,BLOCK)
+    EXPR_str = string(EXPR)
     quote
-        mgr = $(esc(EXPR))
-        exit = pybuiltin("type")(mgr)[:__exit__]  # Not calling it yet
-        value = pybuiltin("type")(mgr)[:__enter__](mgr)
+        mgr = $(isa(EXPR,Expr) && EXPR.head==:(::) ? :(@pycall $(esc(EXPR))) : esc(EXPR))
+        @assert isa(mgr,PyObject) "@pywith: `$($EXPR_str)` did not return a PyObject. If this is a call to a Python function, try `$($EXPR_str)::PyObject` to turn off automatic conversion."
+        mgrT = pytypeof(mgr)
+        exit = mgrT["__exit__"]  # Not calling it yet
+        value = pycall(mgrT["__enter__"],$(esc(TYPE)),mgr)
         exc = true
         try
             try
@@ -627,6 +634,25 @@ pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
 (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
 
+pytypeof(o::PyObject) = PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
+
+
+"""
+    @pycall func(args...)::T
+
+Convenience macro which turns `func(args...)::T` into pycall(func, T, args...)
+"""
+macro pycall(ex)
+    @assert (isa(ex,Expr) && (ex.head==:(::)) 
+            && isa(ex.args[1],Expr) && (ex.args[1].head==:call)) "Usage: @pycall f(args...)::T"
+    func = ex.args[1].args[1]
+    args, kwargs = ex.args[1].args[2:end], []
+    if isa(args[1],Expr) && (args[1].head==:parameters)
+        kwargs, args = args[1], args[2:end]
+    end
+    T = ex.args[2]
+    :(pycall($(map(esc,[kwargs; func; T; args])...)))
+end
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
