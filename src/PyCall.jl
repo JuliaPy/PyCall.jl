@@ -101,7 +101,7 @@ function pydecref(o::PyObject)
 end
 
 function pyincref(o::PyObject)
-    ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
+    ccall((@pysym :Py_IncRef), Void, (PyPtr,), o.o)
     o
 end
 
