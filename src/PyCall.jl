@@ -669,6 +669,10 @@ end
 unshift!(a::PyObject, item) = insert!(a, 1, item)
 
 function prepend!(a::PyObject, items)
+    if isa(items,PyObject) && items.o == a.o
+        # avoid infinite loop in prepending a to itself
+        return prepend!(a, collect(items))
+    end
     for (i,x) in enumerate(items)
         insert!(a, i, x)
     end
@@ -680,6 +684,14 @@ function append!(a::PyObject, items)
         push!(a, item)
     end
     return a
+end
+
+# _PyList_Extend implements a.extend(items) in Python; although it
+# is undocumented, it is present from at least Python 2.7 to Python 3.5.
+function append!(a::PyObject, items::PyObject)
+    @pycheckn ccall((@pysym :_PyList_Extend), PyPtr, (PyPtr, PyPtr),
+                     a, items)
+    a
 end
 
 #########################################################################

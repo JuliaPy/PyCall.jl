@@ -271,6 +271,11 @@ let o = PyObject(Any[8,3])
     @test collect(append!(o, [1,6,8])) == [5,4,2,9,3,1,6,8]
     @test isempty(empty!(o))
 end
+let o = PyObject(Any[8,3])
+    @test collect(append!(o, o)) == [8,3,8,3]
+    push!(o, 1)
+    @test collect(prepend!(o, o)) == [8,3,8,3,1,8,3,8,3,1]
+end
 
 # issue #216:
 @test length(collect(pyimport("itertools")[:combinations]([1,2,3],2))) == 3
