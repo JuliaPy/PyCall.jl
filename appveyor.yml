@@ -1,47 +1,6 @@
 environment:
   matrix:
 
-# Julia 0.4
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.4/julia-0.4-latest-win32.exe"
-    PYTHONDIR: "C:\\Python27"
-    PYTHON: "C:\\Python27\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.4/julia-0.4-latest-win32.exe"
-    PYTHONDIR: "C:\\Python33"
-    PYTHON: "C:\\Python33\\python.exe"
-    
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.4/julia-0.4-latest-win32.exe"
-    PYTHONDIR: "C:\\Python34"
-    PYTHON: "C:\\Python34\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.4/julia-0.4-latest-win32.exe"
-    PYTHONDIR: "C:\\Python35"
-    PYTHON: "C:\\Python35\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x86/0.4/julia-0.4-latest-win32.exe"
-    PYTHONDIR: "use_conda"
-    PYTHON: "use_conda"
-
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.4/julia-0.4-latest-win64.exe"
-    PYTHONDIR: "C:\\Python27-x64"
-    PYTHON: "C:\\Python27-x64\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.4/julia-0.4-latest-win64.exe"
-    PYTHONDIR: "C:\\Python33-x64"
-    PYTHON: "C:\\Python33-x64\\python.exe"
-    
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.4/julia-0.4-latest-win64.exe"
-    PYTHONDIR: "C:\\Python34-x64"
-    PYTHON: "C:\\Python34-x64\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.4/julia-0.4-latest-win64.exe"
-    PYTHONDIR: "C:\\Python35-x64"
-    PYTHON: "C:\\Python35-x64\\python.exe"
-
-  - JULIAVERSION: "julialang/bin/winnt/x64/0.4/julia-0.4-latest-win64.exe"
-    PYTHONDIR: "use_conda"
-    PYTHON: "use_conda"
-
 # Julia 0.5
   - JULIAVERSION: "julialang/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
     PYTHONDIR: "C:\\Python27"
@@ -83,7 +42,7 @@ environment:
   - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
     PYTHONDIR: "C:\\Python33"
     PYTHON: "C:\\Python33\\python.exe"
-    
+
   - JULIAVERSION: "julianightlies/bin/winnt/x86/julia-latest-win32.exe"
     PYTHONDIR: "C:\\Python34"
     PYTHON: "C:\\Python34\\python.exe"
@@ -103,7 +62,7 @@ environment:
   - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python33-x64"
     PYTHON: "C:\\Python33-x64\\python.exe"
-    
+
   - JULIAVERSION: "julianightlies/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python34-x64"
     PYTHON: "C:\\Python34-x64\\python.exe"

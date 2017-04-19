@@ -19,7 +19,7 @@ without copying them.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.4 or later is required.
+install the files.  Julia 0.5 or later is required.
 
 The latest development version of PyCall is available from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to

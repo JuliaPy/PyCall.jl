@@ -5,7 +5,7 @@
 # so we define anonymous globals to hold them, returning the pointer
 const prevent_gc = Any[]
 function gstring_ptr(name::AbstractString, s::AbstractString)
-    g = Compat.String(s)
+    g = String(s)
     push!(prevent_gc, g)
     unsafe_convert(Ptr{UInt8}, g)
 end

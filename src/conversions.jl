@@ -202,7 +202,7 @@ Alternatively, `PyVector` can be used as the return type for a `pycall` that ret
 """
 type PyVector{T} <: AbstractVector{T}
     o::PyObject
-    @compat function (::Type{PyVector{T}}){T}(o::PyObject)
+    function (::Type{PyVector{T}}){T}(o::PyObject)
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyVector from NULL PyObject"))
         end
@@ -397,7 +397,7 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     o::PyObject
     # isdict = true for python dict, otherwise is a generic Mapping object
 
-    @compat function (::Type{PyDict{K,V,isdict}}){K,V,isdict}(o::PyObject)
+    function (::Type{PyDict{K,V,isdict}}){K,V,isdict}(o::PyObject)
         if o.o != C_NULL && pydict_query(o) == Union{}
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
@@ -405,8 +405,8 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     end
 end
 
-@compat (::Type{PyDict{K,V}}){K,V}(o::PyObject) = PyDict{K,V,pyisinstance(o, @pyglobalobj :PyDict_Type)}(o)
-@compat (::Type{PyDict{K,V}}){K,V}() = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())))
+(::Type{PyDict{K,V}}){K,V}(o::PyObject) = PyDict{K,V,pyisinstance(o, @pyglobalobj :PyDict_Type)}(o)
+(::Type{PyDict{K,V}}){K,V}() = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())))
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
 PyObject(d::PyDict) = d.o
@@ -653,7 +653,7 @@ pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc)
 function PyObject(i::BigInt)
     PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
                              (Ptr{UInt8}, Ptr{Void}, Cint),
-                             Compat.String(string(i)), C_NULL, 10))
+                             String(string(i)), C_NULL, 10))
 end
 
 function convert(::Type{BigInt}, o::PyObject)

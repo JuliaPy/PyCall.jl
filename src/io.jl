@@ -105,7 +105,7 @@ function pyio_initialize()
                 @with_ioraise(for s in seq write(pyio_jl(self), s) end)
             read(self, nb=typemax(Int)) =
                 @with_ioraise(self[:istextio] ?
-                              Compat.String(read(pyio_jl(self), nb)) :
+                              String(read(pyio_jl(self), nb)) :
                               read(pyio_jl(self), nb))
             readall(self) =
                 @with_ioraise(self[:istextio] ? readstring(pyio_jl(self)) :

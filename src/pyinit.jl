@@ -92,7 +92,7 @@ function __init__()
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
         if pyversion.major < 3
-            argv_s = Compat.String("")
+            argv_s = ""
             argv = unsafe_convert(Ptr{UInt8}, argv_s)
             ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{UInt8}},Cint), 1, &argv, 0)
         else

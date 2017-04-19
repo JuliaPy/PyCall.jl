@@ -14,7 +14,7 @@ end
 # Python dictionaries of global and local variables to use in the expression,
 # and a current "file name" to use for stack traces
 function pyeval_(s::AbstractString, globals=maindict(), locals=maindict(), input_type=Py_eval_input, fname="PyCall")
-    sb = Compat.String(s) # use temp var to prevent gc before we are done with o
+    sb = String(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
@@ -64,7 +64,7 @@ function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
 end
 
 # get filename from @__FILE__ macro, which returns nothing in the REPL
-make_fname(fname::AbstractString) = Compat.UTF8String(fname)
+make_fname(fname::AbstractString) = String(fname)
 make_fname(fname::Any) = "REPL"
 
 # a little finite-state-machine dictionary to keep track of where

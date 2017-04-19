@@ -1,5 +1,4 @@
 using Base.Test, PyCall, Compat
-import Compat.String
 
 if isdefined(Base, :Iterators)
     filter(f, itr) = collect(Iterators.filter(f, itr))
@@ -76,7 +75,7 @@ let d = PyDict(Dict(1 => "hello", 34 => "yes" ))
     set!(d.o, 34, "goodbye")
     @test d[34] == "goodbye"
     @test sort!(keys(Int, d)) == sort!(collect(d.o[:keys]())) == sort!(collect(keys(d))) == [1, 34]
-    @test eltype(d) == eltype(typeof(d)) == Pair{Int, Compat.ASCIIString}
+    @test eltype(d) == eltype(typeof(d)) == Pair{Int, String}
 end
 
 let d = Dict(zip(1:1000, 1:1000)), f = (k,v) -> iseven(k)

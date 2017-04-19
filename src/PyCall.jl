@@ -26,8 +26,6 @@ import Base: sigatomic_begin, sigatomic_end
 ## Compatibility import for v0.4, v0.5
 using Compat
 import Conda
-import Compat.String
-@compat import Base.show
 import Base.unsafe_convert
 import MacroTools   # because of issue #270
 
@@ -573,8 +571,8 @@ pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
 pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
     return convert(PyAny, _pycall(o, args...; kwargs...))
 
-@compat (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-@compat (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
+(o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+(::Type{PyAny})(o::PyObject) = convert(PyAny, o)
 
 
 #########################################################################
@@ -735,7 +733,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"text/latex", "_repr_latex_"))
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
-        @compat function show(io::IO, mime::$mime, o::PyObject)
+        function show(io::IO, mime::$mime, o::PyObject)
             if o.o != C_NULL && haskey(o, $method)
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))

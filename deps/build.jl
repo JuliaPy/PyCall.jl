@@ -20,7 +20,7 @@ try # make sure deps.jl file is removed on error
 function pythonenv(cmd::Cmd)
     env = copy(ENV)
     if dirname(cmd.exec[1]) == abspath(Conda.PYTHONDIR)
-        pythonvars = Compat.UTF8String[]
+        pythonvars = String[]
         for var in keys(env)
             if startswith(var, "CONDA") || startswith(var, "PYTHON")
                 push!(pythonvars, var)
@@ -72,7 +72,7 @@ function find_libpython(python::AbstractString)
     push!(libpaths, exec_prefix)
     push!(libpaths, joinpath(exec_prefix, "lib"))
 
-    error_strings = Compat.String[]
+    error_strings = String[]
 
     # TODO: other paths? python-config output? pyconfigvar("LDFLAGS")?
 
