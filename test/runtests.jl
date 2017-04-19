@@ -207,6 +207,7 @@ pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
 @test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
 @test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
 @test pyanycheck(Complex128, PyVector{PyObject}(PyObject([1.3+1im]))[1])
+@test pyanycheck(Bool, PyVector{PyObject}(PyObject([true]))[1])
 
 pymodule_exists(s::AbstractString) = try
     pyimport(s)
@@ -365,3 +366,11 @@ for b in (4, PyObject(4))
         end
     end
 end
+
+# more flexible bool conversions, matching Python "truth value testing"
+@test convert(Bool, PyObject(nothing)) === false
+@test convert(Bool, PyObject(0.0)) === false
+@test convert(Bool, PyObject(Any[])) === false
+@test convert(Bool, PyObject(17.3)) === true
+@test convert(Bool, PyObject(Any[0])) === true
+@test Bool(PyVector{PyObject}(PyObject([false]))[1]) === false

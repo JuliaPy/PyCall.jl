@@ -37,7 +37,7 @@ if Sys.WORD_SIZE == 32
 end
 
 convert(::Type{Bool}, po::PyObject) =
-    0 != @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po))
+    0 != @pycheck ccall(@pysym(:PyObject_IsTrue), Cint, (PyPtr,), po)
 
 convert{T<:Real}(::Type{T}, po::PyObject) =
   convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), asscalar(po)))
@@ -768,6 +768,7 @@ function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)
     @return_not_None pyint_query(o)
+    pyisinstance(o, npy_bool) && return Bool
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)
     @return_not_None pystring_query(o)

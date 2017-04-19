@@ -36,6 +36,7 @@ const npy_number = PyNULL()
 const npy_integer = PyNULL()
 const npy_floating = PyNULL()
 const npy_complexfloating = PyNULL()
+const npy_bool = PyNULL()
 
 function npyinitialize()
     global npy_initialized
@@ -68,6 +69,7 @@ function npyinitialize()
     copy!(npy_integer, numpy["integer"])
     copy!(npy_floating, numpy["floating"])
     copy!(npy_complexfloating, numpy["complexfloating"])
+    copy!(npy_bool, numpy["bool_"])
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try
