@@ -686,13 +686,9 @@ function append!(a::PyObject, items)
     return a
 end
 
-# _PyList_Extend implements a.extend(items) in Python; although it
-# is undocumented, it is present from at least Python 2.7 to Python 3.5.
-function append!(a::PyObject, items::PyObject)
-    @pycheckn ccall((@pysym :_PyList_Extend), PyPtr, (PyPtr, PyPtr),
-                     a, items)
-    a
-end
+append!(a::PyObject, items::PyObject) =
+    PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat),
+                             PyPtr, (PyPtr, PyPtr), a, items))
 
 #########################################################################
 # support IPython _repr_foo functions for MIME output of PyObjects
