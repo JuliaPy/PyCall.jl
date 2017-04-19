@@ -355,3 +355,13 @@ if isdefined(Docs, :getdoc)
     # use 'content' since `Text` objects test equality by object identity
     @test @doc(foo).content == "foo docstring"
 end
+
+# binary operators
+for b in (4, PyObject(4))
+    for op in (+, -, *, /, %, &, |, ^, <<, >>, ⊻)
+        let x = op(PyObject(111), b)
+            @test isa(x, PyObject)
+            @test convert(PyAny, x) == op(111, 4)
+        end
+    end
+end

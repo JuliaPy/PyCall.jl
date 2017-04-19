@@ -691,6 +691,37 @@ append!(a::PyObject, items::PyObject) =
                              PyPtr, (PyPtr, PyPtr), a, items))
 
 #########################################################################
+# operators on Python objects
+
+# binary operators
+import Base: +,-,*,/,//,%,&,|,^,<<,>>
+import Compat: ⊻
+for (op,py) in ((:+,:PyNumber_Add), (:-,:PyNumber_Subtract), (:*,:PyNumber_Multiply),
+                (:/,:PyNumber_TrueDivide), (:%,:PyNumber_Remainder),
+                (:&,:PyNumber_And), (:|,:PyNumber_Or),
+                (:<<,:PyNumber_Lshift), (:>>,:PyNumber_Rshift), (:⊻,:PyNumber_Xor))
+    qpy = QuoteNode(py)
+    @eval $op(a::PyObject, b) =
+        PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
+end
+^(a::PyObject, b) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
+^(a::PyObject, b::Integer) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
+
+if VERSION >= v"0.6.0-dev.1632" # julia#17623
+    # .+= etcetera map to in-place Python operations
+    for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
+                    (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
+                    (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
+                    (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
+        qpy = QuoteNode(py)
+        @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
+            a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
+            PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
+        end
+    end
+end
+
+#########################################################################
 # support IPython _repr_foo functions for MIME output of PyObjects
 
 for (mime, method) in ((MIME"text/html", "_repr_html_"),
