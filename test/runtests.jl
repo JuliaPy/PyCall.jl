@@ -367,6 +367,15 @@ for b in (4, PyObject(4))
     end
 end
 
+# updating operators .+= etcetera
+if VERSION >= v"0.6.0-dev.1632"
+    let o = PyObject(Any[1,2]), c = o
+        o .+= Any[3,4]
+        @test collect(o) == [1,2,3,4]
+        @test o.o == c.o # updated in-place
+    end
+end
+
 # more flexible bool conversions, matching Python "truth value testing"
 @test convert(Bool, PyObject(nothing)) === false
 @test convert(Bool, PyObject(0.0)) === false
