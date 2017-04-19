@@ -341,7 +341,7 @@ end
 let weakdict = pyimport("weakref")["WeakValueDictionary"]
     # (use weakdict for the value, since Python supports
     #  weak references to type objects)
-    @test weakdict(Dict(3=>weakdict)) == Dict(3=>weakdict)
+    @test weakdict(Dict(3=>weakdict))[:__getitem__](3) == weakdict
 end
 
 # Expose python docs to Julia doc system
