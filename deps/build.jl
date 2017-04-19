@@ -36,12 +36,14 @@ function pythonenv(cmd::Cmd)
     setenv(cmd, env)
 end
 
-pyconfigvar(python::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('$var'))"`)))
+pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import $mod; print($mod.$var)"`)))
+
+pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$var')")
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
 
-pysys(python::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import sys; print(sys.$var)"`)))
+pysys(python::AbstractString, var::AbstractString) = pyvar(python, "sys", var)
 
 #########################################################################
 
@@ -202,9 +204,7 @@ else
 end
 
 # cache the Python version as a Julia VersionNumber
-const pyversion = withenv("PYTHONHOME"=>PYTHONHOME) do
-    convert(VersionNumber, split(Py_GetVersion(libpython))[1])
-end
+const pyversion = VersionNumber(pyvar(python, "platform", "python_version()"))
 
 info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
 
