@@ -385,6 +385,14 @@ include("numpy.jl")
 #########################################################################
 # PyDict: no-copy wrapping of a Julia object around a Python dictionary
 
+# we check for "items" attr since PyMapping_Check doesn't do this (it only
+# checks for __getitem__) and PyMapping_Check returns true for some
+# scipy scalar array members, grrr.
+function is_mapping_object(o::PyObject)
+    pyisinstance(o, @pyglobalobj :PyDict_Type) ||
+    (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items") == 1)
+end
+
 """
     PyDict(o::PyObject)
     PyDict(d::Dict{K,V})
@@ -398,7 +406,7 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     # isdict = true for python dict, otherwise is a generic Mapping object
 
     function (::Type{PyDict{K,V,isdict}}){K,V,isdict}(o::PyObject)
-        if o.o != C_NULL && pydict_query(o) == Union{}
+        if o.o != C_NULL && !is_mapping_object(o)
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         return new{K,V,isdict}(o)
