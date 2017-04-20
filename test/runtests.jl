@@ -260,6 +260,12 @@ let a1=[5,8,6], a2=rand(3,4), a3=rand(3,4,5), o1=PyObject(a1), o2=PyObject(a2), 
         @test o3[2,3,4] == 9
     end
 end
+# []-based dict access
+let o = PyObject(Dict(3=>"yes", 6=>"no"))
+    @test length(o) == 2
+    @test o[3] == "yes"
+    @test pop!(o,3) == "yes" && length(o)==1 && o[6]=="no"
+end
 
 # list operations:
 let o = PyObject(Any[8,3])
