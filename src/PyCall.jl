@@ -28,6 +28,7 @@ using Compat
 import Conda
 import Base.unsafe_convert
 import MacroTools   # because of issue #270
+using LegacyStrings
 
 if isdefined(Base, :Iterators)
     import Base.Iterators: filter
