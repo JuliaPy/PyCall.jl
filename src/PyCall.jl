@@ -621,14 +621,11 @@ function ind2py(i::Integer)
     i <= 0 && throw(BoundsError())
     return i-1
 end
-# don't shift to 0-based index for mapping (dict-like) objects:
-ind2py(o::PyObject, i::Integer) =
-    pyquery((@pyglobal :PyMapping_Check), o) ? i : ind2py(i)
 
-_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr, PyPtr), o, PyObject(ind2py(o,i)))))
+_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
 getindex(o::PyObject, i::Integer) = _getindex(o, i, PyAny)
 function setindex!(o::PyObject, v, i::Integer)
-    @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr), o, PyObject(ind2py(o,i)), PyObject(v))
+    @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
     v
 end
 getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2)))
@@ -636,14 +633,14 @@ setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py
 getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
 setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
 Base.endof(o::PyObject) = length(o)
-length(o::PyObject) = @pycheckz ccall((@pysym :PyObject_Length), Int, (PyPtr,), o)
+length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
 
-function pop!(a::PyObject, key)
-    v = get(a, key)
-    @pycheckz ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), a, PyObject(key))
+function splice!(a::PyObject, i::Integer)
+    v = a[i]
+    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
     v
 end
-splice!(a::PyObject, i::Integer) = pop!(a, i-1)
+
 pop!(a::PyObject) = splice!(a, length(a))
 shift!(a::PyObject) = splice!(a, 1)
 
