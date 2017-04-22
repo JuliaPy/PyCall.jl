@@ -398,3 +398,32 @@ end
 # issue #389
 @pydef type EmptyClass
 end
+
+# @pycall macro expands correctly
+_pycall = GlobalRef(PyCall,:pycall)
+@test macroexpand(:(@pycall foo(bar)::T)) == :($(_pycall)(foo, T, bar))
+@test macroexpand(:(@pycall foo(bar, args...)::T)) == :($(_pycall)(foo, T, bar, args...))
+@test macroexpand(:(@pycall foo(bar; kwargs...)::T)) == :($(_pycall)(foo, T, bar; kwargs...))
+
+
+# basic @pywith functionality
+fname = tempname()
+try
+    @test begin
+        @pywith pybuiltin("open")(fname,"w") as f begin
+            f[:write]("test")
+        end
+        open(readstring,fname)=="test"
+    end
+finally
+    rm(fname)
+end
+
+# @pywith errors correctly handled
+@pydef type IgnoreError
+    __init__(self, ignore) = (self[:ignore]=ignore)
+    __enter__(self) = ()
+    __exit__(self, typ, value, tb) = self[:ignore]
+end
+@test_throws ErrorException @pywith IgnoreError(false) error()
+@test (@pywith IgnoreError(true) error(); true)

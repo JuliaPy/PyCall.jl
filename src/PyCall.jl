@@ -442,55 +442,62 @@ end
 
 Mimics a Python 'with' statement. Usage:
 
-@pywith EXPR[::TYPE_EXPR] [as VAR[::TYPE_VAR]] begin
+@pywith EXPR[::TYPE1] [as VAR[::TYPE2]] begin
     BLOCK
 end
 
-TYPE_EXPR and TYPE_VAR can optionally be used to override automatic conversion
-to Julia types in cases where this is not desired. 
+TYPE1/TYPE2 can optionally be used to override automatic conversion to Julia
+types for both the context manager and variable in cases where this is not
+desired.
 
 """
 macro pywith(EXPR,as,VAR,BLOCK)
-    if isa(VAR,Expr) && (VAR.head==:(::))
+    if isexpr(VAR,:(::))
         VAR,TYPE = VAR.args
     else
         TYPE = PyAny
     end
-    @assert (as==:as) && isa(VAR,Symbol) "usage: @pywith EXPR [as VAR[::TYPE]] BLOCK."
+    if !((as==:as) && isa(VAR,Symbol))
+        throw(ArgumentError("usage: @pywith EXPR[::TYPE1] [as VAR[::TYPE2]] BLOCK."))
+    end
     _pywith(EXPR,VAR,TYPE,BLOCK)
 end
 macro pywith(EXPR,BLOCK)
     _pywith(EXPR,nothing,PyObject,BLOCK)
 end
-        
-        
+
+
 function _pywith(EXPR,VAR,TYPE,BLOCK)
     EXPR_str = string(EXPR)
     quote
-        mgr = $(isa(EXPR,Expr) && EXPR.head==:(::) ? :(@pycall $(esc(EXPR))) : esc(EXPR))
-        @assert isa(mgr,PyObject) "@pywith: `$($EXPR_str)` did not return a PyObject. If this is a call to a Python function, try `$($EXPR_str)::PyObject` to turn off automatic conversion."
+        mgr = $(isexpr(EXPR,:(::)) ? :(@pycall $(esc(EXPR))) : esc(EXPR))
+        if !isa(mgr,PyObject)
+            if $(isexpr(EXPR,:call))
+                throw(ArgumentError("@pywith: `$($EXPR_str)` did not return a PyObject. If this is a call to a Python function, try `$($EXPR_str)::PyObject` to turn off automatic conversion."))
+            else
+                throw(ArgumentError("@pywith: `$($EXPR_str)` should be a PyObject."))
+            end
+        end
         mgrT = pytypeof(mgr)
-        exit = mgrT["__exit__"]  # Not calling it yet
-        value = pycall(mgrT["__enter__"],$(esc(TYPE)),mgr)
+        exit = mgrT["__exit__"]
+        value = @pycall mgrT["__enter__"](mgr)::$(esc(TYPE))
         exc = true
         try
             try
                 $(VAR==nothing ? :() : :($(esc(VAR)) = value))
                 $(esc(BLOCK))
             catch err
-                # The exceptional case is handled here
                 exc = false
-                if !(pybuiltin("bool")(exit(mgr, pyimport(:sys)[:exc_info]()...)))
+                if !(@pycall exit(mgr, pyimport(:sys)[:exc_info]()...)::Bool)
                     throw(err)
                 end
-                # The exception is swallowed if exit() returns true
             end
         finally
-            # The normal and non-local-goto cases are handled here
             if exc
                 exit(mgr, nothing, nothing, nothing)
             end
         end
+        nothing
     end
 end
 
@@ -643,11 +650,12 @@ pytypeof(o::PyObject) = PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, 
 Convenience macro which turns `func(args...)::T` into pycall(func, T, args...)
 """
 macro pycall(ex)
-    @assert (isa(ex,Expr) && (ex.head==:(::)) 
-            && isa(ex.args[1],Expr) && (ex.args[1].head==:call)) "Usage: @pycall f(args...)::T"
+    if !(isexpr(ex,:(::)) && isexpr(ex.args[1],:call))
+        throw(ArgumentError("Usage: @pycall func(args...)::T"))
+    end
     func = ex.args[1].args[1]
     args, kwargs = ex.args[1].args[2:end], []
-    if isa(args[1],Expr) && (args[1].head==:parameters)
+    if isexpr(args[1],:parameters)
         kwargs, args = args[1], args[2:end]
     end
     T = ex.args[2]
