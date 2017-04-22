@@ -416,7 +416,7 @@ try
         open(readstring,fname)=="test"
     end
 finally
-    rm(fname)
+    rm(fname,force=true)
 end
 
 # @pywith errors correctly handled
