@@ -385,6 +385,7 @@ end
 @test Bool(PyVector{PyObject}(PyObject([false]))[1]) === false
 
 # serialization
-let py_sum_obj = pybuiltin("sum")
-    @test py_sum_obj == deserialize(IOBuffer(sprint(io->serialize(io, py_sum_obj))))
+let py_sum_obj = pybuiltin("sum"), b = IOBuffer()
+    serialize(b, py_sum_obj)
+    @test py_sum_obj == deserialize(seekstart(b))
 end

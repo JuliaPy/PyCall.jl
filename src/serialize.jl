@@ -1,18 +1,29 @@
-const pickle = PyNULL()
+const _pickle = PyNULL()
 
-function get_pickle()
-    if pickle.o == C_NULL
-        copy!(pickle, pyimport("pickle"))
-    end
-
-    return pickle
-end
+pickle() = _pickle.o == C_NULL ? copy!(_pickle, pyimport("pickle")) : _pickle
 
 function Base.serialize(s::AbstractSerializer, pyo::PyObject)
     Base.serialize_type(s, PyObject)
-    serialize(s, get_pickle()[:dumps](pyo))
+
+    b = PyBuffer(pycall(pickle()[:dumps], PyObject, pyo))
+
+    serialize(s, unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
 end
 
 function Base.deserialize(s::AbstractSerializer, t::Type{PyObject})
-    get_pickle()[:loads](deserialize(s))
+    b = deserialize(s)
+
+    pycall(
+        pickle()[:loads],
+        PyObject,
+        PyObject(
+            @pycheckn ccall(
+                @pysym(PyString_FromStringAndSize),
+                PyPtr,
+                (Ptr{UInt8}, Int),
+                b,
+                sizeof(b)
+            )
+        )
+    )
 end
