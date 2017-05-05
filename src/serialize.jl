@@ -1,16 +1,6 @@
 const _pickle = PyNULL()
 
-function pickle()
-    if _pickle.o == C_NULL
-        if pyexists(:cPickle)
-            copy!(_pickle, pyimport(:cPickle))
-        else
-            copy!(_pickle, pyimport(:pickle))
-        end
-    end
-
-    return _pickle
-end
+pickle() = _pickle.o == C_NULL ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
 
 function Base.serialize(s::AbstractSerializer, pyo::PyObject)
     Base.serialize_type(s, PyObject)
@@ -20,7 +10,6 @@ end
 
 function Base.deserialize(s::AbstractSerializer, t::Type{PyObject})
     b = deserialize(s)
-
     pycall(pickle()["loads"], PyObject,
         PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
                 PyPtr, (Ptr{UInt8}, Int),
