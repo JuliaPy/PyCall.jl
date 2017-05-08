@@ -394,3 +394,7 @@ let py_sum_obj = pybuiltin("sum")
     serialize(b, PyNULL())
     @test PyNULL() == deserialize(seekstart(b))
 end
+
+# issue #389
+@pydef type EmptyClass
+end

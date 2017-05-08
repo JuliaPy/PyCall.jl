@@ -56,12 +56,6 @@ function parse_pydef_toplevel(expr)
 
         base_classes = []
     end
-    if isa(lines[1], Expr) && lines[1].head == :block
-        # unfortunately, @capture fails to parse the type's fields correctly
-        # It's been reported and fixed, we can remove this line on the next
-        # MacroTools release (> v0.2)
-        lines = lines[1].args
-    end
     return class_name::Symbol, base_classes, lines
 end
 
