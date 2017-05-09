@@ -760,6 +760,7 @@ end
 #########################################################################
 
 include("pyeval.jl")
+include("serialize.jl")
 
 #########################################################################
 # Precompilation: just an optimization to speed up initialization.
