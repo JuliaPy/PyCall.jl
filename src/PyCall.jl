@@ -23,7 +23,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
 # similar long-running (or potentially long-running) code.
 import Base: sigatomic_begin, sigatomic_end
 
-## Compatibility import for v0.4, v0.5
+## Compatibility import for v0.5
 using Compat
 import Conda
 import Base.unsafe_convert
