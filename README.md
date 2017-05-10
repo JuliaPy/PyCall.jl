@@ -424,7 +424,7 @@ responsive without blocking Julia's input prompt.  PyCall includes
 functions to implement these event loops for some of the most common
 cross-platform [GUI
 toolkits](http://en.wikipedia.org/wiki/Widget_toolkit):
-[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/) version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via [PyGObject](https://wiki.gnome.org/action/show/Projects/PyGObject)),
+[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/) version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via [PyGObject](https://pygobject.readthedocs.io/en/latest/)),
 and [Qt](http://qt-project.org/) (via the [PyQt4](http://wiki.python.org/moin/PyQt4) or [PySide](http://qt-project.org/wiki/PySide)
 Python modules).
 
