@@ -65,8 +65,7 @@ function PyObject(s::AbstractString)
                                  PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
                                  sb, sizeof(sb), C_NULL))
     else
-        PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
-                                 PyPtr, (Ptr{UInt8}, Int), sb, sizeof(sb)))
+        pybytes(sb)
     end
 end
 

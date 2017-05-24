@@ -12,15 +12,16 @@ function Base.serialize(s::AbstractSerializer, pyo::PyObject)
     end
 end
 
+pybytes(b) = PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
+                                      PyPtr, (Ptr{UInt8}, Int),
+                                      b, sizeof(b)))
+
 function Base.deserialize(s::AbstractSerializer, t::Type{PyObject})
     b = deserialize(s)
     if isa(b, PyPtr)
         @assert b == C_NULL
         return PyNULL()
     else
-        return pycall(pickle()["loads"], PyObject,
-            PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
-                    PyPtr, (Ptr{UInt8}, Int),
-                    b, sizeof(b))))
+        return pycall(pickle()["loads"], PyObject, pybytes(b))
     end
 end
