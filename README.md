@@ -134,6 +134,18 @@ we could call the Newton solver in scipy.optimize via:
     @pyimport scipy.optimize as so
     so.newton(x -> cos(x) - x, 1)
 
+A macro exists for mimicking Python's "with statement". For example:
+
+    @pywith pybuiltin("open")("file.txt","w") as f begin
+        f[:write]("hello")
+    end
+
+The type of `f` can be specified with `f::T` (for example, to override automatic
+conversion, use `f::PyObject`). Similarly, if the context manager returns a type
+which is automatically converted to a Julia type, you will have override this
+via `@pywith EXPR::PyObject ...`. 
+
+
 **Important:** The biggest difference from Python is that object attributes/members are
 accessed with `o[:attribute]` rather than `o.attribute`, so that `o.method(...)` in
 Python is replaced by `o[:method](...)` in Julia.  Also, you use
@@ -312,6 +324,9 @@ and also by providing more type information to the Julia compiler.
   the corresponding Python types if possible), converting the return value
   to `returntype` (use a `returntype` of `PyObject` to return the unconverted
   Python object reference, or of `PyAny` to request an automated conversion).
+  For convenience, a macro `@pycall` exists which automatically converts
+  `@pycall function(args...)::returntype` into
+  `pycall(function,returntype,args...)`.  
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).  Functions or other symbols
