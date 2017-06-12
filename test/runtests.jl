@@ -427,3 +427,6 @@ end
 end
 @test_throws ErrorException @pywith IgnoreError(false) error()
 @test (@pywith IgnoreError(true) error(); true)
+
+@test contains(Base.Docs.doc(PyObject(1)).content, "integer")
+@test contains(Base.Docs.doc(PyObject(py"lambda x: x+1")).content, "no docstring")

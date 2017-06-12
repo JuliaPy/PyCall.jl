@@ -197,9 +197,13 @@ function show(io::IO, o::PyObject)
 end
 
 function Base.Docs.doc(o::PyObject)
-    Base.Docs.Text(haskey(o, "__doc__") ?
-                   convert(AbstractString, o["__doc__"]) :
-                   "Python object (no docstring found)")
+    if haskey(o, "__doc__")
+        d = o["__doc__"]
+        if d.o != pynothing[]
+            return Base.Docs.Text(convert(AbstractString, d))
+        end
+    end
+    return Base.Docs.Text("Python object (no docstring found)")
 end
 
 #########################################################################
