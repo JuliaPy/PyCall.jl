@@ -138,8 +138,6 @@ pyisinstance(o::PyObject, t::Union{Ptr{Void},PyPtr}) =
 pyquery(q::Ptr{Void}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
 
-pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : pycall(TypeType, PyObject, o)
-
 # conversion to pass PyObject as ccall arguments:
 unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
 
@@ -153,6 +151,8 @@ PyObject(o::PyObject) = o
 include("pyinit.jl")
 include("exception.jl")
 include("gui.jl")
+
+pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
 
 #########################################################################
 
@@ -644,8 +644,6 @@ pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
 
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
 (::Type{PyAny})(o::PyObject) = convert(PyAny, o)
-
-pytypeof(o::PyObject) = PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
 
 
 """

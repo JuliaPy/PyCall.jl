@@ -8,7 +8,6 @@
 const inspect = PyNULL()
 const builtin = PyNULL()
 const BuiltinFunctionType = PyNULL()
-const TypeType = PyNULL()
 const MethodType = PyNULL()
 const MethodWrapperType = PyNULL()
 const ufuncType = PyNULL()
@@ -60,9 +59,6 @@ function __init__()
     copy!(pyproperty, pybuiltin(:property))
 
     pyexc_initialize() # mappings from Julia Exception types to Python exceptions
-
-    types = pyimport("types")
-    copy!(TypeType, pybuiltin("type")) # for pytypeof
 
     # cache Python None -- PyPtr, not PyObject, to prevent it from
     # being finalized prematurely on exit
