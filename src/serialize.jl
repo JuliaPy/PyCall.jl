@@ -12,9 +12,17 @@ function Base.serialize(s::AbstractSerializer, pyo::PyObject)
     end
 end
 
-pybytes(b) = PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
-                                      PyPtr, (Ptr{UInt8}, Int),
-                                      b, sizeof(b)))
+"""
+    pybytes(b::Union{String,Vector{UInt8}})
+
+Convert `b` to a Python `bytes` object.   This differs from the default
+`PyObject(b)` conversion of `String` to a Python string (which may fail if `b`
+does not contain valid Unicode), or from the default conversion of a
+`Vector{UInt8}` to a `bytearray` object (which is mutable, unlike `bytes`).
+"""
+pybytes(b::Union{String,Array{UInt8}}) = PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
+                                                  PyPtr, (Ptr{UInt8}, Int),
+                                                  b, sizeof(b)))
 
 function Base.deserialize(s::AbstractSerializer, t::Type{PyObject})
     b = deserialize(s)

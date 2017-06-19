@@ -430,3 +430,7 @@ end
 
 @test contains(Base.Docs.doc(PyObject(1)).content, "integer")
 @test contains(Base.Docs.doc(PyObject(py"lambda x: x+1")).content, "no docstring")
+
+let b = rand(UInt8, 1000)
+    @test Vector{UInt8}(pybytes(b)) == b == Vector{UInt8}(pybytes(String(b)))
+end

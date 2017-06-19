@@ -143,7 +143,7 @@ A macro exists for mimicking Python's "with statement". For example:
 The type of `f` can be specified with `f::T` (for example, to override automatic
 conversion, use `f::PyObject`). Similarly, if the context manager returns a type
 which is automatically converted to a Julia type, you will have override this
-via `@pywith EXPR::PyObject ...`. 
+via `@pywith EXPR::PyObject ...`.
 
 
 **Important:** The biggest difference from Python is that object attributes/members are
@@ -229,6 +229,10 @@ copying the data.   Julia arrays are stored in [column-major order](https://en.w
 and since NumPy supports column-major arrays this is not a problem.
 
 However, the *default* ordering of NumPy arrays created in *Python* is row-major, and some Python packages will throw an error if you try to pass them column-major NumPy arrays.  To deal with this, you can use `PyReverseDims(a)` to pass a Julia array as a row-major NumPy array with the dimensions *reversed*. For example, if `a` is a 3x4x5 Julia array, then `PyReverseDims(a)` passes it as a 5x4x3 NumPy row-major array (without making a copy of the underlying data).
+
+A `Vector{UInt8}` object in Julia, by default, is converted to a Python
+`bytearray` object.   If you want a `bytes` object instead, you can use
+the function `pybytes(a)`.
 
 ##### From Python to Julia
 
