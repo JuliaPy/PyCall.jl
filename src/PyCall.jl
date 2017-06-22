@@ -230,30 +230,6 @@ function hash(o::PyObject)
 end
 
 #########################################################################
-# PyObject equality
-
-const Py_EQ = convert(Cint, 2) # from Python's object.h
-
-function ==(o1::PyObject, o2::PyObject)
-    if o1.o == C_NULL || o2.o == C_NULL
-        return o1.o == o2.o
-    elseif is_pyjlwrap(o1)
-        if is_pyjlwrap(o2)
-            return unsafe_pyjlwrap_to_objref(o1.o) ==
-                   unsafe_pyjlwrap_to_objref(o2.o)
-        else
-            return false
-        end
-    else
-        val = ccall((@pysym :PyObject_RichCompareBool), Cint,
-                    (PyPtr, PyPtr, Cint), o1, o2, Py_EQ)
-        return val == -1 ? o1.o == o2.o : Bool(val)
-    end
-end
-
-isequal(o1::PyObject, o2::PyObject) = o1 == o2 # Julia 0.2 compatibility
-
-#########################################################################
 # For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python,
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
@@ -780,33 +756,7 @@ append!(a::PyObject, items::PyObject) =
 #########################################################################
 # operators on Python objects
 
-# binary operators
-import Base: +,-,*,/,//,%,&,|,^,<<,>>
-import Compat: ⊻
-for (op,py) in ((:+,:PyNumber_Add), (:-,:PyNumber_Subtract), (:*,:PyNumber_Multiply),
-                (:/,:PyNumber_TrueDivide), (:%,:PyNumber_Remainder),
-                (:&,:PyNumber_And), (:|,:PyNumber_Or),
-                (:<<,:PyNumber_Lshift), (:>>,:PyNumber_Rshift), (:⊻,:PyNumber_Xor))
-    qpy = QuoteNode(py)
-    @eval $op(a::PyObject, b) =
-        PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
-end
-^(a::PyObject, b) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
-^(a::PyObject, b::Integer) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
-
-if VERSION >= v"0.6.0-dev.1632" # julia#17623
-    # .+= etcetera map to in-place Python operations
-    for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
-                    (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
-                    (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
-                    (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
-        qpy = QuoteNode(py)
-        @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
-            a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
-            PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
-        end
-    end
-end
+include("pyoperators.jl")
 
 #########################################################################
 # support IPython _repr_foo functions for MIME output of PyObjects

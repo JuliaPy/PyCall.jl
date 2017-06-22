@@ -366,6 +366,22 @@ for b in (4, PyObject(4))
         end
     end
 end
+# unary operators
+for op in (+, -, ~, abs)
+    let x = op(PyObject(-3))
+        @test isa(x, PyObject)
+        @test convert(PyAny, x) == op(-3)
+    end
+end
+# comparisons
+for x in (3,4,5), y in (3.0,4.0,5.0)
+    for op in (<, <=, ==, !=, >, >=, isless, isequal)
+        @test op(PyObject(x), PyObject(y)) == op(x, y)
+        if op != isequal
+            @test op(PyObject(x), y) == op(x, y)
+        end
+    end
+end
 
 # updating operators .+= etcetera
 if VERSION >= v"0.6.0-dev.1632"
