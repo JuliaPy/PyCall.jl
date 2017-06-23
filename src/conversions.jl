@@ -173,22 +173,32 @@ function PyObject(t::Union{Tuple,Pair})
 end
 
 # somewhat annoying to get the length and types in a tuple type
-istuplen(T,n) = Base.isvatuple(T) ? n ≥ length(T.types)-1 : n == length(T.types)
-function tuptype(T,i)
-    if Base.isvatuple(T) && i ≥ length(T.types)
-        return Base.unwrapva(T.types[end])
+# ... would be better not to have to use undocumented internals!
+istuplen(T,isva,n) = isva ? n ≥ length(T.parameters)-1 : n == length(T.parameters)
+function tuptype(T::DataType,isva,i)
+    println("calling tuptype($T, $isva, $i)")
+    if isva && i ≥ length(T.parameters)
+        return Base.unwrapva(T.parameters[end])
     else
-        return T.types[i]
+        return T.parameters[i]
     end
+end
+if VERSION >= v"0.6.0-dev.2107" # julia#18457
+    tuptype(T::UnionAll,isva,i) = tuptype(T.body,isva,i)
+    isvatuple(T::UnionAll) = isvatuple(T.body)
+    isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameters[end])
+else
+    isvatuple(T) = Base.isvatuple(T)
 end
 
 function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
+    isva = isvatuple(T)
     len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    if !istuplen(tt, len)
+    if !istuplen(tt, isva, len)
         throw(BoundsError())
     end
     ntuple((i ->
-            convert(tuptype(tt, i),
+            convert(tuptype(T, isva, i),
                     PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
                                    (PyPtr, Int), o, i-1)))),
            len)
