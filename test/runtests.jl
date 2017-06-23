@@ -450,3 +450,15 @@ end
 let b = rand(UInt8, 1000)
     @test Vector{UInt8}(pybytes(b)) == b == Vector{UInt8}(pybytes(String(b)))
 end
+
+let t = convert(Tuple, PyObject((3,34)))
+    @test isa(t, Tuple{PyObject,PyObject})
+    @test t == (PyObject(3), PyObject(34))
+end
+for T in (Tuple{Vararg{PyAny}}, NTuple{2,Int}, Tuple{Int,Int}, Tuple{Vararg{Int}}, Tuple{Int,Vararg{Int}})
+    let t = convert(T, PyObject((3,34)))
+        @test isa(t, Tuple{Int,Int})
+        @test t == (3,34)
+    end
+end
+@test_throws BoundsError convert(NTuple{3,Int}, PyObject((3,34)))

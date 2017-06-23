@@ -172,13 +172,23 @@ function PyObject(t::Union{Tuple,Pair})
     return o
 end
 
+# somewhat annoying to get the length and types in a tuple type
+istuplen(T,n) = Base.isvatuple(T) ? n ≥ length(T.types)-1 : n == length(T.types)
+function tuptype(T,i)
+    if Base.isvatuple(T) && i ≥ length(T.types)
+        return Base.unwrapva(T.types[end])
+    else
+        return T.types[i]
+    end
+end
+
 function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
     len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    if len != length(tt.types)
+    if !istuplen(tt, len)
         throw(BoundsError())
     end
     ntuple((i ->
-            convert(tt.types[i],
+            convert(tuptype(tt, i),
                     PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
                                    (PyPtr, Int), o, i-1)))),
            len)
