@@ -176,7 +176,6 @@ end
 # ... would be better not to have to use undocumented internals!
 istuplen(T,isva,n) = isva ? n ≥ length(T.parameters)-1 : n == length(T.parameters)
 function tuptype(T::DataType,isva,i)
-    println("calling tuptype($T, $isva, $i)")
     if isva && i ≥ length(T.parameters)
         return Base.unwrapva(T.parameters[end])
     else
