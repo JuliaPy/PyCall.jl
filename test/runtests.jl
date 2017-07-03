@@ -172,7 +172,7 @@ end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test !obuf[:writable]()
     @test obuf[:readable]()
-    @test obuf[:readlines]() == readlines(IOBuffer("hello\nagain"))
+    @test obuf[:readlines]() == ["hello\n", "again"]
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test Vector{UInt8}(obuf[:read](5)) == convert(Vector{UInt8}, "hello")

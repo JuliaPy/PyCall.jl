@@ -27,19 +27,19 @@ macro with_ioraise(expr)
 end
 
 function jl_io_readline(io::IO, nb)
-    d = readline(io)
-    if length(d) > nb
-        resize!(d, nb)
+    d = Compat.readline(io, chomp=false)
+    if sizeof(d) > nb ≥ 0
+        error("byte-limited readline is not yet supported by PyCall")
     end
     return d
 end
 
 function jl_io_readlines(io::IO, nb)
-    ret = Any[]  # should it be some other type?
+    ret = PyObject[]
     nread = 0
-    while nread < nb && !eof(io)
-        d = readline(io)
-        nread += length(d)
+    while (nb < 0 || nread ≤ nb) && !eof(io)
+        d = Compat.readline(io, chomp=false)
+        nread += sizeof(d)
         push!(ret, PyObject(d))
     end
     return ret
@@ -96,7 +96,7 @@ function pyio_initialize()
             readline(self, size=typemax(Int)) =
                 @with_ioraise(jl_io_readline(pyio_jl(self), size))
             readlines(self, size=typemax(Int)) =
-                @with_ioraise(jl_io_readlines(pyio_jl(self), size))
+                @with_ioraise(array2py(jl_io_readlines(pyio_jl(self), size)))
             seek(self, offset, whence=1) =
                 @with_ioraise(jl_io_seek(pyio_jl(self), offset, whence))
             seekable(self) = isseekable(pyio_jl(self))
@@ -105,8 +105,8 @@ function pyio_initialize()
                 @with_ioraise(for s in seq write(pyio_jl(self), s) end)
             read(self, nb=typemax(Int)) =
                 @with_ioraise(self[:istextio] ?
-                              String(read(pyio_jl(self), nb)) :
-                              pybytes(read(pyio_jl(self), nb)))
+                              String(read(pyio_jl(self), nb < 0 ? typemax(Int) : nb)) :
+                              pybytes(read(pyio_jl(self), nb < 0 ? typemax(Int) : nb)))
             readall(self) =
                 @with_ioraise(self[:istextio] ? readstring(pyio_jl(self)) :
                                                 pybytes(read(pyio_jl(self))))
