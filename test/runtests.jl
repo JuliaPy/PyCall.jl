@@ -175,8 +175,8 @@ let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test obuf[:readlines]() == readlines(IOBuffer("hello\nagain"))
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-    @test obuf[:read](5) == convert(Vector{UInt8}, "hello")
-    @test obuf[:readall]() == convert(Vector{UInt8}, "\nagain")
+    @test Vector{UInt8}(obuf[:read](5)) == convert(Vector{UInt8}, "hello")
+    @test Vector{UInt8}(obuf[:readall]()) == convert(Vector{UInt8}, "\nagain")
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
     @test obuf[:encoding] == "UTF-8"
@@ -462,3 +462,12 @@ for T in (Tuple{Vararg{PyAny}}, NTuple{2,Int}, Tuple{Int,Int}, Tuple{Vararg{Int}
     end
 end
 @test_throws BoundsError convert(NTuple{3,Int}, PyObject((3,34)))
+
+let p = PyCall.pickle(), buf = IOBuffer()
+    p[:dump]("hello world", buf)
+    p[:dump](314159, buf)
+    p[:dump](Any[1,1,2,3,5,8], buf)
+    @test p[:load](seekstart(buf)) == "hello world"
+    @test p[:load](buf) == 314159
+    @test p[:load](buf) == [1,1,2,3,5,8]
+end

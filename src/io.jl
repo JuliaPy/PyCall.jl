@@ -106,11 +106,11 @@ function pyio_initialize()
             read(self, nb=typemax(Int)) =
                 @with_ioraise(self[:istextio] ?
                               String(read(pyio_jl(self), nb)) :
-                              read(pyio_jl(self), nb))
+                              pybytes(read(pyio_jl(self), nb)))
             readall(self) =
                 @with_ioraise(self[:istextio] ? readstring(pyio_jl(self)) :
-                                                read(pyio_jl(self)))
-            readinto(self, b) = @with_ioraise(readbytes!(pyio_jl(self), b))
+                                                pybytes(read(pyio_jl(self))))
+            readinto(self, b) = @with_ioraise(pybytes(readbytes!(pyio_jl(self), b)))
             write(self, b) = @with_ioraise(write(pyio_jl(self), b))
         end)
         pyio_initialized = true
