@@ -31,7 +31,7 @@ function __init__()
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
     if !already_inited
-        Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion)
+        PYTHONHOME != nothing && Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion)
         if !isempty(pyprogramname)
             if pyversion.major < 3
                 ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)

@@ -189,7 +189,7 @@ const programname = pysys(python, "executable")
 
 # Get PYTHONHOME, either from the environment or from Python
 # itself (if it is not in the environment or if we are using Conda)
-PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
+PYTHONHOME = if use_conda
     # PYTHONHOME tells python where to look for both pure python
     # and binary modules.  When it is set, it replaces both
     # `prefix` and `exec_prefix` and we thus need to set it to
@@ -200,7 +200,7 @@ PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
     exec_prefix = pysys(python, "exec_prefix")
     is_windows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
 else
-    ENV["PYTHONHOME"]
+    get(ENV, "PYTHONHOME", nothing)
 end
 
 # cache the Python version as a Julia VersionNumber
@@ -238,8 +238,8 @@ writeifchanged("deps.jl", """
     const pyprogramname = "$(escape_string(programname))"
     const wpyprogramname = $(wstringconst(programname))
     const pyversion_build = $(repr(pyversion))
-    const PYTHONHOME = "$(escape_string(PYTHONHOME))"
-    const wPYTHONHOME = $(wstringconst(PYTHONHOME))
+    const PYTHONHOME = $(PYTHONHOME == nothing ? nothing : "\"" * escape_string(PYTHONHOME) * "\"")
+    const wPYTHONHOME = $(PYTHONHOME == nothing ? nothing : wstringconst(PYTHONHOME))
 
     "True if we are using the Python distribution in the Conda package."
     const conda = $use_conda
