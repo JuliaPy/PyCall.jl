@@ -367,9 +367,63 @@ Import the Python module `s` (a string or symbol) and return a pointer to it (a 
 """
 function pyimport(name::AbstractString)
     cookie = ActivatePyActCtx()
-    obj = PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
-                             (Cstring,), name))
-    DeactivatePyActCtx(cookie)
+    try
+        return PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
+                                        (Cstring,), name))
+    catch e
+        # on importerror, add a bit more information to the
+        # exception message to help with common user confusions
+        # about installing packages.
+        if isa(e, PyError) && e.T.o == @pyglobalobjptr(:PyExc_ImportError)
+            msg = """
+The Python package $name could not be found by pyimport. Usually this means
+that you did not install $name in the Python version being used by PyCall.
+
+"""
+            if conda
+                msg = msg * """
+PyCall is currently configured to use the Julia-specific Python distribution
+installed by the Conda.jl package.  To install the $name module, you can
+use `pyimport_conda("$(escape_string(name))", PKG)`, where PKG is the Anaconda
+package the contains the module $name, or alternatively you can use the
+Conda package directly (via `using Conda` followed by `Conda.add` etcetera).
+
+Alternatively, if you want to use a different Python distribution on your
+system, such as a system-wide Python (as opposed to the Julia-specific Python),
+you can re-configure PyCall with that Python.   As explained in the PyCall
+documentation, set ENV["PYTHON"] to the path/name of the python executable
+you want to use, run Pkg.build("PyCall"), and re-launch Julia.
+"""
+            else
+                msg = msg * """
+PyCall is currently configured to use the Python version at:
+
+$python
+
+and you should use whatever mechanism you usually use (apt-get, pip, conda,
+etcetera) to install the Python package containing the $name module.
+
+One alternative is to re-configure PyCall to use a different Python
+version on your system: set ENV["PYTHON"] to the path/name of the python
+executable you want to use, run Pkg.build("PyCall"), and re-launch Julia.
+
+Another alternative is to configure PyCall to use a Julia-specific Python
+distribution via the Conda.jl package (which installs a private Anaconda
+Python distribution), which has the advantage that packages can be installed
+and kept up-to-date via Julia.  As explained in the PyCall documentation,
+set ENV["PYTHON"]="", run Pkg.build("PyCall"), and re-launch Julia. Then,
+To install the $name module, you can use `pyimport_conda("$(escape_string(name))", PKG)`,
+where PKG is the Anaconda package the contains the module $name,
+or alternatively you can use the Conda package directly (via
+`using Conda` followed by `Conda.add` etcetera).
+"""
+            end
+            e.msg *= "\n\n" * msg * "\n"
+        end
+        rethrow(e)
+    finally
+        DeactivatePyActCtx(cookie)
+    end
     obj
 end
 pyimport(name::Symbol) = pyimport(string(name))
