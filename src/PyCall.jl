@@ -307,7 +307,7 @@ end
 
 #########################################################################
 
-@static if is_windows()
+@static if Compat.Sys.iswindows()
     # Many python extensions are linked against a very specific version of the
     # MSVC runtime library. To load this library, libpython declares an
     # appropriate manifest, but unfortunately most extensions do not.
@@ -831,8 +831,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))
             end
-            throw(MethodError($(VERSION < v"0.5.0-dev+4340") ? writemime : show,
-                              (io, mime, o)))
+            throw(MethodError(show, (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
             o.o != C_NULL && haskey(o, $method) && let meth = o[$method]

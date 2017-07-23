@@ -43,7 +43,7 @@ function __init__()
     end
 
     # Will get reinitialized properly on first use
-    is_windows() && (PyActCtx[] = C_NULL)
+    Compat.Sys.iswindows() && (PyActCtx[] = C_NULL)
 
     # Make sure python wasn't upgraded underneath us
     new_pyversion = convert(VersionNumber, split(unsafe_string(ccall(@pysym(:Py_GetVersion),

@@ -3,7 +3,7 @@
 # and if so do not use the deps.jl file, getting everything we need from the
 # current process instead.
 
-proc_handle = unsafe_load(@static is_windows() ? cglobal(:jl_exe_handle, Ptr{Void}) : cglobal(:jl_dl_handle, Ptr{Void}))
+proc_handle = unsafe_load(@static Compat.Sys.iswindows() ? cglobal(:jl_exe_handle, Ptr{Void}) : cglobal(:jl_dl_handle, Ptr{Void}))
 
 immutable Dl_info
     dli_fname::Ptr{UInt8}
@@ -17,7 +17,7 @@ EnumProcessModules(hProcess, lphModule, cb, lpcbNeeded) =
         hProcess, lphModule, cb, lpcbNeeded)
 
 symbols_present = false
-@static if is_windows()
+@static if Compat.Sys.iswindows()
     lpcbneeded = Ref{UInt32}()
     proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Void}, ())
     handles = Vector{Ptr{Void}}(20)
@@ -49,7 +49,7 @@ if !symbols_present
     # need SetPythonHome to avoid warning, #299
     Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion_build)
 else
-    @static if is_windows()
+    @static if Compat.Sys.iswindows()
         pathbuf = Vector{UInt16}(1024)
         ret = ccall(:GetModuleFileNameW, stdcall, UInt32,
             (Ptr{Void}, Ptr{UInt16}, UInt32),
@@ -109,7 +109,7 @@ else
 end
 
 # hashes changed from long to intptr_t in Python 3.2
-const Py_hash_t = pyversion < v"3.2" ? Clong:Int
+const Py_hash_t = pyversion < v"3.2" ? Clong : Int
 
 # whether to use unicode for strings by default, ala Python 3
 const pyunicode_literals = pyversion >= v"3.0"

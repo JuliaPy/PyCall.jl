@@ -47,7 +47,7 @@ pysys(python::AbstractString, var::AbstractString) = pyvar(python, "sys", var)
 
 #########################################################################
 
-const dlprefix = is_windows() ? "" : "lib"
+const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
 
 # return libpython name, libpython pointer
 function find_libpython(python::AbstractString)
@@ -62,8 +62,8 @@ function find_libpython(python::AbstractString)
 
     # it is ridiculous that it is this hard to find the path of libpython
     libpaths = [pyconfigvar(python, "LIBDIR"),
-                (is_windows() ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
-    if is_apple()
+                (Compat.Sys.iswindows() ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
+    if Compat.Sys.isapple()
         push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
     end
 
@@ -144,7 +144,7 @@ include("depsutils.jl")
 
 const python = try
     let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
-                 is_linux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
+                 Compat.Sys.islinux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
         vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
         if vers < v"2.7"
             if isempty(py)
@@ -172,7 +172,7 @@ catch e1
             info( "No system-wide Python was found; got the following error:\n",
                   "$e1\nusing the Python distribution in the Conda package")
         end
-        abspath(Conda.PYTHONDIR, "python" * (is_windows() ? ".exe" : ""))
+        abspath(Conda.PYTHONDIR, "python" * (Compat.Sys.iswindows() ? ".exe" : ""))
     else
         error("No system-wide Python was found; got the following error:\n",
               "$e1")
@@ -198,7 +198,7 @@ PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
     # to always be the same on Windows, where it causes
     # problems if we try to include both.
     exec_prefix = pysys(python, "exec_prefix")
-    is_windows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+    Compat.Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
 else
     ENV["PYTHONHOME"]
 end
@@ -215,10 +215,7 @@ end
 # A couple of key strings need to be stored as constants so that
 # they persist throughout the life of the program.  In Python 3,
 # they need to be wchar_t* data.
-wstringconst(s) =
-    VERSION < v"0.5.0-dev+4859" ?
-    string("wstring(\"", escape_string(s), "\")") :
-    string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
+wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
 
 # we write configuration files only if they change, both
 # to prevent unnecessary recompilation and to minimize

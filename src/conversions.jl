@@ -548,23 +548,6 @@ function next{K,V}(d::PyDict{K,V,false}, s)
     return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
 end
 
-if VERSION < v"0.5.0-dev+9920" # julia PR #14937
-    # We can't use the Base.filter! implementation because it worked
-    # by `for (k,v) in d; !f(k,v) && delete!(d,k); end`, but the PyDict_Next
-    # iterator function in Python is explicitly documented to say that
-    # you shouldn't modify the dictionary during iteration.
-    function filter!(f::Function, d::PyDict)
-        badkeys = Array{keytype(d)}(0)
-        for (k,v) in d
-            f(k,v) || push!(badkeys, k)
-        end
-        for k in badkeys
-            delete!(d, k)
-        end
-        return d
-    end
-end
-
 #########################################################################
 # Dictionary conversions (copies)
 
