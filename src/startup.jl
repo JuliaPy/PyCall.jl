@@ -3,7 +3,7 @@
 # and if so do not use the deps.jl file, getting everything we need from the
 # current process instead.
 
-proc_handle = unsafe_load(@static Compat.Sys.iswindows() ? cglobal(:jl_exe_handle, Ptr{Void}) : cglobal(:jl_dl_handle, Ptr{Void}))
+proc_handle = unsafe_load(@static (Compat.Sys.iswindows() || VERSION >= v"0.6.0-pre.beta.121") ? cglobal(:jl_exe_handle, Ptr{Void}) : cglobal(:jl_dl_handle, Ptr{Void}))
 
 immutable Dl_info
     dli_fname::Ptr{UInt8}
@@ -35,7 +35,6 @@ symbols_present = false
         break
     end
 else
-    proc_handle = unsafe_load(cglobal(:jl_dl_handle, Ptr{Void}))
     symbols_present = hassym(proc_handle, :Py_GetVersion)
 end
 
@@ -56,19 +55,27 @@ else
             libpy_handle, pathbuf, length(pathbuf))
         @assert ret != 0
         libname = String(Base.transcode(UInt8, pathbuf[1:findfirst(pathbuf, 0)-1]))
+        if (Libdl.dlopen_e(libname) != C_NULL)
+            const libpython = libname
+        else
+            const libpython = nothing
+        end
     else
         libpy_handle = proc_handle
         # Now determine the name of the python library that these symbols are from
         some_address_in_libpython = Libdl.dlsym(libpy_handle, :Py_GetVersion)
-        dlinfo = Ref{Dl_info}()
+        some_address_in_main_exe = Libdl.dlsym(proc_handle, :main)
+        dlinfo1 = Ref{Dl_info}()
+        dlinfo2 = Ref{Dl_info}()
         ccall(:dladdr, Cint, (Ptr{Void}, Ptr{Dl_info}), some_address_in_libpython,
-            dlinfo)
-        libname = unsafe_string(dlinfo[].dli_fname)
-    end
-    if (Libdl.dlopen_e(libname) != C_NULL)
-        const libpython = libname
-    else
-        const libpython = nothing
+            dlinfo1)
+        ccall(:dladdr, Cint, (Ptr{Void}, Ptr{Dl_info}), some_address_in_main_exe,
+            dlinfo2)
+        if dlinfo1[].dli_fbase == dlinfo2[].dli_fbase
+            const libpython = nothing
+        else
+            const libpython = unsafe_string(dlinfo[].dli_fname)
+        end
     end
     # If we're not in charge, assume the user is installing necessary python
     # libraries rather than messing with their configuration
