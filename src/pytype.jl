@@ -400,6 +400,7 @@ function pyjlwrap_init()
                      t.tp_members = pointer(pyjlwrap_members);
                      t.tp_dealloc = pyjlwrap_dealloc_ptr
                      t.tp_repr = pyjlwrap_repr_ptr
+                     t.tp_call = jl_Function_call_ptr
                      t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
                      pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
                   end)

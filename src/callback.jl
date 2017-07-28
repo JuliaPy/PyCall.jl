@@ -30,7 +30,7 @@ end
 function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     args = PyObject(args_) # don't need pyincref because of finally clause below
     try
-        f = unsafe_pyjlwrap_to_objref(self_)::Function
+        f = unsafe_pyjlwrap_to_objref(self_)
 
         # on 0.6 we need to use invokelatest to get execution in newest world
         @static if isdefined(Base, :invokelatest)

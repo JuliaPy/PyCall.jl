@@ -471,3 +471,9 @@ let p = PyCall.pickle(), buf = IOBuffer()
     @test p[:load](buf) == 314159
     @test p[:load](buf) == [1,1,2,3,5,8]
 end
+
+# Test that we can call constructors on the python side
+immutable TestConstruct
+    x
+end
+@test pycall(PyObject(TestConstruct), PyAny, 1).x == 1
