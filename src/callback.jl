@@ -31,13 +31,31 @@ function jl_Function_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     args = PyObject(args_) # don't need pyincref because of finally clause below
     try
         f = unsafe_pyjlwrap_to_objref(self_)::Function
-        if kw_ == C_NULL
-            ret = PyObject(f(convert(PyAny, args)...))
-        else
-            kw = PyDict{Symbol,PyAny}(pyincref(kw_))
-            kwargs = [ (k,v) for (k,v) in kw ]
-            ret = PyObject(f(convert(PyAny, args)...; kwargs...))
+
+        # on 0.6 we need to use invokelatest to get execution in newest world
+        @static if isdefined(Base, :invokelatest)
+            if kw_ == C_NULL
+                ret = PyObject(Base.invokelatest(f, convert(PyAny, args)...))
+            else
+                kw = PyDict{Symbol,PyAny}(pyincref(kw_))
+                kwargs = [ (k,v) for (k,v) in kw ]
+
+                # 0.6 `invokelatest` doesn't support kwargs, instead
+                # use a closure over kwargs. see:
+                #   https://github.com/JuliaLang/julia/pull/22646
+                f_kw_closure() = f(convert(PyAny, args)...; kwargs...)
+                ret = PyObject(Core._apply_latest(f_kw_closure))
+            end
+        else # 0.5 support
+            if kw_ == C_NULL
+                ret = PyObject(f(convert(PyAny, args)...))
+            else
+                kw = PyDict{Symbol,PyAny}(pyincref(kw_))
+                kwargs = [ (k,v) for (k,v) in kw ]
+                ret = PyObject(f(convert(PyAny, args)...; kwargs...))
+            end
         end
+
         return pystealref!(ret)
     catch e
         pyraise(e)
