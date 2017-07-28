@@ -64,7 +64,7 @@ else
         libpy_handle = proc_handle
         # Now determine the name of the python library that these symbols are from
         some_address_in_libpython = Libdl.dlsym(libpy_handle, :Py_GetVersion)
-        some_address_in_main_exe = Libdl.dlsym(proc_handle, :main)
+        some_address_in_main_exe = Libdl.dlsym(proc_handle, Compat.Sys.isapple() ? :_mh_execute_header : :main)
         dlinfo1 = Ref{Dl_info}()
         dlinfo2 = Ref{Dl_info}()
         ccall(:dladdr, Cint, (Ptr{Void}, Ptr{Dl_info}), some_address_in_libpython,
@@ -74,7 +74,7 @@ else
         if dlinfo1[].dli_fbase == dlinfo2[].dli_fbase
             const libpython = nothing
         else
-            const libpython = unsafe_string(dlinfo[].dli_fname)
+            const libpython = unsafe_string(dlinfo1[].dli_fname)
         end
     end
     # If we're not in charge, assume the user is installing necessary python
