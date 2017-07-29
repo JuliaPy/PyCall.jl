@@ -383,11 +383,11 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
             return pystealref!(PyObject(docstring(f)))
         elseif attr in ("__module__","__defaults__","func_defaults","__closure__","func_closure")
             return pystealref!(PyObject(nothing))
-        else
+        elseif startswith(attr, "__")
             # TODO: handle __code__/func_code (issue #268)
-
-            # fallback: (probably raises AttributeError)
             return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
+        else
+            return pystealref!(PyObject(getfield(f, Symbol(attr))))
         end
     catch e
         pyraise(e)
