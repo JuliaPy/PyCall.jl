@@ -363,13 +363,46 @@ function pyjlwrap_hash32(o::PyPtr)
     return h == reinterpret(UInt32, Int32(-1)) ? pysalt32 : h::UInt32
 end
 
+# just string(Docs.doc(f)) doesn't work on VERSION < v"0.5"
+function docstring(f::Function)
+    buf = IOBuffer()
+    show(buf, "text/plain", Docs.doc(f))
+    return String(take!(buf))
+end
+
+# this function emulates standard attributes of Python functions,
+# where possible.
+function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
+    attr_ = PyObject(attr__) # don't need pyincref because of finally clause below
+    try
+        f = unsafe_pyjlwrap_to_objref(self_)
+        attr = convert(String, attr_)
+        if attr in ("__name__","func_name")
+            return pystealref!(PyObject(string(f)))
+        elseif attr in ("__doc__", "func_doc")
+            return pystealref!(PyObject(docstring(f)))
+        elseif attr in ("__module__","__defaults__","func_defaults","__closure__","func_closure")
+            return pystealref!(PyObject(nothing))
+        else
+            # TODO: handle __code__/func_code (issue #268)
+
+            # fallback: (probably raises AttributeError)
+            return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
+        end
+    catch e
+        pyraise(e)
+    finally
+        attr_.o = PyPtr_NULL # don't decref
+    end
+    return PyPtr_NULL
+end
+
 # constant strings (must not be gc'ed) for pyjlwrap_members
 const pyjlwrap_membername = "jl_value"
 const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
 # other pointer-containing constants that need to be initialized at runtime
 const pyjlwrap_members = PyMemberDef[]
 const jlWrapType = PyTypeObject()
-const jl_FunctionType = PyTypeObject()
 const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = Ref(0x00000000)
 
 # called in __init__
@@ -385,8 +418,8 @@ function pyjlwrap_init()
     pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
     pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
     pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
-    jl_Function_call_ptr = cfunction(jl_Function_call, PyPtr, (PyPtr,PyPtr,PyPtr))
-    jl_Function_getattr_ptr = cfunction(jl_Function_getattr, PyPtr, (PyPtr,PyPtr))
+    pyjlwrap_call_ptr = cfunction(pyjlwrap_call, PyPtr, (PyPtr,PyPtr,PyPtr))
+    pyjlwrap_getattr_ptr = cfunction(pyjlwrap_getattr, PyPtr, (PyPtr,PyPtr))
 
     # detect at runtime whether we are using Stackless Python
     try
@@ -400,16 +433,11 @@ function pyjlwrap_init()
                      t.tp_members = pointer(pyjlwrap_members);
                      t.tp_dealloc = pyjlwrap_dealloc_ptr
                      t.tp_repr = pyjlwrap_repr_ptr
-                     t.tp_call = jl_Function_call_ptr
+                     t.tp_call = pyjlwrap_call_ptr
+                     t.tp_getattro = pyjlwrap_getattr_ptr
                      t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
                      pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
                   end)
-
-    pyjlwrap_type!(jl_FunctionType, "PyCall.jl_Function",
-                   t -> begin
-                            t.tp_call = jl_Function_call_ptr
-                            t.tp_getattro = jl_Function_getattr_ptr
-                        end)
 end
 
 # use this to create a new jlwrap type, with init to set up custom members

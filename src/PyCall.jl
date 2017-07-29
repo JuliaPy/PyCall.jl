@@ -859,7 +859,7 @@ include("serialize.jl")
 # Here, we precompile functions that are passed to cfunction by __init__,
 # for the reasons described in JuliaLang/julia#12256.
 
-precompile(jl_Function_call, (PyPtr,PyPtr,PyPtr))
+precompile(pyjlwrap_call, (PyPtr,PyPtr,PyPtr))
 precompile(pyjlwrap_dealloc, (PyPtr,))
 precompile(pyjlwrap_repr, (PyPtr,))
 precompile(pyjlwrap_hash, (PyPtr,))
