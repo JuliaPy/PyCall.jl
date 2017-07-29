@@ -64,5 +64,3 @@ function pyjlwrap_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr)
     end
     return PyPtr_NULL
 end
-
-pycallback(f::Function) = PyObject(f)
