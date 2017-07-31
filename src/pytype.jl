@@ -363,12 +363,7 @@ function pyjlwrap_hash32(o::PyPtr)
     return h == reinterpret(UInt32, Int32(-1)) ? pysalt32 : h::UInt32
 end
 
-# just string(Docs.doc(f)) doesn't work on VERSION < v"0.5"
-function docstring(f::Function)
-    buf = IOBuffer()
-    show(buf, "text/plain", Docs.doc(f))
-    return String(take!(buf))
-end
+docstring(x) = string(Docs.doc(x))
 
 # this function emulates standard attributes of Python functions,
 # where possible.
