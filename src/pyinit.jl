@@ -76,7 +76,7 @@ function __init__()
     init_datetime()
     pyjlwrap_init()
 
-    # jl_FunctionType is a class, and when assigning it to an object
+    # jlwrap is a class, and when assigning it to an object
     #    obj[:foo] = some_julia_function
     # it won't behave like a regular Python method because it's not a Python
     # function (in particular, `self` won't be passed to it). The solution is:
