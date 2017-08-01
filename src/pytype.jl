@@ -45,8 +45,8 @@ const NULL_UInt8_Ptr = convert(Ptr{UInt8}, C_NULL)
 function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
                 ((flags & METH_KEYWORDS) == 0 ?
-                 cfunction(meth, PyPtr, (PyPtr,PyPtr)) :
-                 cfunction(meth, PyPtr, (PyPtr,PyPtr,PyPtr))),
+                 cfunction(meth, PyPtr, Tuple{PyPtr,PyPtr}) :
+                 cfunction(meth, PyPtr, Tuple{PyPtr,PyPtr,PyPtr})),
                 convert(Cint, flags),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
