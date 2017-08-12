@@ -10,8 +10,6 @@ import Conda
 
 immutable UseCondaPython <: Exception end
 
-try # make sure deps.jl file is removed on error
-
 #########################################################################
 
 # Fix the environment for running `python`, and setts IO encoding to UTF-8.
@@ -36,7 +34,7 @@ function pythonenv(cmd::Cmd)
     setenv(cmd, env)
 end
 
-pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(readstring(pythonenv(`$python -c "import $mod; print($mod.$var)"`)))
+pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(read(pythonenv(`$python -c "import $mod; print($mod.$var)"`), String))
 
 pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$var')")
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
@@ -113,7 +111,7 @@ function find_libpython(python::AbstractString)
             print(s, "\n\n")
         end
         println(STDERR, "---------------------------------- get_config_vars ---------------------------------------")
-        print(STDERR, readstring(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`))
+        print(STDERR, read(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`, String))
         println(STDERR, "--------------------------------- directory contents -------------------------------------")
         for libpath in libpaths
             if isdir(libpath)
@@ -142,76 +140,6 @@ include("depsutils.jl")
 
 #########################################################################
 
-const python = try
-    let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
-                 Compat.Sys.islinux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
-        vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
-        if vers < v"2.7"
-            if isempty(py)
-                throw(UseCondaPython())
-            else
-                error("Python version $vers < 2.7 is not supported")
-            end
-        end
-
-        # check word size of Python via sys.maxsize, since a common error
-        # on Windows is to link a 64-bit Julia to a 32-bit Python.
-        pywordsize = parse(UInt64, pysys(py, "maxsize")) > (UInt64(1)<<32) ? 64 : 32
-        if pywordsize != Sys.WORD_SIZE
-            error("$py is $(pywordsize)-bit, but Julia is $(Sys.WORD_SIZE)-bit")
-        end
-
-        py
-    end
-catch e1
-    if Sys.ARCH in (:i686, :x86_64)
-        if isa(e1, UseCondaPython)
-            info("Using the Python distribution in the Conda package by default.\n",
-                 "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
-        else
-            info( "No system-wide Python was found; got the following error:\n",
-                  "$e1\nusing the Python distribution in the Conda package")
-        end
-        abspath(Conda.PYTHONDIR, "python" * (Compat.Sys.iswindows() ? ".exe" : ""))
-    else
-        error("No system-wide Python was found; got the following error:\n",
-              "$e1")
-    end
-end
-
-use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
-if use_conda
-    Conda.add("numpy")
-end
-
-const (libpython, libpy_name) = find_libpython(python)
-const programname = pysys(python, "executable")
-
-# Get PYTHONHOME, either from the environment or from Python
-# itself (if it is not in the environment or if we are using Conda)
-PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
-    # PYTHONHOME tells python where to look for both pure python
-    # and binary modules.  When it is set, it replaces both
-    # `prefix` and `exec_prefix` and we thus need to set it to
-    # both in case they differ. This is also what the
-    # documentation recommends.  However, they are documented
-    # to always be the same on Windows, where it causes
-    # problems if we try to include both.
-    exec_prefix = pysys(python, "exec_prefix")
-    Compat.Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
-else
-    ENV["PYTHONHOME"]
-end
-
-# cache the Python version as a Julia VersionNumber
-const pyversion = VersionNumber(pyvar(python, "platform", "python_version()"))
-
-info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
-
-if pyversion < v"2.7"
-    error("Python 2.7 or later is required for PyCall")
-end
-
 # A couple of key strings need to be stored as constants so that
 # they persist throughout the life of the program.  In Python 3,
 # they need to be wchar_t* data.
@@ -221,7 +149,7 @@ wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
 # to prevent unnecessary recompilation and to minimize
 # problems in the unlikely event of read-only directories.
 function writeifchanged(filename, str)
-    if !isfile(filename) || readstring(filename) != str
+    if !isfile(filename) || read(filename, String) != str
         info(abspath(filename), " has been updated")
         write(filename, str)
     else
@@ -229,7 +157,78 @@ function writeifchanged(filename, str)
     end
 end
 
-writeifchanged("deps.jl", """
+try # make sure deps.jl file is removed on error
+    python = try
+        let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
+                     Compat.Sys.islinux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
+            vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
+            if vers < v"2.7"
+                if isempty(py)
+                    throw(UseCondaPython())
+                else
+                    error("Python version $vers < 2.7 is not supported")
+                end
+            end
+
+            # check word size of Python via sys.maxsize, since a common error
+            # on Windows is to link a 64-bit Julia to a 32-bit Python.
+            pywordsize = parse(UInt64, pysys(py, "maxsize")) > (UInt64(1)<<32) ? 64 : 32
+            if pywordsize != Sys.WORD_SIZE
+                error("$py is $(pywordsize)-bit, but Julia is $(Sys.WORD_SIZE)-bit")
+            end
+
+            py
+        end
+    catch e1
+        if Sys.ARCH in (:i686, :x86_64)
+            if isa(e1, UseCondaPython)
+                info("Using the Python distribution in the Conda package by default.\n",
+                     "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
+            else
+                info( "No system-wide Python was found; got the following error:\n",
+                      "$e1\nusing the Python distribution in the Conda package")
+            end
+            abspath(Conda.PYTHONDIR, "python" * (Compat.Sys.iswindows() ? ".exe" : ""))
+        else
+            error("No system-wide Python was found; got the following error:\n",
+                  "$e1")
+        end
+    end
+
+    use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
+    if use_conda
+        Conda.add("numpy")
+    end
+
+    (libpython, libpy_name) = find_libpython(python)
+    programname = pysys(python, "executable")
+
+    # Get PYTHONHOME, either from the environment or from Python
+    # itself (if it is not in the environment or if we are using Conda)
+    PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
+        # PYTHONHOME tells python where to look for both pure python
+        # and binary modules.  When it is set, it replaces both
+        # `prefix` and `exec_prefix` and we thus need to set it to
+        # both in case they differ. This is also what the
+        # documentation recommends.  However, they are documented
+        # to always be the same on Windows, where it causes
+        # problems if we try to include both.
+        exec_prefix = pysys(python, "exec_prefix")
+        Compat.Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+    else
+        ENV["PYTHONHOME"]
+    end
+
+    # cache the Python version as a Julia VersionNumber
+    pyversion = VersionNumber(pyvar(python, "platform", "python_version()"))
+
+    info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
+
+    if pyversion < v"2.7"
+        error("Python 2.7 or later is required for PyCall")
+    end
+
+    writeifchanged("deps.jl", """
     const python = "$(escape_string(python))"
     const libpython = "$(escape_string(libpy_name))"
     const pyprogramname = "$(escape_string(programname))"
@@ -242,16 +241,16 @@ writeifchanged("deps.jl", """
     const conda = $use_conda
     """)
 
-# Make subsequent builds (e.g. Pkg.update) use the same Python by default:
-writeifchanged("PYTHON", isfile(programname) ? programname : python)
+    # Make subsequent builds (e.g. Pkg.update) use the same Python by default:
+    writeifchanged("PYTHON", isfile(programname) ? programname : python)
 
-#########################################################################
+    #########################################################################
 
 catch
 
-# remove deps.jl (if it exists) on an error, so that PyCall will
-# not load until it is properly configured.
-isfile("deps.jl") && rm("deps.jl")
-rethrow()
+    # remove deps.jl (if it exists) on an error, so that PyCall will
+    # not load until it is properly configured.
+    isfile("deps.jl") && rm("deps.jl")
+    rethrow()
 
 end
