@@ -479,4 +479,5 @@ end
 @test pycall(PyObject(TestConstruct), PyAny, 1).x == 1
 
 # Test getattr fallback
-PyObject(TestConstruct(1))[:x] == 1
+@test PyObject(TestConstruct(1))[:x] == 1
+@test_throws KeyError PyObject(TestConstruct(1))[:y]
