@@ -392,7 +392,7 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
     py2array(T, Array{pyany_toany(T)}(len), o, 1, 1)
 end
 
-convert(::Type{Array}, o::PyObject) = py2array(PyAny, o)
+convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
 convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
 
 PyObject(a::BitArray) = PyObject(Array(a))
