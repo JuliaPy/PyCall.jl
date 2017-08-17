@@ -44,6 +44,9 @@ import PyCall.pyany_toany
 @test roundtripeq(UInt8[1,3,4,5])
 @test roundtrip(3 => 4) == (3,4)
 @test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
+if VERSION >= v"0.6.0"
+    @test eltype(roundtrip([Ref(1), Ref(2)])) == typeof(Ref(1))
+end
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 @test PyObject(x -> x + 1)(314158) == 314159
