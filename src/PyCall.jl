@@ -98,18 +98,20 @@ function pydecref(o::PyObject)
     o
 end
 
-function pyincref(o::PyObject)
+function pyincref_(o::PyPtr)
     ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
+    return o
+end
+
+function pyincref(o::PyObject)
+    pyincref_(o.o)
     o
 end
 
 # doing an incref *before* creating a PyObject may safer in the
 # case of borrowed references, to ensure that no exception or interrupt
 # induces a double decref.
-function pyincref(o::PyPtr)
-    ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
-    PyObject(o)
-end
+pyincref(o::PyPtr) = PyObject(pyincref_(o))
 
 """
 "Steal" a reference from a PyObject: return the raw PyPtr, while
@@ -168,6 +170,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")
+include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")

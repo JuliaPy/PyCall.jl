@@ -292,7 +292,7 @@ end
 
 # Often, PyTypeObject instances are global constants, which we initialize
 # to 0 via PyTypeObject() and then initialize at runtime via PyTypeObject!
-function PyTypeObject!(t::PyTypeObject, name::AbstractString, basicsize::Integer, init::Function)
+function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, basicsize::Integer)
     t.tp_basicsize = convert(Int, basicsize)
 
     # figure out Py_TPFLAGS_DEFAULT, depending on Python version
@@ -428,6 +428,7 @@ function pyjlwrap_init()
     pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
     pyjlwrap_call_ptr = cfunction(pyjlwrap_call, PyPtr, (PyPtr,PyPtr,PyPtr))
     pyjlwrap_getattr_ptr = cfunction(pyjlwrap_getattr, PyPtr, (PyPtr,PyPtr))
+    pyjlwrap_getiter_ptr = cfunction(pyjlwrap_getiter, PyPtr, (PyPtr,))
 
     # detect at runtime whether we are using Stackless Python
     try
@@ -435,33 +436,31 @@ function pyjlwrap_init()
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] = Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_
     end
 
-    PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap),
-                  t::PyTypeObject -> begin
-                     t.tp_flags |= Py_TPFLAGS_BASETYPE
-                     t.tp_members = pointer(pyjlwrap_members);
-                     t.tp_dealloc = pyjlwrap_dealloc_ptr
-                     t.tp_repr = pyjlwrap_repr_ptr
-                     t.tp_call = pyjlwrap_call_ptr
-                     t.tp_getattro = pyjlwrap_getattr_ptr
-                     t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
-                     pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
-                  end)
+    PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap)) do t::PyTypeObject
+        t.tp_flags |= Py_TPFLAGS_BASETYPE
+        t.tp_members = pointer(pyjlwrap_members);
+        t.tp_dealloc = pyjlwrap_dealloc_ptr
+        t.tp_repr = pyjlwrap_repr_ptr
+        t.tp_call = pyjlwrap_call_ptr
+        t.tp_getattro = pyjlwrap_getattr_ptr
+        t.tp_iter = pyjlwrap_getiter_ptr
+        t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
+                    pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+    end
 end
 
 # use this to create a new jlwrap type, with init to set up custom members
-function pyjlwrap_type!(to::PyTypeObject, name::AbstractString, init::Function)
-    PyTypeObject!(to, name, sizeof(Py_jlWrap) + sizeof(PyPtr), # must be > base type
-                  t::PyTypeObject -> begin
-                     t.tp_base = ccall(:jl_value_ptr, Ptr{Void},
-                                       (Ptr{PyTypeObject},),
-                                       &jlWrapType)
-                     ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &jlWrapType)
-                     init(t)
-                  end)
+function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
+    sz = sizeof(Py_jlWrap) + sizeof(PyPtr) # must be > base type
+    PyTypeObject!(to, name, sz) do t::PyTypeObject
+        t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, (Ptr{PyTypeObject},), &jlWrapType)
+        ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &jlWrapType)
+        init(t)
+    end
 end
 
-pyjlwrap_type(name::AbstractString, init::Function) =
-    pyjlwrap_type!(PyTypeObject(), name, init)
+pyjlwrap_type(init::Function, name::AbstractString) =
+    pyjlwrap_type!(init, PyTypeObject(), name)
 
 # Given a jlwrap type, create a new instance (and save value for gc)
 # (Careful: not sure if this works if value is an isbits type,
