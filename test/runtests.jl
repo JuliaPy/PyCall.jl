@@ -484,3 +484,9 @@ end
 # Test getattr fallback
 @test PyObject(TestConstruct(1))[:x] == 1
 @test_throws KeyError PyObject(TestConstruct(1))[:y]
+
+# iterating over Julia objects in Python:
+@test py"[x**2 for x in $(PyCall.pyjlwrap_new(1:4))]" ==
+      py"[x**2 for x in $(x for x in 1:4)]" ==
+      py"[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]" ==
+      [1,4,9,16]
