@@ -129,7 +129,7 @@ For instance,
 
 is essentially equivalent to the following Python code:
 
-    class JuliaType(numpy.polynomial.Polynomial):
+    class Doubler(numpy.polynomial.Polynomial):
         def __init__(self, x=10):
             self.x = x
         def my_method(self, arg1): return arg1 + 20
