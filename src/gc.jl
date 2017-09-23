@@ -28,6 +28,9 @@ end
 
 # "embed" a reference to jo in po, using the weak-reference mechanism
 function pyembed(po::PyObject, jo::Any)
+    # If there's a need to support immutable embedding,
+    # the API needs to be changed to return the pointer.
+    isimmutable(jo) && ArgumentError("pyembed: immutable argument now allowed")
     if weakref_callback_obj.o == C_NULL
         weakref_callback_obj.o = pyincref(pymethod(weakref_callback,
                                                    "weakref_callback",

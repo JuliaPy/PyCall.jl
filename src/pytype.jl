@@ -472,9 +472,21 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
                                  PyPtr, (Any,), pyT))
-    pycall_gc[o.o] = value
     p = convert(Ptr{Ptr{Void}}, o.o)
-    unsafe_store!(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
+    if isimmutable(value)
+        # It is undefined to call `pointer_from_objref` on immutable objects.
+        # The compiler is free to return basically anything since the boxing is not
+        # significant at all.
+        # Below is a well defined way to get a pointer (`ptr`) and an object that defines
+        # the lifetime of the pointer `ref`.
+        ref = Ref{Any}(value)
+        pycall_gc[o.o] = ref
+        ptr = unsafe_load(Ptr{Ptr{Void}}(pointer_from_objref(ref)))
+    else
+        pycall_gc[o.o] = value
+        ptr = pointer_from_objref(value)
+    end
+    unsafe_store!(p, ptr, 3)
     return o
 end
 
