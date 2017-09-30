@@ -40,7 +40,8 @@ end
 function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
-    ccall(@pysym(:PyBuffer_Release), Void, (Ptr{PyBuffer},), &o)
+    # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
+    ccall(@pysym(:PyBuffer_Release), Void, (Any,), o)
     o
 end
 
@@ -85,9 +86,10 @@ function Base.stride(b::PyBuffer, d::Integer)
     return Int(unsafe_load(b.buf.strides, d))
 end
 
+# TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
 iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
-               (Ptr{PyBuffer}, Cchar), &b, 'A')
+               (Any, Cchar), b, 'A')
 
 #############################################################################
 # pybuffer constant values from Include/object.h
@@ -105,8 +107,9 @@ const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     b = PyBuffer()
+    # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
-                     (PyPtr, Ptr{PyBuffer}, Cint), o, &b, flags)
+                     (PyPtr, Any, Cint), o, b, flags)
     return b
 end
 
