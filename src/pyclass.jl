@@ -129,7 +129,7 @@ For instance,
 
 is essentially equivalent to the following Python code:
 
-    class JuliaType(numpy.polynomial.Polynomial):
+    class Doubler(numpy.polynomial.Polynomial):
         def __init__(self, x=10):
             self.x = x
         def my_method(self, arg1): return arg1 + 20
@@ -156,7 +156,7 @@ Multiple dispatch works, too:
 """
 macro pydef(class_expr)
     class_name, _, _ = parse_pydef_toplevel(class_expr)
-    :(const $(esc(class_name)) = @pydef_object($(esc(class_expr))))
+    esc(:(const $class_name = $PyCall.@pydef_object($class_expr)))
 end
 
 """

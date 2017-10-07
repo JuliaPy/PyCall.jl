@@ -81,7 +81,9 @@ let d = PyDict(Dict(1 => "hello", 34 => "yes" ))
     @test eltype(d) == eltype(typeof(d)) == Pair{Int, String}
 end
 
-let d = Dict(zip(1:1000, 1:1000)), f = (k,v) -> iseven(k)
+let d = Dict(zip(1:1000, 1:1000)), f
+    f(k,v) = iseven(k) # For 0.6
+    f(kv) = iseven(kv[1]) # For 0.7
     @test filter(f, d) == filter(f, PyDict(d)) == filter!(f, PyDict(d)) ==
           Dict(zip(2:2:1000, 2:2:1000))
 end
@@ -108,6 +110,9 @@ array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
 @test collect(PyObject([1,"hello",5])) == [1,"hello",5]
 
 @test try @eval (@pyimport os.path) catch ex
+    if VERSION >= v"0.7.0-DEV.1729"
+        ex = (ex::LoadError).error
+    end
     isa(ex, ArgumentError)
 end
 
@@ -166,7 +171,7 @@ let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test String(take!(buf)) == "hello"
     obuf[:writelines](["first\n", "second\n", "third"])
     @test String(take!(buf)) == "first\nsecond\nthird"
-    obuf[:write](convert(Vector{UInt8}, "möre stuff"))
+    obuf[:write](b"möre stuff")
     @test String(take!(buf)) == "möre stuff"
     @test isopen(buf) == !obuf[:closed] == true
     obuf[:close]()
@@ -178,8 +183,8 @@ let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
     @test obuf[:readlines]() == ["hello\n", "again"]
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-    @test Vector{UInt8}(obuf[:read](5)) == convert(Vector{UInt8}, "hello")
-    @test Vector{UInt8}(obuf[:readall]()) == convert(Vector{UInt8}, "\nagain")
+    @test Vector{UInt8}(obuf[:read](5)) == b"hello"
+    @test Vector{UInt8}(obuf[:readall]()) == b"\nagain"
 end
 let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
     @test obuf[:encoding] == "UTF-8"
@@ -196,7 +201,7 @@ let nm = tempname()
         pf[:write](pyutf8(nm))
         pf[:flush]()
     end
-    @test readstring(nm) == nm
+    @test read(nm, String) == nm
 end
 
 # issue #112
@@ -420,9 +425,9 @@ end
 
 # @pycall macro expands correctly
 _pycall = GlobalRef(PyCall,:pycall)
-@test macroexpand(:(@pycall foo(bar)::T)) == :($(_pycall)(foo, T, bar))
-@test macroexpand(:(@pycall foo(bar, args...)::T)) == :($(_pycall)(foo, T, bar, args...))
-@test macroexpand(:(@pycall foo(bar; kwargs...)::T)) == :($(_pycall)(foo, T, bar; kwargs...))
+@test macroexpand(@__MODULE__, :(@pycall foo(bar)::T)) == :($(_pycall)(foo, T, bar))
+@test macroexpand(@__MODULE__, :(@pycall foo(bar, args...)::T)) == :($(_pycall)(foo, T, bar, args...))
+@test macroexpand(@__MODULE__, :(@pycall foo(bar; kwargs...)::T)) == :($(_pycall)(foo, T, bar; kwargs...))
 
 
 # basic @pywith functionality
@@ -432,7 +437,7 @@ try
         @pywith pybuiltin("open")(fname,"w") as f begin
             f[:write]("test")
         end
-        open(readstring,fname)=="test"
+        open(io->read(io, String), fname)=="test"
     end
 finally
     rm(fname,force=true)

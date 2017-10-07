@@ -1,4 +1,4 @@
 julia 0.5
-Compat 0.27.0
+Compat 0.32.0
 Conda 0.2
 MacroTools 0.3

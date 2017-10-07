@@ -49,8 +49,8 @@ const jlWrapIteratorType = PyTypeObject()
 function jlwrap_iterator(o::Any)
     if jlWrapIteratorType.tp_name == C_NULL # lazily initialize
         pyjlwrap_type!(jlWrapIteratorType, "PyCall.jlwrap_iterator") do t
-            t.tp_iter = cfunction(pyincref_, PyPtr, (PyPtr,)) # new reference to same object
-            t.tp_iternext = cfunction(pyjlwrap_iternext, PyPtr, (PyPtr,))
+            t.tp_iter = cfunction(pyincref_, PyPtr, Tuple{PyPtr}) # new reference to same object
+            t.tp_iternext = cfunction(pyjlwrap_iternext, PyPtr, Tuple{PyPtr})
         end
     end
     return pyjlwrap_new(jlWrapIteratorType, (o, Ref(start(o))))

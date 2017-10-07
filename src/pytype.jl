@@ -68,15 +68,15 @@ end
 
 function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
-                cfunction(set, Int, (PyPtr,PyPtr,Ptr{Void})),
+                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Void}}),
+                cfunction(set, Int, Tuple{PyPtr,PyPtr,Ptr{Void}}),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
 
 function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, (PyPtr,Ptr{Void})),
+                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Void}}),
                 C_NULL,
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
@@ -319,8 +319,9 @@ function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, ba
     if t.tp_new == C_NULL
         t.tp_new = @pyglobal :PyType_GenericNew
     end
-    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ptr{PyTypeObject},), &t)
-    ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &t)
+    # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
+    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Any,), t)
+    ccall((@pysym :Py_IncRef), Void, (Any,), t)
     return t
 end
 
@@ -422,13 +423,13 @@ function pyjlwrap_init()
                             PyMemberDef(C_NULL,0,0,0,C_NULL))
 
     # all cfunctions must be compiled at runtime
-    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, (PyPtr,))
-    pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
-    pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, (PyPtr,))
-    pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
-    pyjlwrap_call_ptr = cfunction(pyjlwrap_call, PyPtr, (PyPtr,PyPtr,PyPtr))
-    pyjlwrap_getattr_ptr = cfunction(pyjlwrap_getattr, PyPtr, (PyPtr,PyPtr))
-    pyjlwrap_getiter_ptr = cfunction(pyjlwrap_getiter, PyPtr, (PyPtr,))
+    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, Tuple{PyPtr})
+    pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, Tuple{PyPtr})
+    pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, Tuple{PyPtr})
+    pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, Tuple{PyPtr})
+    pyjlwrap_call_ptr = cfunction(pyjlwrap_call, PyPtr, Tuple{PyPtr,PyPtr,PyPtr})
+    pyjlwrap_getattr_ptr = cfunction(pyjlwrap_getattr, PyPtr, Tuple{PyPtr,PyPtr})
+    pyjlwrap_getiter_ptr = cfunction(pyjlwrap_getiter, PyPtr, Tuple{PyPtr})
 
     # detect at runtime whether we are using Stackless Python
     try
@@ -453,8 +454,9 @@ end
 function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
     sz = sizeof(Py_jlWrap) + sizeof(PyPtr) # must be > base type
     PyTypeObject!(to, name, sz) do t::PyTypeObject
-        t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, (Ptr{PyTypeObject},), &jlWrapType)
-        ccall((@pysym :Py_IncRef), Void, (Ptr{PyTypeObject},), &jlWrapType)
+        # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
+        t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, (Any,), jlWrapType)
+        ccall((@pysym :Py_IncRef), Void, (Any,), jlWrapType)
         init(t)
     end
 end
@@ -467,11 +469,24 @@ pyjlwrap_type(init::Function, name::AbstractString) =
 #  since, the jl_value_t* may be to a temporary copy.  But don't need
 #  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
+    # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
-                                 PyPtr, (Ptr{PyTypeObject},), &pyT))
-    pycall_gc[o.o] = value
+                                 PyPtr, (Any,), pyT))
     p = convert(Ptr{Ptr{Void}}, o.o)
-    unsafe_store!(p, ccall(:jl_value_ptr, Ptr{Void}, (Any,), value), 3)
+    if isimmutable(value)
+        # It is undefined to call `pointer_from_objref` on immutable objects.
+        # The compiler is free to return basically anything since the boxing is not
+        # significant at all.
+        # Below is a well defined way to get a pointer (`ptr`) and an object that defines
+        # the lifetime of the pointer `ref`.
+        ref = Ref{Any}(value)
+        pycall_gc[o.o] = ref
+        ptr = unsafe_load(Ptr{Ptr{Void}}(pointer_from_objref(ref)))
+    else
+        pycall_gc[o.o] = value
+        ptr = pointer_from_objref(value)
+    end
+    unsafe_store!(p, ptr, 3)
     return o
 end
 
@@ -479,7 +494,8 @@ function pyjlwrap_new(x::Any)
     pyjlwrap_new(jlWrapType, x)
 end
 
-is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,Ptr{PyTypeObject}), o, &jlWrapType) == 1
+# TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
+is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Any), o, jlWrapType) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,

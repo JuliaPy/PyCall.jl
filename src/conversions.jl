@@ -565,13 +565,13 @@ function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
 end
 
 #########################################################################
-# Range: integer ranges are converted to xrange,
-#         while other ranges (<: AbstractVector) are converted to lists
+# AbstractRange: integer ranges are converted to xrange,
+#                while other ranges (<: AbstractVector) are converted to lists
 
 xrange(start, stop, step) = pycall(pyxrange[], PyObject,
                                    start, stop, step)
 
-function PyObject{T<:Integer}(r::Range{T})
+function PyObject{T<:Integer}(r::AbstractRange{T})
     s = step(r)
     f = first(r)
     l = last(r) + s
@@ -583,7 +583,7 @@ function PyObject{T<:Integer}(r::Range{T})
     end
 end
 
-function convert{T<:Range}(::Type{T}, o::PyObject)
+function convert{T<:AbstractRange}(::Type{T}, o::PyObject)
     v = PyVector(o)
     len = length(v)
     if len == 0
@@ -715,7 +715,7 @@ function pysequence_query(o::PyObject)
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
         return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
     elseif pyisinstance(o, pyxrange[])
-        return Range
+        return AbstractRange
     elseif ispybytearray(o)
         return Vector{UInt8}
     else

@@ -341,7 +341,8 @@ and also by providing more type information to the Julia compiler.
   type-conversion).  Unlike the `@pyimport` macro, this does not
   define a Julia module and members cannot be accessed with `s.name`.
 
-* `py"..."` evaluates `"..."` as a Python string and returns the result
+* `py"..."` evaluates `"..."` as a Python string, equivalent to
+  Python's [`eval`](https://docs.python.org/2/library/functions.html#eval) function, and returns the result
   converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
   Julia variables and other expressions into the Python code with `$`,
@@ -357,7 +358,7 @@ and also by providing more type information to the Julia compiler.
   If you use `py"""..."""` to pass a *multi-line* string, the string can
   contain arbitrary Python code (not just a single expression) to be evaluated,
   but the return value is `nothing`; this is useful e.g. to define pure-Python
-  functions.  (If you define a Python global `g` in a multiline `py"""..."""`
+  functions, and is equivalent to Python's [`exec`](https://docs.python.org/2/reference/simple_stmts.html#exec) statement.  (If you define a Python global `g` in a multiline `py"""..."""`
   string, you can retrieve it in Julia by subsequently evaluating `py"g"`.)
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python

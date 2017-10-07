@@ -74,7 +74,7 @@ function npyinitialize()
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try
         hdrfile = open(joinpath(inc, "numpy", "__multiarray_api.h"))
-        hdr = readstring(hdrfile);
+        hdr = read(hdrfile, String)
         close(hdrfile)
     catch e
         error("could not read __multiarray_api.h to parse PyArray_API ", e)

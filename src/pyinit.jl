@@ -87,14 +87,14 @@ function __init__()
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
-        if pyversion.major < 3
-            argv_s = ""
-            argv = unsafe_convert(Ptr{UInt8}, argv_s)
-            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint,Ptr{Ptr{UInt8}},Cint), 1, &argv, 0)
+        @static if VERSION >= v"0.7.0-DEV.1963"
+            ref0 = Ref{UInt32}(0)
+            Base.@gc_preserve ref0 ccall(@pysym(:PySys_SetArgvEx), Void,
+                                         (Cint, Ref{Ptr{Void}}, Cint),
+                                         1, pointer_from_objref(ref0), 0)
         else
-            argv_s = Cwchar_t[0]
-            argv   = unsafe_convert(Ptr{Cwchar_t}, argv_s)
-            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Ptr{Cwchar_t}}, Cint), 1, &argv, 0)
+            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Cwstring}, Cint),
+                  1, [""], 0)
         end
 
         # Some Python code checks sys.ps1 to see if it is running

@@ -457,6 +457,7 @@ end
 pyimport(name::Symbol) = pyimport(string(name))
 
 # convert expressions like :math or :(scipy.special) into module name strings
+modulename(s::QuoteNode) = modulename(s.value)
 modulename(s::Symbol) = string(s)
 function modulename(e::Expr)
     if e.head == :.
@@ -487,8 +488,15 @@ end
 macro pyimport(name, optional_varname...)
     mname = modulename(name)
     Name = pyimport_name(name, optional_varname)
+    quoteName = Expr(:quote, Name)
+    # VERSION 0.7
+    @static if isdefined(Base, Symbol("@isdefined"))
+        isdef_check = :(isdefined($__module__, $quoteName))
+    else
+        isdef_check = :(isdefined($quoteName))
+    end
     quote
-        if !isdefined($(Expr(:quote, Name)))
+        if !$isdef_check
             const $(esc(Name)) = pywrap(pyimport($mname))
         elseif !isa($(esc(Name)), Module)
             error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
