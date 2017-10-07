@@ -218,6 +218,8 @@ You can call an `o::PyObject` via `o(args...)` just like in Python
 `pycall` form is still useful in Julia if you want to specify the
 return type.
 
+`pystr(o)` and `pyrepr(o)` are analogous to `str` and `repr` in Python, respectively.
+
 #### Arrays and PyArray
 
 ##### From Julia to Python

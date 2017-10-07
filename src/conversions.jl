@@ -639,11 +639,7 @@ function PyObject(x::Complex{BigFloat})
     pycall(mpc, PyObject, string(real(x)), string(imag(x)))
 end
 
-function convert(::Type{BigFloat}, o::PyObject)
-    parse(BigFloat,
-          convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
-                                                 PyPtr, (PyPtr,), o))))
-end
+convert(::Type{BigFloat}, o::PyObject) = parse(BigFloat, pystr(o))
 
 function convert(::Type{Complex{BigFloat}}, o::PyObject)
     try
@@ -665,10 +661,7 @@ function PyObject(i::BigInt)
                              String(string(i)), C_NULL, 10))
 end
 
-function convert(::Type{BigInt}, o::PyObject)
-    parse(BigInt, convert(AbstractString, PyObject(ccall((@pysym :PyObject_Str),
-                                          PyPtr, (PyPtr,), o))))
-end
+convert(::Type{BigInt}, o::PyObject) = parse(BigInt, pystr(o))
 
 #########################################################################
 # Dates (Calendar time)

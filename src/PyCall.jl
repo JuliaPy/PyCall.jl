@@ -5,7 +5,7 @@ module PyCall
 export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
-       pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring,
+       pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
        pyimport_conda, @py_str, @pywith, @pycall, pybytes
@@ -178,6 +178,31 @@ include("io.jl")
 #########################################################################
 # Pretty-printing PyObject
 
+"""
+    pystr(o::PyObject)
+
+Return a string representation of `o` corresponding to `str(o)` in Python.
+"""
+pystr(o::PyObject) = convert(AbstractString,
+                             PyObject(@pycheckn ccall((@pysym :PyObject_Str), PyPtr,
+                                                      (PyPtr,), o)))
+
+"""
+    pyrepr(o::PyObject)
+
+Return a string representation of `o` corresponding to `repr(o)` in Python.
+"""
+pyrepr(o::PyObject) = convert(AbstractString,
+                              PyObject(@pycheckn ccall((@pysym :PyObject_Repr), PyPtr,
+                                                       (PyPtr,), o)))
+
+"""
+    pystring(o::PyObject)
+
+Return a string representation of `o`.  Normally, this corresponds to `repr(o)`
+in Python, but unlike `repr` it should never fail (falling back to `str` or to
+printing the raw pointer if necessary).
+"""
 function pystring(o::PyObject)
     if o.o == C_NULL
         return "NULL"

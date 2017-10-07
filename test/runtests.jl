@@ -490,3 +490,8 @@ end
       py"[x**2 for x in $(x for x in 1:4)]" ==
       py"[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]" ==
       [1,4,9,16]
+
+let o = PyObject("foo")
+    @test pystr(o) == "foo"
+    @test pyrepr(o) == "'foo'"
+end
