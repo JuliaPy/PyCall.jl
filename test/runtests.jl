@@ -1,4 +1,4 @@
-using Base.Test, PyCall, Compat
+using Compat.Test, PyCall, Compat
 
 if isdefined(Base, :Iterators)
     filter(f, itr) = collect(Iterators.filter(f, itr))

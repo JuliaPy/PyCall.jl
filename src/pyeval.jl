@@ -115,7 +115,7 @@ function interpolate_pycode(code::AbstractString)
                 i += 1
                 interp_literal = true
             end
-            expr, i = parse(code, i, greedy=false)
+            expr, i = Meta.parse(code, i, greedy=false)
             if interp_literal
                 # need to save both the expression and the position
                 # in the string where it should be interpolated
