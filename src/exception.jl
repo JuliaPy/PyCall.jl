@@ -102,7 +102,7 @@ function pyexc_initialize()
     pyexc[ErrorException] = @pyglobalobjptr :PyExc_RuntimeError
     pyexc[SystemError] = @pyglobalobjptr :PyExc_SystemError
     pyexc[TypeError] = @pyglobalobjptr :PyExc_TypeError
-    pyexc[ParseError] = @pyglobalobjptr :PyExc_SyntaxError
+    pyexc[Meta.ParseError] = @pyglobalobjptr :PyExc_SyntaxError
     pyexc[ArgumentError] = @pyglobalobjptr :PyExc_ValueError
     pyexc[KeyError] = @pyglobalobjptr :PyExc_KeyError
     pyexc[LoadError] = @pyglobalobjptr :PyExc_ImportError
