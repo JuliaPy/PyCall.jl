@@ -16,7 +16,7 @@ end
     pybytes(b::Union{String,Vector{UInt8}})
 
 Convert `b` to a Python `bytes` object.   This differs from the default
-`PyObject(b)` conversion of `Strqing` to a Python string (which may fail if `b`
+`PyObject(b)` conversion of `String` to a Python string (which may fail if `b`
 does not contain valid Unicode), or from the default conversion of a
 `Vector{UInt8}` to a `bytearray` object (which is mutable, unlike `bytes`).
 """
