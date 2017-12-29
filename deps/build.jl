@@ -160,7 +160,7 @@ end
 try # make sure deps.jl file is removed on error
     python = try
         let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
-                     Compat.Sys.islinux() || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
+                     (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
             vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
                 if isempty(py)
