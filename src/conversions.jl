@@ -663,6 +663,15 @@ end
 
 convert(::Type{BigInt}, o::PyObject) = parse(BigInt, pystr(o))
 
+# If 32-bit systems are used, Int64 has to be converted to long integes as well.
+@static if Int == Int32
+    function PyObject(i::Int64)
+        PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
+                                 (Ptr{UInt8}, Ptr{Void}, Cint),
+                                 String(string(i)), C_NULL, 10))
+    end
+end
+
 #########################################################################
 # Dates (Calendar time)
 
