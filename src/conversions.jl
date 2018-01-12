@@ -653,9 +653,11 @@ end
 pymp_query(o::PyObject) = pyisinstance(o, mpf) ? BigFloat : pyisinstance(o, mpc) ? Complex{BigFloat} : Union{}
 
 #########################################################################
-# BigInt conversion to Python "long" integers
+# (Int64), Int128 and BigInt conversion to Python "long" integers
 
-function PyObject(i::BigInt)
+const LongInt = @static (Sys.WORD_SIZE==32) ? Union{Int64,UInt64,Int128,UInt128,BigInt} : Union{Int128,UInt128,BigInt}
+
+function PyObject(i::LongInt)
     PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
                              (Ptr{UInt8}, Ptr{Void}, Cint),
                              String(string(i)), C_NULL, 10))

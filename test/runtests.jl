@@ -216,6 +216,17 @@ pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
 @test pyanycheck(Complex128, PyVector{PyObject}(PyObject([1.3+1im]))[1])
 @test pyanycheck(Bool, PyVector{PyObject}(PyObject([true]))[1])
 
+# conversions of Int128 and BigInt
+let i = 1234567890123456789 # Int64
+    @test PyObject(i) - i == 0
+end
+let i = 12345678901234567890 # Int128
+    @test PyObject(i) - i == 0
+end
+let i = BigInt(12345678901234567890) # BigInt
+    @test PyObject(i) - i == 0
+end
+
 pymodule_exists(s::AbstractString) = try
     pyimport(s)
     true
