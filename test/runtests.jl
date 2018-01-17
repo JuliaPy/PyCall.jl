@@ -511,3 +511,10 @@ let o = PyObject("foo")
     @test pystr(o) == "foo"
     @test pyrepr(o) == "'foo'"
 end
+
+# pyfunction
+@test pyfunction(factorial, Int)(3) === 6
+@test pyfunction(sin, Complex{Int})(3) === sin(3+0im)
+@test pyfunctionret(factorial, Float64, Int)(3) === 6.0
+@test pyfunctionret(factorial, nothing, Int)(3) === nothing
+@test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))

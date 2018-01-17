@@ -8,7 +8,7 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
