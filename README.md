@@ -384,6 +384,23 @@ For example, calling `f(x, function=g)` will fail because `function` is
 a reserved word in Julia. In such cases, you can use the lower-level
 Julia syntax `f(x; :function=>g)`.
 
+### Calling Julia from Python
+
+Julia functions get converted to callable Python objects, so you
+can easily call Julia from Python via callback function arguments.
+The [pyjulia module](https://github.com/JuliaPy/pyjulia) allows you
+to call Julia directly from Python, and also uses PyCall to do its
+conversions.
+
+A Julia function `f(args...)` is ordinarily converted to a callable
+Python object `p(args...)` that first converts its Python arguments
+into Julia arguments by the default `PyAny` conversion, calls `f`,
+then converts the Julia return value of `f` back into a Python object
+with the default `PyObject(...)` conversion.    However, you can
+exert lower-level control over these argument/return conversions
+by calling `pyfunction(f, ...)` or `pyfunctionret(f, ...)`; see the
+documentation `?pyfunction` and `?pyfunctionret` for more information.
+
 ### Defining Python Classes
 
 `@pydef` creates a Python class whose methods are implemented in Julia.
@@ -495,8 +512,8 @@ do so using `ccall`.
   type.  `PythonObject(p::PyPtr)` creates a Julia wrapper around a
   `PyPtr` return value.
 
-* Use `PythonObject` and the `convert` routines mentioned above to convert
-  Julia types to/from `PythonObject*` references.
+* Use `PyObject` and the `convert` routines mentioned above to convert
+  Julia types to/from `PyObject*` references.
 
 * If a new reference is returned by a Python function, immediately
   convert the `PyPtr` return values to `PythonObject` objects in order to
