@@ -7,6 +7,9 @@
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.3.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.3)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.4.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.4)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
+[![PyCall](http://pkg.julialang.org/badges/PyCall_0.6.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.6)
+[![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
+
 
 This package provides the ability to directly call and **fully
 interoperate with Python** from [the Julia
