@@ -4,8 +4,6 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
 [![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
 
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.3.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.3)
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.4.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.4)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.6.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.6)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
