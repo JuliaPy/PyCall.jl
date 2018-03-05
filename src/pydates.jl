@@ -8,7 +8,7 @@
 # Fortunately, they don't seem to have changed much since Python 2.7, with
 # the biggest difference being the use of a 64-bit hash type.
 
-immutable PyDateTime_CAPI
+struct PyDateTime_CAPI
     # type objects:
     DateType::PyPtr
     DateTimeType::PyPtr
@@ -25,7 +25,7 @@ immutable PyDateTime_CAPI
     Date_FromTimestamp::Ptr{Void}
 end
 
-immutable PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
+struct PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
     ob_refcnt::Int
     ob_type::PyPtr

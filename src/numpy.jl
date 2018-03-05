@@ -185,7 +185,7 @@ const npy_typestrs = Dict( "b1"=>Bool,
 # dimensions. For example, although NumPy works with both row-major and
 # column-major data, some Python libraries like OpenCV seem to require
 # row-major data (the default in NumPy). In such cases, use PyReverseDims(array)
-function NpyArray{T<:NPY_TYPES}(a::StridedArray{T}, revdims::Bool)
+function NpyArray(a::StridedArray{T}, revdims::Bool) where T<:NPY_TYPES
     @npyinitialize
     size_a = revdims ? reverse(size(a)) : size(a)
     strides_a = revdims ? reverse(strides(a)) : strides(a)
@@ -199,7 +199,7 @@ function NpyArray{T<:NPY_TYPES}(a::StridedArray{T}, revdims::Bool)
     return PyObject(p, a)
 end
 
-function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
+function PyObject(a::StridedArray{T}) where T<:NPY_TYPES
     try
         return NpyArray(a, false)
     catch
@@ -207,7 +207,7 @@ function PyObject{T<:NPY_TYPES}(a::StridedArray{T})
     end
 end
 
-PyReverseDims{T<:NPY_TYPES}(a::StridedArray{T}) = NpyArray(a, true)
+PyReverseDims(a::StridedArray{T}) where {T<:NPY_TYPES} = NpyArray(a, true)
 PyReverseDims(a::BitArray) = PyReverseDims(Array(a))
 
 """
@@ -227,7 +227,7 @@ PyReverseDims(a::AbstractArray)
 # in NumPy's C API is only available via macros (or parsing structs).
 # [ Hopefully, this will be improved in a future NumPy version. ]
 
-type PyArray_Info
+mutable struct PyArray_Info
     T::Type
     native::Bool # native byte order?
     sz::Vector{Int}
@@ -301,7 +301,7 @@ This implements a nocopy wrapper to a NumPy array (currently of only numeric typ
 
 If you are using `pycall` and the function returns an `ndarray`, you can use `PyArray` as the return type to directly receive a `PyArray`.
 """
-type PyArray{T,N} <: AbstractArray{T,N}
+mutable struct PyArray{T,N} <: AbstractArray{T,N}
     o::PyObject
     info::PyArray_Info
     dims::Dims
@@ -310,7 +310,7 @@ type PyArray{T,N} <: AbstractArray{T,N}
     c_contig::Bool
     data::Ptr{T}
 
-    function (::Type{PyArray{T,N}}){T,N}(o::PyObject, info::PyArray_Info)
+    function PyArray{T,N}(o::PyObject, info::PyArray_Info) where {T,N}
         if !aligned(info)
             throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
         elseif !info.native
@@ -332,11 +332,11 @@ function PyArray(o::PyObject)
 end
 
 size(a::PyArray) = a.dims
-ndims{T,N}(a::PyArray{T,N}) = N
+ndims(a::PyArray{T,N}) where {T,N} = N
 
 similar(a::PyArray, T, dims::Dims) = Array{T}(dims)
 
-function copy{T,N}(a::PyArray{T,N})
+function copy(a::PyArray{T,N}) where {T,N}
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return permutedims(B, (N:-1:1))
@@ -352,10 +352,10 @@ end
 
 # TODO: need to do bounds-checking of these indices!
 
-getindex{T}(a::PyArray{T,0}) = unsafe_load(a.data)
-getindex{T}(a::PyArray{T,1}, i::Integer) = unsafe_load(a.data, 1 + (i-1)*a.st[1])
+getindex(a::PyArray{T,0}) where {T} = unsafe_load(a.data)
+getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_load(a.data, 1 + (i-1)*a.st[1])
 
-getindex{T}(a::PyArray{T,2}, i::Integer, j::Integer) =
+getindex(a::PyArray{T,2}, i::Integer, j::Integer) where {T} =
   unsafe_load(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
 function getindex(a::PyArray, i::Integer)
@@ -389,10 +389,10 @@ function writeok_assign(a::PyArray, v, i::Integer)
     return a
 end
 
-setindex!{T}(a::PyArray{T,0}, v) = writeok_assign(a, v, 1)
-setindex!{T}(a::PyArray{T,1}, v, i::Integer) = writeok_assign(a, v, 1 + (i-1)*a.st[1])
+setindex!(a::PyArray{T,0}, v) where {T} = writeok_assign(a, v, 1)
+setindex!(a::PyArray{T,1}, v, i::Integer) where {T} = writeok_assign(a, v, 1 + (i-1)*a.st[1])
 
-setindex!{T}(a::PyArray{T,2}, v, i::Integer, j::Integer) =
+setindex!(a::PyArray{T,2}, v, i::Integer, j::Integer) where {T} =
   writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
 function setindex!(a::PyArray, v, i::Integer)
@@ -419,11 +419,11 @@ end
 
 stride(a::PyArray, i::Integer) = a.st[i]
 
-Base.unsafe_convert{T}(::Type{Ptr{T}}, a::PyArray{T}) = a.data
+Base.unsafe_convert(::Type{Ptr{T}}, a::PyArray{T}) where {T} = a.data
 
 pointer(a::PyArray, i::Int) = pointer(a, ind2sub(a.dims, i))
 
-function pointer{T}(a::PyArray{T}, is::Tuple{Vararg{Int}})
+function pointer(a::PyArray{T}, is::Tuple{Vararg{Int}}) where T
     offset = 0
     for i = 1:length(is)
         offset += (is[i]-1)*a.st[i]
@@ -431,8 +431,8 @@ function pointer{T}(a::PyArray{T}, is::Tuple{Vararg{Int}})
     return a.data + offset*sizeof(T)
 end
 
-summary{T}(a::PyArray{T}) = string(Base.dims2string(size(a)), " ",
-                                   string(T), " PyArray")
+summary(a::PyArray{T}) where {T} = string(Base.dims2string(size(a)), " ",
+                                          string(T), " PyArray")
 
 #########################################################################
 # PyArray <-> PyObject conversions
@@ -441,7 +441,7 @@ PyObject(a::PyArray) = a.o
 
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
-function convert{T<:NPY_TYPES}(::Type{Array{T, 1}}, o::PyObject)
+function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
     try
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
@@ -451,7 +451,7 @@ function convert{T<:NPY_TYPES}(::Type{Array{T, 1}}, o::PyObject)
     end
 end
 
-function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
+function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
     try
         info = PyArray_Info(o)
         try
@@ -464,7 +464,7 @@ function convert{T<:NPY_TYPES}(::Type{Array{T}}, o::PyObject)
     end
 end
 
-function convert{T<:NPY_TYPES,N}(::Type{Array{T,N}}, o::PyObject)
+function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
     try
         info = PyArray_Info(o)
         try
@@ -493,7 +493,7 @@ function convert(::Type{Array{PyObject,1}}, o::PyObject)
     map(pyincref, convert(Array{PyPtr, 1}, o))
 end
 
-function convert{N}(::Type{Array{PyObject,N}}, o::PyObject)
+function convert(::Type{Array{PyObject,N}}, o::PyObject) where N
     map(pyincref, convert(Array{PyPtr, N}, o))
 end
 

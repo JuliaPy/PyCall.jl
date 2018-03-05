@@ -1,7 +1,7 @@
 #########################################################################
 # Wrapper around Python exceptions
 
-type PyError <: Exception
+mutable struct PyError <: Exception
     msg::AbstractString # message string from Julia context, or "" if none
 
     # info returned by PyErr_Fetch/PyErr_Normalize
@@ -95,7 +95,7 @@ end
 # Mapping of Julia Exception types to Python exceptions
 
 const pyexc = Dict{DataType, PyPtr}()
-type PyIOError <: Exception end
+mutable struct PyIOError <: Exception end
 
 function pyexc_initialize()
     pyexc[Exception] = @pyglobalobjptr :PyExc_RuntimeError

@@ -431,7 +431,7 @@ let py_sum_obj = pybuiltin("sum")
 end
 
 # issue #389
-@pydef type EmptyClass
+@pydef mutable struct EmptyClass
 end
 
 # @pycall macro expands correctly
@@ -455,7 +455,7 @@ finally
 end
 
 # @pywith errors correctly handled
-@pydef type IgnoreError
+@pydef mutable struct IgnoreError
     __init__(self, ignore) = (self[:ignore]=ignore)
     __enter__(self) = ()
     __exit__(self, typ, value, tb) = self[:ignore]
@@ -492,7 +492,7 @@ let p = PyCall.pickle(), buf = IOBuffer()
 end
 
 # Test that we can call constructors on the python side
-immutable TestConstruct
+struct TestConstruct
     x
 end
 @test pycall(PyObject(TestConstruct), PyAny, 1).x == 1

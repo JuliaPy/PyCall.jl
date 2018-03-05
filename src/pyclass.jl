@@ -43,14 +43,14 @@ end
 # Returns (class_name::Symbol, base_classes, lines)
 # where there's one `line` per method definition
 function parse_pydef_toplevel(expr)
-    if @capture(expr, begin type class_name_ <: base_classes_expr_
+    if @capture(expr, begin mutable struct class_name_ <: base_classes_expr_
                     lines__
                 end end)
         if !@capture(base_classes_expr, (base_classes__,))
             base_classes = (base_classes_expr,)
         end
     else
-        @assert(@capture(expr, type class_name_
+        @assert(@capture(expr, mutable struct class_name_
                     lines__
             end), "Malformed @pydef expression")
 

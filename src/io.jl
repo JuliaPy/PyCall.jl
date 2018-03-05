@@ -73,7 +73,7 @@ pyio_initialized = false
 function pyio_initialize()
     global pyio_initialized
     if !pyio_initialized::Bool
-        copy!(PyIO, @pydef_object type PyIO
+        copy!(PyIO, @pydef_object mutable struct PyIO
             __init__(self, io::IO; istextio=false) = begin
                 self[:io] = pyjlwrap_new(io) # avoid recursion
                 self[:istextio] = istextio
