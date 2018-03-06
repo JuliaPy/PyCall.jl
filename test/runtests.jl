@@ -383,8 +383,12 @@ for b in (4, PyObject(4))
             @test isa(x, PyObject)
             @test convert(PyAny, x) == op(111, 4)
         end
+        @test convert(PyAny, op(b, PyObject(3))) == op(4, 3)
     end
 end
+@test convert(PyAny, PyObject(3)^4)  == 3^4 # literal integer powers
+@test convert(PyAny, PyObject(3)^0)  == 1   # literal integer powers
+@test convert(PyAny, PyObject(2)^-1) == 0.5 # literal integer powers
 # unary operators
 for op in (+, -, ~, abs)
     let x = op(PyObject(-3))
