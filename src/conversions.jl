@@ -137,7 +137,7 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 # I want to use a union, but this seems to confuse Julia's method
 # dispatch for the convert function in some circumstances
 # const PyAny = Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
-@compat abstract type PyAny end
+abstract type PyAny end
 
 function pyany_toany(T::Type)
     T === Vararg{PyAny} ? Vararg{Any} : T
@@ -182,13 +182,9 @@ function tuptype(T::DataType,isva,i)
         return T.parameters[i]
     end
 end
-if VERSION >= v"0.6.0-dev.2107" # julia#18457
-    tuptype(T::UnionAll,isva,i) = tuptype(T.body,isva,i)
-    isvatuple(T::UnionAll) = isvatuple(T.body)
-    isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameters[end])
-else
-    isvatuple(T) = Base.isvatuple(T)
-end
+tuptype(T::UnionAll,isva,i) = tuptype(T.body,isva,i)
+isvatuple(T::UnionAll) = isvatuple(T.body)
+isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameters[end])
 
 function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
     isva = isvatuple(T)

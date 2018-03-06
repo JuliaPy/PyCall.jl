@@ -22,17 +22,15 @@ end
 ^(a::PyObject, b::Integer) = a^PyObject(b)
 Base.literal_pow(::typeof(^), x::PyObject, ::Val{p}) where {p} = x^PyObject(p)
 
-if VERSION >= v"0.6.0-dev.1632" # julia#17623
-    # .+= etcetera map to in-place Python operations
-    for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
-                    (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
-                    (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
-                    (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
-        qpy = QuoteNode(py)
-        @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
-            a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
-            PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
-        end
+# .+= etcetera map to in-place Python operations
+for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
+                (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
+                (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
+                (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
+    qpy = QuoteNode(py)
+    @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
+        a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
+        PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
     end
 end
 

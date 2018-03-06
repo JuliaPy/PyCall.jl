@@ -366,14 +366,6 @@ end
 
 docstring(x) = string(Docs.doc(x))
 
-if VERSION < v"0.6"
-    function fieldindex(T::DataType, name::Symbol, err::Bool=true)
-        return Int(ccall(:jl_field_index, Cint, (Any, Any, Cint), T, name, err)+1)
-    end
-else
-    fieldindex = Base.fieldindex
-end
-
 # this function emulates standard attributes of Python functions,
 # where possible.
 function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
@@ -391,7 +383,7 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
             # TODO: handle __code__/func_code (issue #268)
             return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
         else
-            fidx = fieldindex(typeof(f), Symbol(attr), false)
+            fidx = Base.fieldindex(typeof(f), Symbol(attr), false)
             if fidx != 0
                 return pystealref!(PyObject(getfield(f, fidx)))
             else

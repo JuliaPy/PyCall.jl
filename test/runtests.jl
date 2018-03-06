@@ -44,9 +44,7 @@ import PyCall.pyany_toany
 @test roundtripeq(UInt8[1,3,4,5])
 @test roundtrip(3 => 4) == (3,4)
 @test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
-if VERSION >= v"0.6.0"
-    @test eltype(roundtrip([Ref(1), Ref(2)])) == typeof(Ref(1))
-end
+@test eltype(roundtrip([Ref(1), Ref(2)])) == typeof(Ref(1))
 
 @test pycall(PyObject(x -> x + 1), PyAny, 314158) == 314159
 @test PyObject(x -> x + 1)(314158) == 314159
@@ -407,12 +405,10 @@ for x in (3,4,5), y in (3.0,4.0,5.0)
 end
 
 # updating operators .+= etcetera
-if VERSION >= v"0.6.0-dev.1632"
-    let o = PyObject(Any[1,2]), c = o
-        o .+= Any[3,4]
-        @test collect(o) == [1,2,3,4]
-        @test o.o == c.o # updated in-place
-    end
+let o = PyObject(Any[1,2]), c = o
+    o .+= Any[3,4]
+    @test collect(o) == [1,2,3,4]
+    @test o.o == c.o # updated in-place
 end
 
 # more flexible bool conversions, matching Python "truth value testing"
