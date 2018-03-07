@@ -68,7 +68,7 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(pydecref, po)
+        @compat finalizer(pydecref, po)
         return po
     end
 end
@@ -611,7 +611,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
         pyimport(modulename)
     catch e
         if conda
-            @info "Installing $modulename via the Conda $condapkg package..."
+            Compat.@info "Installing $modulename via the Conda $condapkg package..."
             isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
@@ -619,7 +619,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
             aconda = anaconda_conda()
             if !isempty(aconda)
                 try
-                    @info "Installing $modulename via Anaconda's $aconda..."
+                    Compat.@info "Installing $modulename via Anaconda's $aconda..."
                     isempty(channel) || run(`$aconda config --add channels $channel --force`)
                     run(`$aconda install -y $condapkg`)
                 catch e2

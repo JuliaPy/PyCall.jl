@@ -32,7 +32,7 @@ mutable struct PyBuffer
         b = new(Py_buffer(C_NULL, C_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
-        finalizer(pydecref, b)
+        @compat finalizer(pydecref, b)
         return b
     end
 end
