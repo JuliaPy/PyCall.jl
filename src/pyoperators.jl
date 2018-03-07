@@ -8,23 +8,29 @@ for (op,py) in ((:+,:PyNumber_Add), (:-,:PyNumber_Subtract), (:*,:PyNumber_Multi
                 (:&,:PyNumber_And), (:|,:PyNumber_Or),
                 (:<<,:PyNumber_Lshift), (:>>,:PyNumber_Rshift), (:⊻,:PyNumber_Xor))
     qpy = QuoteNode(py)
-    @eval $op(a::PyObject, b) =
-        PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
+    @eval begin
+        $op(a::PyObject, b::PyObject) =
+            PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a, b))
+        $op(a::PyObject, b) = $op(a, PyObject(b))
+        $op(a, b::PyObject) = $op(PyObject(a), b)
+    end
 end
-^(a::PyObject, b) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
-^(a::PyObject, b::Integer) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, PyObject(b), pynothing[]))
 
-if VERSION >= v"0.6.0-dev.1632" # julia#17623
-    # .+= etcetera map to in-place Python operations
-    for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
-                    (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
-                    (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
-                    (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
-        qpy = QuoteNode(py)
-        @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
-            a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
-            PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
-        end
+^(a::PyObject, b::PyObject) = PyObject(@pycheckn ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, b, pynothing[]))
+^(a::PyObject, b) = a^PyObject(b)
+^(a, b::PyObject) = PyObject(a)^b
+^(a::PyObject, b::Integer) = a^PyObject(b)
+Base.literal_pow(::typeof(^), x::PyObject, ::Val{p}) where {p} = x^PyObject(p)
+
+# .+= etcetera map to in-place Python operations
+for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:PyNumber_InPlaceMultiply),
+                (:/,:PyNumber_InPlaceTrueDivide), (:%,:PyNumber_InPlaceRemainder),
+                (:&,:PyNumber_InPlaceAnd), (:|,:PyNumber_InPlaceOr),
+                (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
+    qpy = QuoteNode(py)
+    @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
+        a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
+        PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
     end
 end
 

@@ -166,7 +166,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
-@compat TypeTuple{N} = Union{Type,NTuple{N, Type}}
+const TypeTuple = Union{Type,NTuple{N, Type}} where {N}
 include("pybuffer.jl")
 include("conversions.jl")
 include("pytype.jl")

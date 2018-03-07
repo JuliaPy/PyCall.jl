@@ -1,43 +1,6 @@
 environment:
   matrix:
 
-# Julia 0.5
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
-    PYTHONDIR: "C:\\Python27"
-    PYTHON: "C:\\Python27\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
-    PYTHONDIR: "C:\\Python33"
-    PYTHON: "C:\\Python33\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
-    PYTHONDIR: "C:\\Python34"
-    PYTHON: "C:\\Python34\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.5/julia-0.5-latest-win32.exe"
-    PYTHONDIR: "use_conda"
-    PYTHON: "use_conda"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-    PYTHONDIR: "C:\\Python27-x64"
-    PYTHON: "C:\\Python27-x64\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-    PYTHONDIR: "C:\\Python33-x64"
-    PYTHON: "C:\\Python33-x64\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-    PYTHONDIR: "C:\\Python34-x64"
-    PYTHON: "C:\\Python34-x64\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-    PYTHONDIR: "C:\\Python36-x64"
-    PYTHON: "C:\\Python36-x64\\python.exe"
-
-  - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x64/0.5/julia-0.5-latest-win64.exe"
-    PYTHONDIR: "use_conda"
-    PYTHON: "use_conda"
-
 # Julia 0.6
   - JULIA_URL: "https://julialang-s3.julialang.org/bin/winnt/x86/0.6/julia-0.6-latest-win32.exe"
     PYTHONDIR: "C:\\Python27"

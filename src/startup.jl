@@ -3,7 +3,7 @@
 # and if so do not use the deps.jl file, getting everything we need from the
 # current process instead.
 
-proc_handle = unsafe_load(@static (Compat.Sys.iswindows() || VERSION >= v"0.6.0-pre.beta.121") ? cglobal(:jl_exe_handle, Ptr{Void}) : cglobal(:jl_dl_handle, Ptr{Void}))
+proc_handle = unsafe_load(cglobal(:jl_exe_handle, Ptr{Void}))
 
 immutable Dl_info
     dli_fname::Ptr{UInt8}
