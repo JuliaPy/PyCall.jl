@@ -2,6 +2,8 @@ __precompile__()
 
 module PyCall
 
+using Compat
+
 export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
@@ -14,24 +16,19 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
-       unshift!, shift!, append!, insert!, prepend!, mimewritable
+       append!, insert!, prepend!, mimewritable, unsafe_convert
+import Compat: pushfirst!, popfirst!
 
-# Python C API is not interrupt-save.  In principle, we should
+# Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
 # should really be fixed in Julia (#2622).  However, we will
 # use the sigatomic_begin/end functions to protect pycall and
 # similar long-running (or potentially long-running) code.
 import Base: sigatomic_begin, sigatomic_end
 
-## Compatibility import for v0.5
-using Compat
 import Conda
-import Base.unsafe_convert
 import MacroTools   # because of issue #270
-
-if isdefined(Base, :Iterators)
-    import Base.Iterators: filter
-end
+import Base.Iterators: filter
 
 #########################################################################
 
@@ -47,7 +44,7 @@ include("startup.jl")
 # while we're at it.
 struct PyObject_struct
     ob_refcnt::Int
-    ob_type::Ptr{Void}
+    ob_type::Ptr{Cvoid}
 end
 
 const PyPtr = Ptr{PyObject_struct} # type for PythonObject* in ccall
@@ -71,7 +68,7 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(po, pydecref)
+        finalizer(pydecref, po)
         return po
     end
 end
@@ -93,13 +90,13 @@ someobject)`.   This procedure will properly handle Python's reference counting
 PyNULL() = PyObject(PyPtr_NULL)
 
 function pydecref(o::PyObject)
-    ccall(@pysym(:Py_DecRef), Void, (PyPtr,), o.o)
+    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o.o)
     o.o = PyPtr_NULL
     o
 end
 
 function pyincref_(o::PyPtr)
-    ccall((@pysym :Py_IncRef), Void, (PyPtr,), o)
+    ccall((@pysym :Py_IncRef), Cvoid, (PyPtr,), o)
     return o
 end
 
@@ -134,10 +131,10 @@ end
 pyisinstance(o::PyObject, t::PyObject) =
   t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
-pyisinstance(o::PyObject, t::Union{Ptr{Void},PyPtr}) =
+pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
-pyquery(q::Ptr{Void}, o::PyObject) =
+pyquery(q::Ptr{Cvoid}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
 
 # conversion to pass PyObject as ccall arguments:
@@ -347,19 +344,19 @@ end
     # during import.
 
     struct ACTIVATION_CONTEXT_BASIC_INFORMATION
-        handle::Ptr{Void}
+        handle::Ptr{Cvoid}
         dwFlags::UInt32
     end
     const ActivationContextBasicInformation = 1
     const QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS = 0x10
-    const PyActCtx = Ref{Ptr{Void}}(C_NULL)
+    const PyActCtx = Ref{Ptr{Cvoid}}(C_NULL)
 
     function ComputePyActCtx()
         if PyActCtx[] == C_NULL
             some_address_in_libpython = @pyglobal(:PyImport_ImportModule)
             ActCtxBasicInfo = Ref{ACTIVATION_CONTEXT_BASIC_INFORMATION}()
             succeeded = ccall(:QueryActCtxW,stdcall,Bool,
-                (UInt32,Ptr{Void},Ptr{Void},Culong,Ptr{Void},Csize_t,Ptr{Csize_t}),
+                (UInt32,Ptr{Cvoid},Ptr{Cvoid},Culong,Ptr{Cvoid},Csize_t,Ptr{Csize_t}),
                 QUERY_ACTCTX_FLAG_ACTCTX_IS_ADDRESS, some_address_in_libpython,
                 C_NULL, ActivationContextBasicInformation, ActCtxBasicInfo,
                 sizeof(ActCtxBasicInfo), C_NULL)
@@ -370,9 +367,9 @@ end
     end
 
     function ActivatePyActCtx()
-        cookie = Ref{Ptr{Void}}()
+        cookie = Ref{Ptr{Cvoid}}()
         succeeded = ccall(:ActivateActCtx,stdcall, Bool,
-                          (Ptr{Void}, Ptr{Ptr{Void}}),
+                          (Ptr{Cvoid}, Ptr{Ptr{Cvoid}}),
                           ComputePyActCtx(), cookie)
         @assert succeeded
         cookie[]
@@ -380,7 +377,7 @@ end
 
     function DeactivatePyActCtx(cookie)
         succeeded = ccall(:DeactivateActCtx, stdcall, Bool,
-                         (UInt32, Ptr{Void}), 0, cookie)
+                         (UInt32, Ptr{Cvoid}), 0, cookie)
         @assert succeeded
     end
 else
@@ -614,7 +611,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
         pyimport(modulename)
     catch e
         if conda
-            info("Installing $modulename via the Conda $condapkg package...")
+            @info "Installing $modulename via the Conda $condapkg package..."
             isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
@@ -622,7 +619,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
             aconda = anaconda_conda()
             if !isempty(aconda)
                 try
-                    info("Installing $modulename via Anaconda's $aconda...")
+                    @info "Installing $modulename via Anaconda's $aconda..."
                     isempty(channel) || run(`$aconda config --add channels $channel --force`)
                     run(`$aconda install -y $condapkg`)
                 catch e2
@@ -797,7 +794,7 @@ function splice!(a::PyObject, i::Integer)
 end
 
 pop!(a::PyObject) = splice!(a, length(a))
-shift!(a::PyObject) = splice!(a, 1)
+popfirst!(a::PyObject) = splice!(a, 1)
 
 function empty!(a::PyObject)
     for i in length(a):-1:1
@@ -819,7 +816,7 @@ function insert!(a::PyObject, i::Integer, item)
     a
 end
 
-unshift!(a::PyObject, item) = insert!(a, 1, item)
+pushfirst!(a::PyObject, item) = insert!(a, 1, item)
 
 function prepend!(a::PyObject, items)
     if isa(items,PyObject) && items.o == a.o
@@ -880,10 +877,7 @@ end
 #########################################################################
 # Expose Python docstrings to the Julia doc system
 
-if isdefined(Docs, :getdoc)  # Introduced in Julia .6
-    Docs.getdoc(o::PyObject) = Text(String(o["__doc__"]))
-end
-
+Docs.getdoc(o::PyObject) = Text(String(o["__doc__"]))
 
 #########################################################################
 

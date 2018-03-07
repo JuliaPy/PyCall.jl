@@ -7,7 +7,7 @@
 # mirror of Py_buffer struct in Python Include/object.h
 
 struct Py_buffer
-    buf::Ptr{Void}
+    buf::Ptr{Cvoid}
     obj::PyPtr
     len::Cssize_t
     itemsize::Cssize_t
@@ -21,9 +21,9 @@ struct Py_buffer
 
     # some opaque padding fields to account for differences between
     # Python versions (the structure changed in Python 2.7 and 3.3)
-    internal0::Ptr{Void}
-    internal1::Ptr{Void}
-    internal2::Ptr{Void}
+    internal0::Ptr{Cvoid}
+    internal1::Ptr{Cvoid}
+    internal2::Ptr{Cvoid}
 end
 
 mutable struct PyBuffer
@@ -32,7 +32,7 @@ mutable struct PyBuffer
         b = new(Py_buffer(C_NULL, C_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
-        finalizer(b, pydecref)
+        finalizer(pydecref, b)
         return b
     end
 end
@@ -41,7 +41,7 @@ function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
-    ccall(@pysym(:PyBuffer_Release), Void, (Any,), o)
+    ccall(@pysym(:PyBuffer_Release), Cvoid, (Any,), o)
     o
 end
 

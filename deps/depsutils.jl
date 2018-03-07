@@ -1,3 +1,5 @@
+import Compat.Libdl
+
 hassym(lib, sym) = Libdl.dlsym_e(lib, sym) != C_NULL
 
 # call dlsym_e on a sequence of symbols and return the symbol that gives
@@ -20,9 +22,9 @@ end
 function Py_SetPythonHome(libpy, PYTHONHOME, wPYTHONHOME, pyversion)
     if !isempty(PYTHONHOME)
         if pyversion.major < 3
-            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Void, (Cstring,), PYTHONHOME)
+            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Cstring,), PYTHONHOME)
         else
-            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Void, (Ptr{Cwchar_t},), wPYTHONHOME)
+            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},), wPYTHONHOME)
         end
     end
 end

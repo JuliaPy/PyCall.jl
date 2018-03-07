@@ -20,7 +20,7 @@ PyObject(c::Complex) = PyObject(@pycheckn ccall((@pysym :PyComplex_FromDoubles),
                                                 PyPtr, (Cdouble,Cdouble),
                                                 real(c), imag(c)))
 
-PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
+PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
@@ -53,7 +53,7 @@ function convert(::Type{T}, po_::PyObject) where T<:Complex
             end)
 end
 
-convert(::Type{Void}, po::PyObject) = nothing
+convert(::Type{Nothing}, po::PyObject) = nothing
 
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
@@ -111,23 +111,23 @@ end
 
 PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
-function convert(::Type{Ptr{Void}}, po::PyObject)
+function convert(::Type{Ptr{Cvoid}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
-        pynothing_query(v) == Void ? C_NULL :
-          convert(Ptr{Void}, convert(UInt, po["value"]))
+        pynothing_query(v) == Nothing ? C_NULL :
+          convert(Ptr{Cvoid}, convert(UInt, po["value"]))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
-                       Ptr{Void}, (PyPtr,Ptr{UInt8}),
+                       Ptr{Cvoid}, (PyPtr,Ptr{UInt8}),
                        po, ccall((@pysym :PyCapsule_GetName),
                                  Ptr{UInt8}, (PyPtr,), po))
     else
-        convert(Ptr{Void}, convert(UInt, po))
+        convert(Ptr{Cvoid}, convert(UInt, po))
     end
 end
 
-pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Void} : Union{}
+pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Cvoid} : Union{}
 
 #########################################################################
 # for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
@@ -136,7 +136,7 @@ pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, 
 
 # I want to use a union, but this seems to confuse Julia's method
 # dispatch for the convert function in some circumstances
-# const PyAny = Union{PyObject, Int, Bool, Float64, Complex128, AbstractString, Function, Dict, Tuple, Array}
+# const PyAny = Union{PyObject, Int, Bool, Float64, ComplexF64, AbstractString, Function, Dict, Tuple, Array}
 abstract type PyAny end
 
 function pyany_toany(T::Type)
@@ -263,13 +263,13 @@ function splice!(a::PyVector{T}, indices::AbstractVector{I}) where {T,I<:Integer
     v
 end
 pop!(a::PyVector) = pop!(a.o)
-shift!(a::PyVector) = shift!(a.o)
+popfirst!(a::PyVector) = popfirst!(a.o)
 empty!(a::PyVector) = empty!(a.o)
 
 # only works for List subtypes:
 push!(a::PyVector, item) = push!(a.o, item)
 insert!(a::PyVector, i::Integer, item) = insert!(a.o, i, item)
-unshift!(a::PyVector, item) = unshift!(a.o, item)
+pushfirst!(a::PyVector, item) = pushfirst!(a.o, item)
 prepend!(a::PyVector, items) = prepend!(a.o, items)
 append!(a::PyVector{T}, items) where {T} = PyVector{T}(append!(a.o, items))
 
@@ -374,7 +374,7 @@ end
 
 function py2array(T, o::PyObject)
     dims = pyarray_dims(o)
-    A = Array{pyany_toany(T)}(dims)
+    A = Array{pyany_toany(T)}(uninitialized, dims)
     py2array(T, A, o, 1, 1)
 end
 
@@ -385,7 +385,7 @@ function convert(::Type{Vector{T}}, o::PyObject) where T
         pyerr_clear()
         throw(ArgumentError("expected Python sequence"))
     end
-    py2array(T, Array{pyany_toany(T)}(len), o, 1, 1)
+    py2array(T, Array{pyany_toany(T)}(uninitialized, len), o, 1, 1)
 end
 
 convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
@@ -415,7 +415,7 @@ This returns a PyDict, which is a no-copy wrapper around a Python dictionary.
 
 Alternatively, you can specify the return type of a `pycall` as PyDict.
 """
-mutable struct PyDict{K,V,isdict} <: Associative{K,V}
+mutable struct PyDict{K,V,isdict} <: AbstractDict{K,V}
     o::PyObject
     # isdict = true for python dict, otherwise is a generic Mapping object
 
@@ -433,10 +433,10 @@ PyDict{K,V}() where {K,V} = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :P
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
 PyObject(d::PyDict) = d.o
 PyDict() = PyDict{PyAny,PyAny}()
-PyDict(d::Associative{K,V}) where {K,V} = PyDict{K,V}(PyObject(d))
-PyDict(d::Associative{Any,Any}) = PyDict{PyAny,PyAny}(PyObject(d))
-PyDict(d::Associative{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
-PyDict(d::Associative{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
+PyDict(d::AbstractDict{K,V}) where {K,V} = PyDict{K,V}(PyObject(d))
+PyDict(d::AbstractDict{Any,Any}) = PyDict{PyAny,PyAny}(PyObject(d))
+PyDict(d::AbstractDict{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
+PyDict(d::AbstractDict{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
@@ -495,7 +495,7 @@ function delete!(d::PyDict{K,V,false}, k) where {K,V}
 end
 
 function empty!(d::PyDict{K,V,true}) where {K,V}
-    @pycheck ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
+    @pycheck ccall((@pysym :PyDict_Clear), Cvoid, (PyPtr,), d)
     return d
 end
 function empty!(d::PyDict{K,V,false}) where {K,V}
@@ -547,7 +547,7 @@ end
 #########################################################################
 # Dictionary conversions (copies)
 
-function PyObject(d::Associative)
+function PyObject(d::AbstractDict)
     o = PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ()))
     for k in keys(d)
         @pycheckz ccall((@pysym :PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
@@ -655,7 +655,7 @@ const LongInt = @static (Sys.WORD_SIZE==32) ? Union{Int64,UInt64,Int128,UInt128,
 
 function PyObject(i::LongInt)
     PyObject(@pycheckn ccall((@pysym :PyLong_FromString), PyPtr,
-                             (Ptr{UInt8}, Ptr{Void}, Cint),
+                             (Ptr{UInt8}, Ptr{Cvoid}, Cint),
                              String(string(i)), C_NULL, 10))
 end
 
@@ -687,7 +687,7 @@ pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
 pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : Union{}
 
 pycomplex_query(o::PyObject) =
-    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? Complex128 : Union{}
+    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? ComplexF64 : Union{}
 
 pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? String : Union{}
 
@@ -695,7 +695,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? Abst
 # we never automatically convert to Function.
 pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = o.o == pynothing[] ? Void : Union{}
+pynothing_query(o::PyObject) = o.o == pynothing[] ? Nothing : Union{}
 
 # We refrain from converting all objects that support the mapping protocol (PyMapping_Check)
 # to avoid converting types like Pandas `DataFrame` that are only lossily
@@ -741,7 +741,7 @@ macro return_not_None(ex)
     end
 end
 
-const pytype_queries = Array{Tuple{PyObject,Type}}(0)
+const pytype_queries = Tuple{PyObject,Type}[]
 """
     pytype_mapping(pytype, jltype)
 

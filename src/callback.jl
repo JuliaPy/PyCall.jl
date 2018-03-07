@@ -15,7 +15,7 @@ function pymethod(f::Function, name::AbstractString, flags::Integer)
     def = gensym("PyMethodDef")
     @eval const $def = PyMethodDef[PyMethodDef($name, $f, $flags)]
     PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
-                             (Ptr{PyMethodDef}, Ptr{Void}, Ptr{Void}),
+                             (Ptr{PyMethodDef}, Ptr{Cvoid}, Ptr{Cvoid}),
                              eval(def), C_NULL, C_NULL))
 end
 
@@ -37,28 +37,18 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
     try
         jlargs = julia_args(f, args)
 
-        # on 0.6 we need to use invokelatest to get execution in newest world
-        @static if isdefined(Base, :invokelatest)
-            if kw_ == C_NULL
-                ret = PyObject(Base.invokelatest(f, jlargs...))
-            else
-                kw = PyDict{Symbol,PyObject}(pyincref(kw_))
-                kwargs = [ (k,julia_kwarg(f,k,v)) for (k,v) in kw ]
+        # we need to use invokelatest to get execution in newest world
+        if kw_ == C_NULL
+            ret = PyObject(Base.invokelatest(f, jlargs...))
+        else
+            kw = PyDict{Symbol,PyObject}(pyincref(kw_))
+            kwargs = [ (k,julia_kwarg(f,k,v)) for (k,v) in kw ]
 
-                # 0.6 `invokelatest` doesn't support kwargs, instead
-                # use a closure over kwargs. see:
-                #   https://github.com/JuliaLang/julia/pull/22646
-                f_kw_closure() = f(jlargs...; kwargs...)
-                ret = PyObject(Core._apply_latest(f_kw_closure))
-            end
-        else # 0.5 support
-            if kw_ == C_NULL
-                ret = PyObject(f(jlargs...))
-            else
-                kw = PyDict{Symbol,PyAny}(pyincref(kw_))
-                kwargs = [ (k,julia_kwarg(f,k,v)) for (k,v) in kw ]
-                ret = PyObject(f(jlargs...; kwargs...))
-            end
+            # 0.6 `invokelatest` doesn't support kwargs, instead
+            # use a closure over kwargs. see:
+            #   https://github.com/JuliaLang/julia/pull/22646
+            f_kw_closure() = f(jlargs...; kwargs...)
+            ret = PyObject(Core._apply_latest(f_kw_closure))
         end
 
         return pystealref!(ret)

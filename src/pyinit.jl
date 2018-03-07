@@ -34,19 +34,19 @@ function __init__()
         Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion)
         if !isempty(pyprogramname)
             if pyversion.major < 3
-                ccall((@pysym :Py_SetProgramName), Void, (Cstring,), pyprogramname)
+                ccall((@pysym :Py_SetProgramName), Cvoid, (Cstring,), pyprogramname)
             else
-                ccall((@pysym :Py_SetProgramName), Void, (Ptr{Cwchar_t},), wpyprogramname)
+                ccall((@pysym :Py_SetProgramName), Cvoid, (Ptr{Cwchar_t},), wpyprogramname)
             end
         end
-        ccall((@pysym :Py_InitializeEx), Void, (Cint,), 0)
+        ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
     end
 
     # Will get reinitialized properly on first use
     Compat.Sys.iswindows() && (PyActCtx[] = C_NULL)
 
     # Make sure python wasn't upgraded underneath us
-    new_pyversion = convert(VersionNumber, split(unsafe_string(ccall(@pysym(:Py_GetVersion),
+    new_pyversion = VersionNumber(split(unsafe_string(ccall(@pysym(:Py_GetVersion),
                                Ptr{UInt8}, ())))[1])
 
     if new_pyversion.major != pyversion.major
@@ -89,11 +89,11 @@ function __init__()
         # some modules (e.g. IPython) expect sys.argv to be set
         @static if VERSION >= v"0.7.0-DEV.1963"
             ref0 = Ref{UInt32}(0)
-            Base.@gc_preserve ref0 ccall(@pysym(:PySys_SetArgvEx), Void,
-                                         (Cint, Ref{Ptr{Void}}, Cint),
+            GC.@preserve ref0 ccall(@pysym(:PySys_SetArgvEx), Cvoid,
+                                         (Cint, Ref{Ptr{Cvoid}}, Cint),
                                          1, pointer_from_objref(ref0), 0)
         else
-            ccall(@pysym(:PySys_SetArgvEx), Void, (Cint, Ptr{Cwstring}, Cint),
+            ccall(@pysym(:PySys_SetArgvEx), Cvoid, (Cint, Ptr{Cwstring}, Cint),
                   1, [""], 0)
         end
 

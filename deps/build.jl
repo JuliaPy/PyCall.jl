@@ -6,7 +6,7 @@
 # will probably need to re-run Pkg.build("PyCall").
 
 using Compat
-import Conda
+import Conda, Compat.Libdl
 
 struct UseCondaPython <: Exception end
 
@@ -53,9 +53,9 @@ function find_libpython(python::AbstractString)
     v = pyconfigvar(python,"VERSION","")
     libs = [ dlprefix*"python"*v, dlprefix*"python" ]
     lib = pyconfigvar(python, "LIBRARY")
-    lib != "None" && unshift!(libs, splitext(lib)[1])
+    lib != "None" && pushfirst!(libs, splitext(lib)[1])
     lib = pyconfigvar(python, "LDLIBRARY")
-    lib != "None" && unshift!(unshift!(libs, basename(lib)), lib)
+    lib != "None" && pushfirst!(pushfirst!(libs, basename(lib)), lib)
     libs = unique(libs)
 
     # it is ridiculous that it is this hard to find the path of libpython
@@ -106,13 +106,13 @@ function find_libpython(python::AbstractString)
     end
 
     if "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no") # print out extra info to help with remote debugging
-        println(STDERR, "------------------------------------- exceptions -----------------------------------------")
+        println(stderr, "------------------------------------- exceptions -----------------------------------------")
         for s in error_strings
             print(s, "\n\n")
         end
-        println(STDERR, "---------------------------------- get_config_vars ---------------------------------------")
-        print(STDERR, read(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`, String))
-        println(STDERR, "--------------------------------- directory contents -------------------------------------")
+        println(stderr, "---------------------------------- get_config_vars ---------------------------------------")
+        print(stderr, read(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`, String))
+        println(stderr, "--------------------------------- directory contents -------------------------------------")
         for libpath in libpaths
             if isdir(libpath)
                 print(libpath, ":\n")
@@ -123,7 +123,7 @@ function find_libpython(python::AbstractString)
                 end
             end
         end
-        println(STDERR, "------------------------------------------------------------------------------------------")
+        println(stderr, "------------------------------------------------------------------------------------------")
     end
 
     error("""
@@ -150,10 +150,10 @@ wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
 # problems in the unlikely event of read-only directories.
 function writeifchanged(filename, str)
     if !isfile(filename) || read(filename, String) != str
-        info(abspath(filename), " has been updated")
+        @info string(abspath(filename), " has been updated")
         write(filename, str)
     else
-        info(abspath(filename), " has not changed")
+        @info string(abspath(filename), " has not changed")
     end
 end
 
@@ -161,7 +161,7 @@ try # make sure deps.jl file is removed on error
     python = try
         let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
                      (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
-            vers = isempty(py) ? v"0.0" : convert(VersionNumber, pyconfigvar(py,"VERSION","0.0"))
+            vers = isempty(py) ? v"0.0" : VersionNumber(pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
                 if isempty(py)
                     throw(UseCondaPython())
@@ -182,10 +182,10 @@ try # make sure deps.jl file is removed on error
     catch e1
         if Sys.ARCH in (:i686, :x86_64)
             if isa(e1, UseCondaPython)
-                info("Using the Python distribution in the Conda package by default.\n",
+                @info string("Using the Python distribution in the Conda package by default.\n",
                      "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
             else
-                info( "No system-wide Python was found; got the following error:\n",
+                @info string( "No system-wide Python was found; got the following error:\n",
                       "$e1\nusing the Python distribution in the Conda package")
             end
             abspath(Conda.PYTHONDIR, "python" * (Compat.Sys.iswindows() ? ".exe" : ""))
@@ -222,7 +222,7 @@ try # make sure deps.jl file is removed on error
     # cache the Python version as a Julia VersionNumber
     pyversion = VersionNumber(pyvar(python, "platform", "python_version()"))
 
-    info("PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name")
+    @info "PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name"
 
     if pyversion < v"2.7"
         error("Python 2.7 or later is required for PyCall")

@@ -1,8 +1,11 @@
+using Compat.Serialization
+import Compat.Serialization: serialize, deserialize
+
 const _pickle = PyNULL()
 
 pickle() = _pickle.o == C_NULL ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
 
-function Base.serialize(s::AbstractSerializer, pyo::PyObject)
+function serialize(s::AbstractSerializer, pyo::PyObject)
     Serializer.serialize_type(s, PyObject)
     if pyo.o == C_NULL
         serialize(s, pyo.o)
@@ -24,7 +27,7 @@ pybytes(b::Union{String,Array{UInt8}}) = PyObject(@pycheckn ccall(@pysym(PyStrin
                                                   PyPtr, (Ptr{UInt8}, Int),
                                                   b, sizeof(b)))
 
-function Base.deserialize(s::AbstractSerializer, t::Type{PyObject})
+function deserialize(s::AbstractSerializer, t::Type{PyObject})
     b = deserialize(s)
     if isa(b, PyPtr)
         @assert b == C_NULL
