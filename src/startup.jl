@@ -5,7 +5,7 @@
 
 proc_handle = unsafe_load(cglobal(:jl_exe_handle, Ptr{Void}))
 
-immutable Dl_info
+struct Dl_info
     dli_fname::Ptr{UInt8}
     dli_fbase::Ptr{Void}
     dli_sname::Ptr{UInt8}

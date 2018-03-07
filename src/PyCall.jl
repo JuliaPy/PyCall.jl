@@ -45,7 +45,7 @@ include("startup.jl")
 # C API for everything.  However, we need to define a unique Ptr type
 # for PyObject*, and we might as well define the actual struct layout
 # while we're at it.
-immutable PyObject_struct
+struct PyObject_struct
     ob_refcnt::Int
     ob_type::Ptr{Void}
 end
@@ -67,7 +67,7 @@ Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute` in Python, w
 
 Given `o::PyObject`, `get(o, key)` is equivalent to `o[key]` in Python, with automatic type conversion.
 """
-type PyObject
+mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
@@ -346,7 +346,7 @@ end
     # PyImport_ImportModule, since extensions are most likely to be loaded
     # during import.
 
-    immutable ACTIVATION_CONTEXT_BASIC_INFORMATION
+    struct ACTIVATION_CONTEXT_BASIC_INFORMATION
         handle::Ptr{Void}
         dwFlags::UInt32
     end
@@ -709,7 +709,7 @@ pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
     return convert(PyAny, _pycall(o, args...; kwargs...))
 
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-(::Type{PyAny})(o::PyObject) = convert(PyAny, o)
+PyAny(o::PyObject) = convert(PyAny, o)
 
 
 """

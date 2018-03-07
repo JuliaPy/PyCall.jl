@@ -28,7 +28,7 @@ end
 done(po::PyObject, s) = s[1].o == C_NULL
 
 # issue #216
-function Base.collect{T}(::Type{T}, o::PyObject)
+function Base.collect(::Type{T}, o::PyObject) where T
     a = Array{T}(0)
     for x in o
         push!(a, x)

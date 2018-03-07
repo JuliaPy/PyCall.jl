@@ -8,7 +8,7 @@
 using Compat
 import Conda
 
-immutable UseCondaPython <: Exception end
+struct UseCondaPython <: Exception end
 
 #########################################################################
 

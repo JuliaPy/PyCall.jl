@@ -28,21 +28,21 @@ PyObject(n::Void) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 # the item() method before passing to the Python API conversion functions
 asscalar(o::PyObject) = pyisinstance(o, npy_number) ? pycall(o["item"], PyObject) : o
 
-convert{T<:Integer}(::Type{T}, po::PyObject) =
+convert(::Type{T}, po::PyObject) where {T<:Integer} =
   convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
 
 if Sys.WORD_SIZE == 32
-  convert{T<:Union{Int64,UInt64}}(::Type{T}, po::PyObject) =
+  convert(::Type{T}, po::PyObject) where {T<:Union{Int64,UInt64}} =
     @pycheck(ccall((@pysym :PyLong_AsLongLong), UInt64, (PyPtr,), asscalar(po))) % T
 end
 
 convert(::Type{Bool}, po::PyObject) =
     0 != @pycheck ccall(@pysym(:PyObject_IsTrue), Cint, (PyPtr,), po)
 
-convert{T<:Real}(::Type{T}, po::PyObject) =
+convert(::Type{T}, po::PyObject) where {T<:Real} =
   convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), asscalar(po)))
 
-function convert{T<:Complex}(::Type{T}, po_::PyObject)
+function convert(::Type{T}, po_::PyObject) where T<:Complex
     po = asscalar(po_)
     convert(T,
             begin
@@ -71,7 +71,7 @@ end
 
 const _ps_ptr= Ptr{UInt8}[C_NULL]
 const _ps_len = Int[0]
-function convert{T<:AbstractString}(::Type{T}, po::PyObject)
+function convert(::Type{T}, po::PyObject) where T<:AbstractString
     if pyisinstance(po, @pyglobalobj :PyUnicode_Type)
         convert(T, PyObject(@pycheckn ccall(@pysym(PyUnicode_AsUTF8String),
                                              PyPtr, (PyPtr,), po)))
@@ -143,7 +143,7 @@ function pyany_toany(T::Type)
     T === Vararg{PyAny} ? Vararg{Any} : T
 end
 pyany_toany(::Type{PyAny}) = Any
-pyany_toany{T<:Tuple}(t::Type{T}) = Tuple{map(pyany_toany, t.types)...}
+pyany_toany(t::Type{T}) where {T<:Tuple} = Tuple{map(pyany_toany, t.types)...}
 
 # PyAny acts like Any for conversions, except for converting PyObject (below)
 convert(::Type{PyAny}, x) = x
@@ -186,7 +186,7 @@ tuptype(T::UnionAll,isva,i) = tuptype(T.body,isva,i)
 isvatuple(T::UnionAll) = isvatuple(T.body)
 isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameters[end])
 
-function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
+function convert(tt::Type{T}, o::PyObject) where T<:Tuple
     isva = isvatuple(T)
     len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if !istuplen(tt, isva, len)
@@ -199,7 +199,7 @@ function convert{T<:Tuple}(tt::Type{T}, o::PyObject)
            len)
 end
 
-function convert{K,V}(::Type{Pair{K,V}}, o::PyObject)
+function convert(::Type{Pair{K,V}}, o::PyObject) where {K,V}
     k, v = convert(Tuple{K,V}, o)
     return Pair(k, v)
 end
@@ -214,9 +214,9 @@ This returns a PyVector object, which is a wrapper around an arbitrary Python li
 
 Alternatively, `PyVector` can be used as the return type for a `pycall` that returns a sequence object (including tuples).
 """
-type PyVector{T} <: AbstractVector{T}
+mutable struct PyVector{T} <: AbstractVector{T}
     o::PyObject
-    function (::Type{PyVector{T}}){T}(o::PyObject)
+    function PyVector{T}(o::PyObject) where T
         if o.o == C_NULL
             throw(ArgumentError("cannot make PyVector from NULL PyObject"))
         end
@@ -227,23 +227,23 @@ end
 PyVector(o::PyObject) = PyVector{PyAny}(o)
 PyObject(a::PyVector) = a.o
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
-convert{T}(::Type{PyVector{T}}, o::PyObject) = PyVector{T}(o)
+convert(::Type{PyVector{T}}, o::PyObject) where {T} = PyVector{T}(o)
 unsafe_convert(::Type{PyPtr}, a::PyVector) = a.o.o
 PyVector(a::PyVector) = a
-PyVector{T}(a::AbstractVector{T}) = PyVector{T}(array2py(a))
+PyVector(a::AbstractVector{T}) where {T} = PyVector{T}(array2py(a))
 
 # when a PyVector is copied it is converted into an ordinary Julia Vector
 similar(a::PyVector, T, dims::Dims) = Array{T}(dims)
-similar{T}(a::PyVector{T}) = similar(a, pyany_toany(T), size(a))
-similar{T}(a::PyVector{T}, dims::Dims) = similar(a, pyany_toany(T), dims)
-similar{T}(a::PyVector{T}, dims::Int...) = similar(a, pyany_toany(T), dims)
-eltype{T}(::PyVector{T}) = pyany_toany(T)
-eltype{T}(::Type{PyVector{T}}) = pyany_toany(T)
+similar(a::PyVector{T}) where {T} = similar(a, pyany_toany(T), size(a))
+similar(a::PyVector{T}, dims::Dims) where {T} = similar(a, pyany_toany(T), dims)
+similar(a::PyVector{T}, dims::Int...) where {T} = similar(a, pyany_toany(T), dims)
+eltype(::PyVector{T}) where {T} = pyany_toany(T)
+eltype(::Type{PyVector{T}}) where {T} = pyany_toany(T)
 
 size(a::PyVector) = (length(a.o),)
 
 getindex(a::PyVector) = getindex(a, 1)
-getindex{T}(a::PyVector{T}, i::Integer) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
+getindex(a::PyVector{T}, i::Integer) where {T} = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
 
 setindex!(a::PyVector, v) = setindex!(a, v, 1)
 function setindex!(a::PyVector, v, i::Integer)
@@ -251,11 +251,11 @@ function setindex!(a::PyVector, v, i::Integer)
     v
 end
 
-summary{T}(a::PyVector{T}) = string(Base.dims2string(size(a)), " ",
-                                   string(pyany_toany(T)), " PyVector")
+summary(a::PyVector{T}) where {T} = string(Base.dims2string(size(a)), " ",
+                                          string(pyany_toany(T)), " PyVector")
 
 splice!(a::PyVector, i::Integer) = splice!(a.o, i)
-function splice!{T,I<:Integer}(a::PyVector{T}, indices::AbstractVector{I})
+function splice!(a::PyVector{T}, indices::AbstractVector{I}) where {T,I<:Integer}
     v = pyany_toany(T)[a[i] for i in indices]
     for i in sort(indices, rev=true)
         @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
@@ -271,14 +271,14 @@ push!(a::PyVector, item) = push!(a.o, item)
 insert!(a::PyVector, i::Integer, item) = insert!(a.o, i, item)
 unshift!(a::PyVector, item) = unshift!(a.o, item)
 prepend!(a::PyVector, items) = prepend!(a.o, items)
-append!{T}(a::PyVector{T}, items) = PyVector{T}(append!(a.o, items))
+append!(a::PyVector{T}, items) where {T} = PyVector{T}(append!(a.o, items))
 
 #########################################################################
 # Lists and 1d arrays.
 
 # recursive conversion of A to a list of list of lists... starting
 # with dimension dim and index i in A.
-function array2py{T, N}(A::AbstractArray{T, N}, dim::Integer, i::Integer)
+function array2py(A::AbstractArray{T, N}, dim::Integer, i::Integer) where {T, N}
     if dim > N
         return PyObject(A[i])
     elseif dim == N # special case last dim to coarsen recursion leaves
@@ -312,8 +312,8 @@ PyObject(A::AbstractArray) =
    ndims(A) <= 1 || method_exists(stride, Tuple{typeof(A),Int}) ? array2py(A) :
    pyjlwrap_new(A)
 
-function py2array{TA,N}(T, A::Array{TA,N}, o::PyObject,
-                        dim::Integer, i::Integer)
+function py2array(T, A::Array{TA,N}, o::PyObject,
+                  dim::Integer, i::Integer) where {TA,N}
     if dim > N
         A[i] = convert(T, o)
         return A
@@ -378,7 +378,7 @@ function py2array(T, o::PyObject)
     py2array(T, A, o, 1, 1)
 end
 
-function convert{T}(::Type{Vector{T}}, o::PyObject)
+function convert(::Type{Vector{T}}, o::PyObject) where T
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if len < 0 || # not a sequence
        len+1 < 0  # object pretending to be a sequence of infinite length
@@ -389,7 +389,7 @@ function convert{T}(::Type{Vector{T}}, o::PyObject)
 end
 
 convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
-convert{T}(::Type{Array{T}}, o::PyObject) = py2array(T, o)
+convert(::Type{Array{T}}, o::PyObject) where {T} = py2array(T, o)
 
 PyObject(a::BitArray) = PyObject(Array(a))
 
@@ -415,11 +415,11 @@ This returns a PyDict, which is a no-copy wrapper around a Python dictionary.
 
 Alternatively, you can specify the return type of a `pycall` as PyDict.
 """
-type PyDict{K,V,isdict} <: Associative{K,V}
+mutable struct PyDict{K,V,isdict} <: Associative{K,V}
     o::PyObject
     # isdict = true for python dict, otherwise is a generic Mapping object
 
-    function (::Type{PyDict{K,V,isdict}}){K,V,isdict}(o::PyObject)
+    function PyDict{K,V,isdict}(o::PyObject) where {K,V,isdict}
         if o.o != C_NULL && !is_mapping_object(o)
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
@@ -427,34 +427,34 @@ type PyDict{K,V,isdict} <: Associative{K,V}
     end
 end
 
-(::Type{PyDict{K,V}}){K,V}(o::PyObject) = PyDict{K,V,pyisinstance(o, @pyglobalobj :PyDict_Type)}(o)
-(::Type{PyDict{K,V}}){K,V}() = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())))
+PyDict{K,V}(o::PyObject) where {K,V} = PyDict{K,V,pyisinstance(o, @pyglobalobj :PyDict_Type)}(o)
+PyDict{K,V}() where {K,V} = PyDict{K,V,true}(PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ())))
 
 PyDict(o::PyObject) = PyDict{PyAny,PyAny}(o)
 PyObject(d::PyDict) = d.o
 PyDict() = PyDict{PyAny,PyAny}()
-PyDict{K,V}(d::Associative{K,V}) = PyDict{K,V}(PyObject(d))
+PyDict(d::Associative{K,V}) where {K,V} = PyDict{K,V}(PyObject(d))
 PyDict(d::Associative{Any,Any}) = PyDict{PyAny,PyAny}(PyObject(d))
-PyDict{V}(d::Associative{Any,V}) = PyDict{PyAny,V}(PyObject(d))
-PyDict{K}(d::Associative{K,Any}) = PyDict{K,PyAny}(PyObject(d))
+PyDict(d::Associative{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
+PyDict(d::Associative{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
-convert{K,V}(::Type{PyDict{K,V}}, o::PyObject) = PyDict{K,V}(o)
+convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
-haskey{K,V}(d::PyDict{K,V,true}, key) = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
-keys{T,K,V}(::Type{T}, d::PyDict{K,V,true}) = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
-values{T,K,V}(::Type{T}, d::PyDict{K,V,true}) = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
+haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
+keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
+values(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
 
-keys{T,K,V}(::Type{T}, d::PyDict{K,V,false}) = convert(Vector{T}, pycall(d.o["keys"], PyObject))
-values{T,K,V}(::Type{T}, d::PyDict{K,V,false}) = convert(Vector{T}, pycall(d.o["values"], PyObject))
-haskey{K,V}(d::PyDict{K,V,false}, key) = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
+keys(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["keys"], PyObject))
+values(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["values"], PyObject))
+haskey(d::PyDict{K,V,false}, key) where {K,V} = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
 
-similar{K,V}(d::PyDict{K,V}) = Dict{pyany_toany(K),pyany_toany(V)}()
-eltype{K,V}(::Type{PyDict{K,V}}) = Pair{pyany_toany(K),pyany_toany(V)}
-Base.keytype{K,V}(::PyDict{K,V}) = pyany_toany(K)
-Base.valtype{K,V}(::PyDict{K,V}) = pyany_toany(V)
-Base.keytype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(K)
-Base.valtype{K,V}(::Type{PyDict{K,V}}) = pyany_toany(V)
+similar(d::PyDict{K,V}) where {K,V} = Dict{pyany_toany(K),pyany_toany(V)}()
+eltype(::Type{PyDict{K,V}}) where {K,V} = Pair{pyany_toany(K),pyany_toany(V)}
+Base.keytype(::PyDict{K,V}) where {K,V} = pyany_toany(K)
+Base.valtype(::PyDict{K,V}) where {K,V} = pyany_toany(V)
+Base.keytype(::Type{PyDict{K,V}}) where {K,V} = pyany_toany(K)
+Base.valtype(::Type{PyDict{K,V}}) where {K,V} = pyany_toany(V)
 
 function setindex!(d::PyDict, v, k)
     @pycheckz ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
@@ -462,14 +462,14 @@ function setindex!(d::PyDict, v, k)
     v
 end
 
-get{K,V}(d::PyDict{K,V}, k, default) = get(d.o, V, k, default)
+get(d::PyDict{K,V}, k, default) where {K,V} = get(d.o, V, k, default)
 
-function pop!{K,V}(d::PyDict{K,V,true}, k)
+function pop!(d::PyDict{K,V,true}, k) where {K,V}
     v = d[k]
     @pycheckz ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     return v
 end
-function pop!{K,V}(d::PyDict{K,V,false}, k)
+function pop!(d::PyDict{K,V,false}, k) where {K,V}
     v = d[k]
     @pycheckz ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     return v
@@ -483,22 +483,22 @@ function pop!(d::PyDict, k, default)
     end
 end
 
-function delete!{K,V}(d::PyDict{K,V,true}, k)
+function delete!(d::PyDict{K,V,true}, k) where {K,V}
     e = ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     e == -1 && pyerr_clear() # delete! ignores errors in Julia
     return d
 end
-function delete!{K,V}(d::PyDict{K,V,false}, k)
+function delete!(d::PyDict{K,V,false}, k) where {K,V}
     e = ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     e == -1 && pyerr_clear() # delete! ignores errors in Julia
     return d
 end
 
-function empty!{K,V}(d::PyDict{K,V,true})
+function empty!(d::PyDict{K,V,true}) where {K,V}
     @pycheck ccall((@pysym :PyDict_Clear), Void, (PyPtr,), d)
     return d
 end
-function empty!{K,V}(d::PyDict{K,V,false})
+function empty!(d::PyDict{K,V,false}) where {K,V}
     # for generic Mapping items we must delete keys one by one
     for k in keys(d)
         delete!(d, k)
@@ -506,12 +506,12 @@ function empty!{K,V}(d::PyDict{K,V,false})
     return d
 end
 
-length{K,V}(d::PyDict{K,V,true}) = @pycheckz ccall(@pysym(:PyDict_Size), Int, (PyPtr,), d)
-length{K,V}(d::PyDict{K,V,false}) = @pycheckz ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d)
+length(d::PyDict{K,V,true}) where {K,V} = @pycheckz ccall(@pysym(:PyDict_Size), Int, (PyPtr,), d)
+length(d::PyDict{K,V,false}) where {K,V} = @pycheckz ccall(@pysym(:PyObject_Size), Int, (PyPtr,), d)
 isempty(d::PyDict) = length(d) == 0
 
 
-immutable PyDict_Iterator
+struct PyDict_Iterator
     # arrays to pass key, value, and pos pointers to PyDict_Next
     ka::Ref{PyPtr}
     va::Ref{PyPtr}
@@ -519,9 +519,9 @@ immutable PyDict_Iterator
     i::Int # current position in items list (0-based)
     len::Int # length of items list
 end
-start{K,V}(d::PyDict{K,V,true}) = PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))
-done{K,V}(d::PyDict{K,V,true}, itr::PyDict_Iterator) = itr.i >= itr.len
-function next{K,V}(d::PyDict{K,V,true}, itr::PyDict_Iterator)
+start(d::PyDict{K,V,true}) where {K,V} = PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))
+done(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V} = itr.i >= itr.len
+function next(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V}
     if 0 == ccall((@pysym :PyDict_Next), Cint,
                   (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
                   d, itr.pa, itr.ka, itr.va)
@@ -537,9 +537,9 @@ function next{K,V}(d::PyDict{K,V,true}, itr::PyDict_Iterator)
 # To strictly use the Julia iteration protocol, we should pass
 # d.o["items"] rather than d.o to done and next, but the PyObject
 # iterator functions only look at the state s, so we are okay.
-start{K,V}(d::PyDict{K,V,false}) = start(pycall(d.o["items"], PyObject))
-done{K,V}(d::PyDict{K,V,false}, s) = done(d.o, s)
-function next{K,V}(d::PyDict{K,V,false}, s)
+start(d::PyDict{K,V,false}) where {K,V} = start(pycall(d.o["items"], PyObject))
+done(d::PyDict{K,V,false}, s) where {K,V} = done(d.o, s)
+function next(d::PyDict{K,V,false}, s) where {K,V}
     nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
     return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
 end
@@ -556,7 +556,7 @@ function PyObject(d::Associative)
     return o
 end
 
-function convert{K,V}(::Type{Dict{K,V}}, o::PyObject)
+function convert(::Type{Dict{K,V}}, o::PyObject) where {K,V}
     copy(PyDict{K,V}(o))
 end
 
@@ -567,7 +567,7 @@ end
 xrange(start, stop, step) = pycall(pyxrange[], PyObject,
                                    start, stop, step)
 
-function PyObject{T<:Integer}(r::AbstractRange{T})
+function PyObject(r::AbstractRange{T}) where T<:Integer
     s = step(r)
     f = first(r)
     l = last(r) + s
@@ -579,7 +579,7 @@ function PyObject{T<:Integer}(r::AbstractRange{T})
     end
 end
 
-function convert{T<:AbstractRange}(::Type{T}, o::PyObject)
+function convert(::Type{T}, o::PyObject) where T<:AbstractRange
     v = PyVector(o)
     len = length(v)
     if len == 0

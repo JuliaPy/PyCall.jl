@@ -6,7 +6,7 @@
 #############################################################################
 # mirror of Py_buffer struct in Python Include/object.h
 
-immutable Py_buffer
+struct Py_buffer
     buf::Ptr{Void}
     obj::PyPtr
     len::Cssize_t
@@ -26,7 +26,7 @@ immutable Py_buffer
     internal2::Ptr{Void}
 end
 
-type PyBuffer
+mutable struct PyBuffer
     buf::Py_buffer
     PyBuffer() = begin
         b = new(Py_buffer(C_NULL, C_NULL, 0, 0,

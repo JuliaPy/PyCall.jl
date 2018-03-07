@@ -78,12 +78,12 @@ pyjlwrap_call(self_::PyPtr, args_::PyPtr, kw_::PyPtr) =
 # function with specified argument types, both to give more control
 # and to avoid the overhead of type introspection.
 
-immutable FuncWrapper{T,F}
+struct FuncWrapper{T,F}
     f::F
     kwargs::Dict{Symbol,Any}
 end
 (f::FuncWrapper)(args...; kws...) = f.f(args...; kws...)
-julia_args{T}(f::FuncWrapper{T}, args) = convert(T, args)
+julia_args(f::FuncWrapper{T}, args) where {T} = convert(T, args)
 julia_kwarg(f::FuncWrapper, kw, arg) = convert(get(f.kwargs, kw, PyAny), arg)
 
 FuncWrapper(f, kwargs, argtypes::Type) = FuncWrapper{argtypes,typeof(f)}(f, kwargs)

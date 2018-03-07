@@ -13,7 +13,7 @@ end
 ################################################################
 # mirror of Python API types and constants from methodobject.h
 
-immutable PyMethodDef
+struct PyMethodDef
     ml_name::Ptr{UInt8}
     ml_meth::Ptr{Void}
     ml_flags::Cint
@@ -58,7 +58,7 @@ PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL,
 ################################################################
 # mirror of Python API types and constants from descrobject.h
 
-immutable PyGetSetDef
+struct PyGetSetDef
     name::Ptr{UInt8}
     get::Ptr{Void}
     set::Ptr{Void} # may be NULL for read-only members
@@ -89,7 +89,7 @@ PyGetSetDef() = PyGetSetDef(NULL_UInt8_Ptr, C_NULL, C_NULL, NULL_UInt8_Ptr, C_NU
 # from Python structmember.h:
 
 # declare immutable because we need a C-like array of these
-immutable PyMemberDef
+struct PyMemberDef
     name::Ptr{UInt8}
     typ::Cint
     offset::Int # warning: was Cint for Python <= 2.4
@@ -177,7 +177,7 @@ const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_ = (0x00000003<<15)
 
 const sizeof_PyObject_HEAD = sizeof(Int) + sizeof(PyPtr)
 
-type PyTypeObject
+mutable struct PyTypeObject
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
     ob_refcnt::Int
     ob_type::PyPtr
@@ -328,7 +328,7 @@ end
 ################################################################
 # Wrap a Python type around a Julia Any object
 
-immutable Py_jlWrap
+struct Py_jlWrap
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
     ob_refcnt::Int
     ob_type::PyPtr
