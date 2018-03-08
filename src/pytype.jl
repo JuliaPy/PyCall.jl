@@ -15,7 +15,7 @@ end
 
 struct PyMethodDef
     ml_name::Ptr{UInt8}
-    ml_meth::Ptr{Void}
+    ml_meth::Ptr{Cvoid}
     ml_flags::Cint
     ml_doc::Ptr{UInt8} # may be NULL
 end
@@ -60,23 +60,23 @@ PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL,
 
 struct PyGetSetDef
     name::Ptr{UInt8}
-    get::Ptr{Void}
-    set::Ptr{Void} # may be NULL for read-only members
+    get::Ptr{Cvoid}
+    set::Ptr{Cvoid} # may be NULL for read-only members
     doc::Ptr{UInt8} # may be NULL
-    closure::Ptr{Void} # pass-through thunk, may be NULL
+    closure::Ptr{Cvoid} # pass-through thunk, may be NULL
 end
 
 function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Void}}),
-                cfunction(set, Int, Tuple{PyPtr,PyPtr,Ptr{Void}}),
+                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Cvoid}}),
+                cfunction(set, Int, Tuple{PyPtr,PyPtr,Ptr{Cvoid}}),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
 end
 
 function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString="")
     PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Void}}),
+                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Cvoid}}),
                 C_NULL,
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
                 C_NULL)
@@ -190,63 +190,63 @@ mutable struct PyTypeObject
     tp_basicsize::Int # required, = sizeof(instance)
     tp_itemsize::Int
 
-    tp_dealloc::Ptr{Void}
-    tp_print::Ptr{Void}
-    tp_getattr::Ptr{Void}
-    tp_setattr::Ptr{Void}
-    tp_compare::Ptr{Void}
-    tp_repr::Ptr{Void}
+    tp_dealloc::Ptr{Cvoid}
+    tp_print::Ptr{Cvoid}
+    tp_getattr::Ptr{Cvoid}
+    tp_setattr::Ptr{Cvoid}
+    tp_compare::Ptr{Cvoid}
+    tp_repr::Ptr{Cvoid}
 
-    tp_as_number::Ptr{Void}
-    tp_as_sequence::Ptr{Void}
-    tp_as_mapping::Ptr{Void}
+    tp_as_number::Ptr{Cvoid}
+    tp_as_sequence::Ptr{Cvoid}
+    tp_as_mapping::Ptr{Cvoid}
 
-    tp_hash::Ptr{Void}
-    tp_call::Ptr{Void}
-    tp_str::Ptr{Void}
-    tp_getattro::Ptr{Void}
-    tp_setattro::Ptr{Void}
+    tp_hash::Ptr{Cvoid}
+    tp_call::Ptr{Cvoid}
+    tp_str::Ptr{Cvoid}
+    tp_getattro::Ptr{Cvoid}
+    tp_setattro::Ptr{Cvoid}
 
-    tp_as_buffer::Ptr{Void}
+    tp_as_buffer::Ptr{Cvoid}
 
     tp_flags::Clong # Required, should default to Py_TPFLAGS_DEFAULT
 
     tp_doc::Ptr{UInt8} # normally set in example code, but may be NULL
 
-    tp_traverse::Ptr{Void}
+    tp_traverse::Ptr{Cvoid}
 
-    tp_clear::Ptr{Void}
+    tp_clear::Ptr{Cvoid}
 
-    tp_richcompare::Ptr{Void}
+    tp_richcompare::Ptr{Cvoid}
 
     tp_weaklistoffset::Int
 
     # added in Python 2.2:
-    tp_iter::Ptr{Void}
-    tp_iternext::Ptr{Void}
+    tp_iter::Ptr{Cvoid}
+    tp_iternext::Ptr{Cvoid}
 
     tp_methods::Ptr{PyMethodDef}
     tp_members::Ptr{PyMemberDef}
     tp_getset::Ptr{PyGetSetDef}
-    tp_base::Ptr{Void}
+    tp_base::Ptr{Cvoid}
 
     tp_dict::PyPtr
-    tp_descr_get::Ptr{Void}
-    tp_descr_set::Ptr{Void}
+    tp_descr_get::Ptr{Cvoid}
+    tp_descr_set::Ptr{Cvoid}
     tp_dictoffset::Int
 
-    tp_init::Ptr{Void}
-    tp_alloc::Ptr{Void}
-    tp_new::Ptr{Void}
-    tp_free::Ptr{Void}
-    tp_is_gc::Ptr{Void}
+    tp_init::Ptr{Cvoid}
+    tp_alloc::Ptr{Cvoid}
+    tp_new::Ptr{Cvoid}
+    tp_free::Ptr{Cvoid}
+    tp_is_gc::Ptr{Cvoid}
 
     tp_bases::PyPtr
     tp_mro::PyPtr
     tp_cache::PyPtr
     tp_subclasses::PyPtr
     tp_weaklist::PyPtr
-    tp_del::Ptr{Void}
+    tp_del::Ptr{Cvoid}
 
     # added in Python 2.6:
     tp_version_tag::Cuint
@@ -255,8 +255,8 @@ mutable struct PyTypeObject
     tp_allocs::Int
     tp_frees::Int
     tp_maxalloc::Int
-    tp_prev::Ptr{Void}
-    tp_next::Ptr{Void}
+    tp_prev::Ptr{Cvoid}
+    tp_next::Ptr{Cvoid}
 
     # Julia-specific fields, after the end of the Python structure:
 
@@ -321,7 +321,7 @@ function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, ba
     end
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     @pycheckz ccall((@pysym :PyType_Ready), Cint, (Any,), t)
-    ccall((@pysym :Py_IncRef), Void, (Any,), t)
+    ccall((@pysym :Py_IncRef), Cvoid, (Any,), t)
     return t
 end
 
@@ -343,7 +343,7 @@ function pyjlwrap_dealloc(o::PyPtr)
 end
 
 unsafe_pyjlwrap_to_objref(o::PyPtr) =
-  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Void}}, o), 3))
+  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, o), 3))
 
 pyjlwrap_repr(o::PyPtr) =
     pystealref!(PyObject(o != C_NULL ? string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
@@ -415,7 +415,7 @@ function pyjlwrap_init()
                             PyMemberDef(C_NULL,0,0,0,C_NULL))
 
     # all cfunctions must be compiled at runtime
-    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Void, Tuple{PyPtr})
+    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Cvoid, Tuple{PyPtr})
     pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, Tuple{PyPtr})
     pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, Tuple{PyPtr})
     pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, Tuple{PyPtr})
@@ -447,8 +447,8 @@ function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
     sz = sizeof(Py_jlWrap) + sizeof(PyPtr) # must be > base type
     PyTypeObject!(to, name, sz) do t::PyTypeObject
         # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-        t.tp_base = ccall(:jl_value_ptr, Ptr{Void}, (Any,), jlWrapType)
-        ccall((@pysym :Py_IncRef), Void, (Any,), jlWrapType)
+        t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), jlWrapType)
+        ccall((@pysym :Py_IncRef), Cvoid, (Any,), jlWrapType)
         init(t)
     end
 end
@@ -464,7 +464,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
                                  PyPtr, (Any,), pyT))
-    p = convert(Ptr{Ptr{Void}}, o.o)
+    p = convert(Ptr{Ptr{Cvoid}}, o.o)
     if isimmutable(value)
         # It is undefined to call `pointer_from_objref` on immutable objects.
         # The compiler is free to return basically anything since the boxing is not
@@ -473,7 +473,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
         # the lifetime of the pointer `ref`.
         ref = Ref{Any}(value)
         pycall_gc[o.o] = ref
-        ptr = unsafe_load(Ptr{Ptr{Void}}(pointer_from_objref(ref)))
+        ptr = unsafe_load(Ptr{Ptr{Cvoid}}(pointer_from_objref(ref)))
     else
         pycall_gc[o.o] = value
         ptr = pointer_from_objref(value)

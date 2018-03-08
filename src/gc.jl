@@ -15,7 +15,7 @@ const pycall_gc = Dict{PyPtr,Any}()
 
 function weakref_callback(callback::PyPtr, wo::PyPtr)
     delete!(pycall_gc, wo)
-    ccall((@pysym :Py_DecRef), Void, (PyPtr,), wo)
+    ccall((@pysym :Py_DecRef), Cvoid, (PyPtr,), wo)
     return pyincref_(pynothing[])
 end
 

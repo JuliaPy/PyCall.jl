@@ -1,14 +1,12 @@
 using Compat.Test, PyCall, Compat
 
-if isdefined(Base, :Iterators)
-    filter(f, itr) = collect(Iterators.filter(f, itr))
-    filter(f, d::Associative) = Base.filter(f, d)
-end
+filter(f, itr) = collect(Iterators.filter(f, itr))
+filter(f, d::AbstractDict) = Base.filter(f, d)
 
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
-info("Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE")
+Compat.@info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
@@ -35,7 +33,7 @@ import PyCall.pyany_toany
 @test roundtripeq("Hello \0\0\0world")
 @test roundtripeq("Hël\0\0lö")
 @test roundtripeq(Symbol, :Hello)
-@test roundtripeq(C_NULL) && roundtripeq(convert(Ptr{Void}, 12345))
+@test roundtripeq(C_NULL) && roundtripeq(convert(Ptr{Cvoid}, 12345))
 @test roundtripeq([1,3,4,5]) && roundtripeq([1,3.2,"hello",true])
 @test roundtripeq([1 2 3;4 5 6]) && roundtripeq([1. 2 3;4 5 6])
 @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
@@ -131,16 +129,14 @@ let x = PyVector(PyAny[])
     @test x == ["bar"]
 end
 
-if pyversion >= v"2.7" && isdefined(PyCall, :PyDateTime_CAPI)
-    @test roundtripeq(Dates.Date(2012,3,4))
-    @test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
-    @test roundtripeq(Dates.Millisecond(typemax(Int32)))
-    @test roundtripeq(Dates.Millisecond(typemin(Int32)))
-    @test roundtripeq(Dates.Second, Dates.Second(typemax(Int32)))
-    @test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
-    @test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
-    @test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
-end
+@test roundtripeq(Dates.Date(2012,3,4))
+@test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
+@test roundtripeq(Dates.Millisecond(typemax(Int32)))
+@test roundtripeq(Dates.Millisecond(typemin(Int32)))
+@test roundtripeq(Dates.Second, Dates.Second(typemax(Int32)))
+@test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
+@test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
+@test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
 
 # fixme: is there any nontrivial mimewritable test we can do?
 @test !mimewritable("text/html", PyObject(1))
@@ -151,7 +147,7 @@ pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
 pyutf8(s::String) = pyutf8(PyObject(s))
 
 # IO (issue #107)
-#@test roundtripeq(STDOUT) # No longer true since #250
+#@test roundtripeq(stdout) # No longer true since #250
 let buf = IOBuffer(false, true), obuf = PyObject(buf)
     @test !obuf[:isatty]()
     @test obuf[:writable]()
@@ -211,7 +207,7 @@ pyanycheck(x::Any) = pyanycheck(typeof(x), PyObject(x))
 pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
 @test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
 @test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
-@test pyanycheck(Complex128, PyVector{PyObject}(PyObject([1.3+1im]))[1])
+@test pyanycheck(ComplexF64, PyVector{PyObject}(PyObject([1.3+1im]))[1])
 @test pyanycheck(Bool, PyVector{PyObject}(PyObject([true]))[1])
 
 # conversions of Int128 and BigInt
@@ -282,8 +278,8 @@ end
 let o = PyObject(Any[8,3])
     @test collect(push!(o, 5)) == [8,3,5]
     @test pop!(o) == 5 && collect(o) == [8,3]
-    @test shift!(o) == 8 && collect(o) == [3]
-    @test collect(unshift!(o, 9)) == [9,3]
+    @test popfirst!(o) == 8 && collect(o) == [3]
+    @test collect(pushfirst!(o, 9)) == [9,3]
     @test collect(prepend!(o, [5,4,2])) == [5,4,2,9,3]
     @test collect(append!(o, [1,6,8])) == [5,4,2,9,3,1,6,8]
     @test isempty(empty!(o))
@@ -363,16 +359,14 @@ let weakdict = pyimport("weakref")["WeakValueDictionary"]
 end
 
 # Expose python docs to Julia doc system
-if isdefined(Docs, :getdoc)
-    py"""
-    def foo():
-        "foo docstring"
-        return 0
-    """
-    foo = py"foo"
-    # use 'content' since `Text` objects test equality by object identity
-    @test @doc(foo).content == "foo docstring"
-end
+py"""
+def foo():
+    "foo docstring"
+    return 0
+"""
+foo = py"foo"
+# use 'content' since `Text` objects test equality by object identity
+@test @doc(foo).content == "foo docstring"
 
 # binary operators
 for b in (4, PyObject(4))

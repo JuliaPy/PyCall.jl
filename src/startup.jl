@@ -3,32 +3,32 @@
 # and if so do not use the deps.jl file, getting everything we need from the
 # current process instead.
 
-proc_handle = unsafe_load(cglobal(:jl_exe_handle, Ptr{Void}))
+proc_handle = unsafe_load(cglobal(:jl_exe_handle, Ptr{Cvoid}))
 
 struct Dl_info
     dli_fname::Ptr{UInt8}
-    dli_fbase::Ptr{Void}
+    dli_fbase::Ptr{Cvoid}
     dli_sname::Ptr{UInt8}
-    dli_saddr::Ptr{Void}
+    dli_saddr::Ptr{Cvoid}
 end
 EnumProcessModules(hProcess, lphModule, cb, lpcbNeeded) =
     ccall(:K32EnumProcessModules, stdcall, Bool,
-        (Ptr{Void}, Ptr{Ptr{Void}}, UInt32, Ptr{UInt32}),
+        (Ptr{Cvoid}, Ptr{Ptr{Cvoid}}, UInt32, Ptr{UInt32}),
         hProcess, lphModule, cb, lpcbNeeded)
 
 symbols_present = false
 @static if Compat.Sys.iswindows()
     lpcbneeded = Ref{UInt32}()
-    proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Void}, ())
-    handles = Vector{Ptr{Void}}(20)
+    proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Cvoid}, ())
+    handles = Vector{Ptr{Cvoid}}(20)
     if EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded) == 0
-        resize!(handles, div(lpcbneeded[],sizeof(Ptr{Void})))
+        resize!(handles, div(lpcbneeded[],sizeof(Ptr{Cvoid})))
         EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded)
     end
     # Try to find python if it's in the current process
     for handle in handles
-        sym = ccall(:GetProcAddress, stdcall, Ptr{Void},
-            (Ptr{Void}, Ptr{UInt8}), handle, "Py_GetVersion")
+        sym = ccall(:GetProcAddress, stdcall, Ptr{Cvoid},
+            (Ptr{Cvoid}, Ptr{UInt8}), handle, "Py_GetVersion")
         sym != C_NULL || continue
         symbols_present = true
         global libpy_handle = handle
@@ -51,7 +51,7 @@ else
     @static if Compat.Sys.iswindows()
         pathbuf = Vector{UInt16}(1024)
         ret = ccall(:GetModuleFileNameW, stdcall, UInt32,
-            (Ptr{Void}, Ptr{UInt16}, UInt32),
+            (Ptr{Cvoid}, Ptr{UInt16}, UInt32),
             libpy_handle, pathbuf, length(pathbuf))
         @assert ret != 0
         libname = String(Base.transcode(UInt8, pathbuf[1:findfirst(pathbuf, 0)-1]))
@@ -67,9 +67,9 @@ else
         some_address_in_main_exe = Libdl.dlsym(proc_handle, Compat.Sys.isapple() ? :_mh_execute_header : :main)
         dlinfo1 = Ref{Dl_info}()
         dlinfo2 = Ref{Dl_info}()
-        ccall(:dladdr, Cint, (Ptr{Void}, Ptr{Dl_info}), some_address_in_libpython,
+        ccall(:dladdr, Cint, (Ptr{Cvoid}, Ptr{Dl_info}), some_address_in_libpython,
             dlinfo1)
-        ccall(:dladdr, Cint, (Ptr{Void}, Ptr{Dl_info}), some_address_in_main_exe,
+        ccall(:dladdr, Cint, (Ptr{Cvoid}, Ptr{Dl_info}), some_address_in_main_exe,
             dlinfo2)
         if dlinfo1[].dli_fbase == dlinfo2[].dli_fbase
             const libpython = nothing
@@ -82,7 +82,7 @@ else
     const conda = false
 end
 
-const pyversion = convert(VersionNumber, split(Py_GetVersion(libpy_handle))[1])
+const pyversion = VersionNumber(split(Py_GetVersion(libpy_handle))[1])
 
 # PyUnicode_* may actually be a #define for another symbol, so
 # we cache the correct dlsym

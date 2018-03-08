@@ -1,5 +1,6 @@
 # Conversion functions for date and time objects in the Python datetime
 # module and the Julia Dates module.
+import Compat.Dates
 
 # Unfortunately, the Python C API (in Python/Include/datetime.h) is somewhat
 # painful to call from Julia because it consists mainly of macros that
@@ -17,12 +18,12 @@ struct PyDateTime_CAPI
     TZInfoType::PyPtr
 
     # function pointers:
-    Date_FromDate::Ptr{Void}
-    DateTime_FromDateAndTime::Ptr{Void}
-    Time_FromTime::Ptr{Void}
-    Delta_FromDelta::Ptr{Void}
-    DateTime_FromTimestamp::Ptr{Void}
-    Date_FromTimestamp::Ptr{Void}
+    Date_FromDate::Ptr{Cvoid}
+    DateTime_FromDateAndTime::Ptr{Cvoid}
+    Time_FromTime::Ptr{Cvoid}
+    Delta_FromDelta::Ptr{Cvoid}
+    DateTime_FromTimestamp::Ptr{Cvoid}
+    Date_FromTimestamp::Ptr{Cvoid}
 end
 
 struct PyDateTime_Delta{H} # H = Clong in Python 2, Py_hash_t in Python 3
@@ -51,9 +52,9 @@ const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
 const DateType = Ref{PyPtr}(0)
 const DateTimeType = Ref{PyPtr}(0)
 const DeltaType = Ref{PyPtr}(0)
-const Date_FromDate = Ref{Ptr{Void}}(0)
-const DateTime_FromDateAndTime = Ref{Ptr{Void}}(0)
-const Delta_FromDelta = Ref{Ptr{Void}}(0)
+const Date_FromDate = Ref{Ptr{Cvoid}}(0)
+const DateTime_FromDateAndTime = Ref{Ptr{Cvoid}}(0)
+const Delta_FromDelta = Ref{Ptr{Cvoid}}(0)
 function init_datetime()
     # emulate PyDateTime_IMPORT:
     PyDateTimeAPI = unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),

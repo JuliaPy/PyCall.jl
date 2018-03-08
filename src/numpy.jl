@@ -17,7 +17,7 @@
 #
 # The result of npy_api_initialize, below, is to produce the following
 # tables of API pointers:
-const npy_api = Dict{Symbol, Ptr{Void}}()
+const npy_api = Dict{Symbol, Ptr{Cvoid}}()
 
 # need a global to cache pyimport("numpy.core.multiarray"), in order
 # to ensure the module is not garbage-collected as long as we are using it
@@ -51,11 +51,11 @@ function npyinitialize()
     end
     if pyversion.major < 3
         PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr),
-                                     Ptr{Ptr{Void}}, (PyPtr,),
+                                     Ptr{Ptr{Cvoid}}, (PyPtr,),
                                      npy_multiarray["_ARRAY_API"])
     else
         PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
-                                     Ptr{Ptr{Void}}, (PyPtr,Ptr{Void}),
+                                     Ptr{Ptr{Cvoid}}, (PyPtr,Ptr{Cvoid}),
                                      npy_multiarray["_ARRAY_API"], C_NULL)
     end
 
@@ -160,11 +160,11 @@ npy_type(::Type{UInt64}) = NPY_ULONGLONG
 npy_type(::Type{Float16}) = NPY_HALF
 npy_type(::Type{Float32}) = NPY_FLOAT
 npy_type(::Type{Float64}) = NPY_DOUBLE
-npy_type(::Type{Complex64}) = NPY_CFLOAT
-npy_type(::Type{Complex128}) = NPY_CDOUBLE
+npy_type(::Type{ComplexF32}) = NPY_CFLOAT
+npy_type(::Type{ComplexF64}) = NPY_CDOUBLE
 npy_type(::Type{PyPtr}) = NPY_OBJECT
 
-const NPY_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,Complex64,Complex128,PyPtr}
+const NPY_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,ComplexF32,ComplexF64,PyPtr}
 
 # conversions from __array_interface__ type strings to supported Julia types
 const npy_typestrs = Dict( "b1"=>Bool,
@@ -173,8 +173,8 @@ const npy_typestrs = Dict( "b1"=>Bool,
                            "i4"=>Int32,       "u4"=>UInt32,
                            "i8"=>Int64,       "u8"=>UInt64,
                            "f2"=>Float16,     "f4"=>Float32,
-                           "f8"=>Float64,     "c8"=>Complex64,
-                           "c16"=>Complex128, "O"=>PyPtr,
+                           "f8"=>Float64,     "c8"=>ComplexF32,
+                           "c16"=>ComplexF64, "O"=>PyPtr,
                            "O$(div(Sys.WORD_SIZE,8))"=>PyPtr)
 
 #########################################################################
@@ -232,7 +232,7 @@ mutable struct PyArray_Info
     native::Bool # native byte order?
     sz::Vector{Int}
     st::Vector{Int} # strides, in multiples of bytes!
-    data::Ptr{Void}
+    data::Ptr{Cvoid}
     readonly::Bool
 
     function PyArray_Info(a::PyObject)
@@ -257,7 +257,7 @@ mutable struct PyArray_Info
                    || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
                    || typestr[1] == '|',
                    sz, st,
-                   convert(Ptr{Void}, datatuple[1]),
+                   convert(Ptr{Cvoid}, datatuple[1]),
                    datatuple[2])
     end
 end
@@ -334,16 +334,16 @@ end
 size(a::PyArray) = a.dims
 ndims(a::PyArray{T,N}) where {T,N} = N
 
-similar(a::PyArray, T, dims::Dims) = Array{T}(dims)
+similar(a::PyArray, T, dims::Dims) = Array{T}(uninitialized, dims)
 
 function copy(a::PyArray{T,N}) where {T,N}
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return permutedims(B, (N:-1:1))
     end
-    A = Array{T}(a.dims)
+    A = Array{T}(uninitialized, a.dims)
     if a.f_contig
-        ccall(:memcpy, Void, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
+        ccall(:memcpy, Cvoid, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
         return A
     else
         return copy!(A, a)
@@ -446,7 +446,7 @@ function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        A = Array{pyany_toany(T)}(len)
+        A = Array{pyany_toany(T)}(uninitialized, len)
         py2array(T, A, o, 1, 1)
     end
 end
@@ -457,7 +457,7 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
         try
             copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
         catch
-            return py2array(T, Array{pyany_toany(T)}(info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(uninitialized, info.sz...), o, 1, 1)
         end
     catch
         py2array(T, o)
@@ -474,7 +474,7 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
             if nd != N
                 throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
             end
-            return py2array(T, Array{pyany_toany(T)}(info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(uninitialized, info.sz...), o, 1, 1)
         end
     catch
         A = py2array(T, o)
