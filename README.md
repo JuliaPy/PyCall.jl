@@ -409,10 +409,14 @@ For instance,
 
     @pyimport numpy.polynomial as P
     @pydef type Doubler <: P.Polynomial
-        __init__(self, x=10) = (self[:x] = x)
+        function __init__(self, x=10)
+	    self[:x] = x
+	end
         my_method(self, arg1::Number) = arg1 + 20
         x2.get(self) = self[:x] * 2
-        x2.set!(self, new_val) = (self[:x] = new_val / 2)
+        function x2.set!(self, new_val)
+	    self[:x] = new_val / 2
+	end
     end
     Doubler()[:x2]
 
