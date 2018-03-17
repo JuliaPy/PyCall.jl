@@ -74,7 +74,7 @@ function pyio_initialize()
     global pyio_initialized
     if !pyio_initialized::Bool
         copy!(PyIO, @pydef_object mutable struct PyIO
-            __init__(self, io::IO; istextio=false) = begin
+            function __init__(self, io::IO; istextio=false)
                 self[:io] = pyjlwrap_new(io) # avoid recursion
                 self[:istextio] = istextio
             end
@@ -82,7 +82,7 @@ function pyio_initialize()
             closed.get(self) = @with_ioraise(!isopen(pyio_jl(self)))
             encoding.get(self) = "UTF-8"
             fileno(self) = @with_ioraise(fd(pyio_jl(self)))
-            flush(self) = begin
+            function flush(self)
                 @with_ioraise begin
                     io = pyio_jl(self)
                     if method_exists(flush, Tuple{typeof(io)})

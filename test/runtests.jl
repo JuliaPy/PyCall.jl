@@ -450,7 +450,9 @@ end
 
 # @pywith errors correctly handled
 @pydef mutable struct IgnoreError
-    __init__(self, ignore) = (self[:ignore]=ignore)
+    function __init__(self, ignore)
+        self[:ignore] = ignore
+    end
     __enter__(self) = ()
     __exit__(self, typ, value, tb) = self[:ignore]
 end
