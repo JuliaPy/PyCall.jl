@@ -26,15 +26,13 @@ function def_py_class(type_name::AbstractString, methods::Vector;
                       base_classes=[], getsets::Vector=[])
     # Only create new-style classes
     base_classes = union(base_classes, [pybuiltin("object")])
-    new_type = pybuiltin("type")(type_name, tuple(base_classes...), Dict())
-    for (py_name, jl_fun) in methods
-        new_type[py_name::Symbol] = jlfun2pyfun(jl_fun::Function)
-    end
-    for (py_name, getter, setter) in getsets
-        new_type[py_name::Symbol] = pyproperty(jlfun2pyfun(getter),
-                                               jlfun2pyfun(setter))
-    end
-    new_type
+    methods = Dict(py_name => jlfun2pyfun(jl_fun::Function)
+                   for (py_name::Symbol, jl_fun) in methods)
+    getter_setters = Dict(py_name => pyproperty(jlfun2pyfun(getter),
+                                                jlfun2pyfun(setter))
+                          for (py_name::Symbol, getter, setter) in getsets)
+    return pybuiltin("type")(type_name, tuple(base_classes...),
+                             merge(methods, getter_setters))
 end
 
 ######################################################################
