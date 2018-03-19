@@ -46,7 +46,7 @@ function __init__()
     Compat.Sys.iswindows() && (PyActCtx[] = C_NULL)
 
     # Make sure python wasn't upgraded underneath us
-    new_pyversion = VersionNumber(split(unsafe_string(ccall(@pysym(:Py_GetVersion),
+    new_pyversion = vparse(split(unsafe_string(ccall(@pysym(:Py_GetVersion),
                                Ptr{UInt8}, ())))[1])
 
     if new_pyversion.major != pyversion.major

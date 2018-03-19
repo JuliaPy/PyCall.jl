@@ -5,7 +5,7 @@
 # As a result, if you switch to a different version or path of Python, you
 # will probably need to re-run Pkg.build("PyCall").
 
-using Compat
+using Compat, VersionParsing
 import Conda, Compat.Libdl
 
 struct UseCondaPython <: Exception end
@@ -161,7 +161,7 @@ try # make sure deps.jl file is removed on error
     python = try
         let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
                      (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
-            vers = isempty(py) ? v"0.0" : VersionNumber(pyconfigvar(py,"VERSION","0.0"))
+            vers = isempty(py) ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
                 if isempty(py)
                     throw(UseCondaPython())
@@ -220,7 +220,7 @@ try # make sure deps.jl file is removed on error
     end
 
     # cache the Python version as a Julia VersionNumber
-    pyversion = VersionNumber(pyvar(python, "platform", "python_version()"))
+    pyversion = vparse(pyvar(python, "platform", "python_version()"))
 
     Compat.@info "PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name"
 

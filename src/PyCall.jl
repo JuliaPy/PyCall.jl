@@ -2,7 +2,7 @@ __precompile__()
 
 module PyCall
 
-using Compat
+using Compat, VersionParsing
 
 export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,

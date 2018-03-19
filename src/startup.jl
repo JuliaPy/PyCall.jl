@@ -82,7 +82,7 @@ else
     const conda = false
 end
 
-const pyversion = VersionNumber(split(Py_GetVersion(libpy_handle))[1])
+const pyversion = vparse(split(Py_GetVersion(libpy_handle))[1])
 
 # PyUnicode_* may actually be a #define for another symbol, so
 # we cache the correct dlsym
