@@ -458,8 +458,7 @@ end
 end
 
 # @pydef example from README
-@pyimport numpy.polynomial as P
-@pydef type Doubler <: P.Polynomial
+@pydef type Doubler <: PyCall.builtin[:AssertionError]
     __init__(self, x=10) = (self[:x] = x)
     function my_method(self, arg1::Number) 
         return arg1 + 20
@@ -475,6 +474,7 @@ d = Doubler(5)
 d[:x2] = 30
 @test d[:x] == 15
 @test d[:type_str](10) == string(Int)
+@test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
 
 
 @test_throws ErrorException @pywith IgnoreError(false) error()
