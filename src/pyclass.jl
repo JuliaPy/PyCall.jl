@@ -1,6 +1,7 @@
-# Define new Python classes from Julia:
+# Define new Python classes from Julia.
+#############################################################################
 
-import MacroTools: @capture
+import MacroTools: @capture, splitdef, combinedef
 
 ######################################################################
 # def_py_class definition: this is the core non-macro interface for creating
@@ -25,15 +26,13 @@ function def_py_class(type_name::AbstractString, methods::Vector;
                       base_classes=[], getsets::Vector=[])
     # Only create new-style classes
     base_classes = union(base_classes, [pybuiltin("object")])
-    new_type = pybuiltin("type")(type_name, tuple(base_classes...), Dict())
-    for (py_name, jl_fun) in methods
-        new_type[py_name::Symbol] = jlfun2pyfun(jl_fun::Function)
-    end
-    for (py_name, getter, setter) in getsets
-        new_type[py_name::Symbol] = pyproperty(jlfun2pyfun(getter),
-                                               jlfun2pyfun(setter))
-    end
-    new_type
+    methods = Dict(py_name => jlfun2pyfun(jl_fun::Function)
+                   for (py_name::Symbol, jl_fun) in methods)
+    getter_setters = Dict(py_name => pyproperty(jlfun2pyfun(getter),
+                                                jlfun2pyfun(setter))
+                          for (py_name::Symbol, getter, setter) in getsets)
+    return pybuiltin("type")(type_name, tuple(base_classes...),
+                             merge(methods, getter_setters))
 end
 
 ######################################################################
@@ -69,9 +68,10 @@ function parse_pydef(expr)
     method_syms = Dict{Any, Symbol}() # see below
     for line in lines
         if !isa(line, LineNumberNode) && line.head != :line # need to skip those
-            @assert line.head == :(=) "Malformed line: $line"
-            lhs, rhs = line.args
-            @assert @capture(lhs,py_f_(args__)) "Malformed left-hand-side: $lhs"
+            def_dict = splitdef(line)
+            py_f = def_dict[:name]
+            # The dictionary of the new Julia-side definition. 
+            jl_def_dict = copy(def_dict)
             if isa(py_f, Symbol)
                 # Method definition
                 # We save the gensym to support multiple dispatch
@@ -79,17 +79,14 @@ function parse_pydef(expr)
                 #    readlines(io, nlines) = ...
                 # otherwise the first and second `readlines` get different
                 # gensyms, and one of the two gets shadowed by the other.
-                jl_fun_name = get!(method_syms, py_f, gensym(py_f))
+                jl_def_dict[:name] = get!(method_syms, py_f, gensym(py_f))
                 if py_f == :__init__
                     # __init__ must return `nothing` in Python. This is
                     # achieved by default in Python, but not so in Julia, so we
                     # special-case it for convenience.
-                    rhs = :(begin $rhs; nothing end)
+                    jl_def_dict[:body] = :(begin $(def_dict[:body]); nothing end)
                 end
-                push!(function_defs, :(function $jl_fun_name($(args...))
-                    $rhs
-                end))
-                push!(methods, (py_f, jl_fun_name))
+                push!(methods, (py_f, jl_def_dict[:name]))
             elseif @capture(py_f, attribute_.access_)
                 # Accessor (.get/.set) definition
                 if access == :get
@@ -99,14 +96,11 @@ function parse_pydef(expr)
                 else
                     error("$access is not a valid accessor; must be either get or set!")
                 end
-                jl_fun_name = gensym(Symbol(attribute,:_,access))
-                push!(function_defs, :(function $jl_fun_name($(args...))
-                    $rhs
-                end))
-                dict[attribute] = jl_fun_name
+                dict[attribute] = jl_def_dict[:name] = gensym(Symbol(attribute,:_,access))
             else
                 error("Malformed line: $line")
             end
+            push!(function_defs, combinedef(jl_def_dict))
         end
     end
     @assert(isempty(setdiff(keys(setter_dict), keys(getter_dict))),
