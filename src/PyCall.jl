@@ -10,7 +10,8 @@ export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
+       PyFuncWrap, setarg!, setargs!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -170,6 +171,7 @@ include("pytype.jl")
 include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
+include("pyfuncwrap.jl")
 include("io.jl")
 
 #########################################################################
