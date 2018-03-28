@@ -214,6 +214,11 @@ end
 
 # somewhat annoying to get the length and types in a tuple type
 # ... would be better not to have to use undocumented internals!
+function tuplen(T::DataType)
+    isvatuple(T) && ArgumentError("can't determine length of vararg tuple: $T")
+    return length(T.parameters)
+end
+tuplen(T::UnionAll) = tuplen(T.body)
 istuplen(T,isva,n) = isva ? n ≥ length(T.parameters)-1 : n == length(T.parameters)
 function tuptype(T::DataType,isva,i)
     if isva && i ≥ length(T.parameters)

@@ -169,6 +169,7 @@ include("pytype.jl")
 include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
+include("pyfuncwrap.jl")
 include("io.jl")
 
 #########################################################################

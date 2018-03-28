@@ -560,3 +560,5 @@ end
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
 end
+
+include("test_pyfuncwrap.jl")
