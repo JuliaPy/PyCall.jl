@@ -226,54 +226,63 @@ PyReverseDims(a::AbstractArray)
 # to call the Python interface to do this, since the equivalent information
 # in NumPy's C API is only available via macros (or parsing structs).
 # [ Hopefully, this will be improved in a future NumPy version. ]
-
-mutable struct PyArray_Info
-    T::Type
+struct PyArray_Info{T,N}
     native::Bool # native byte order?
-    sz::Vector{Int}
-    st::Vector{Int} # strides, in multiples of bytes!
-    data::Ptr{Cvoid}
+    sz::NTuple{N,Int}
+    st::NTuple{N,Int} # strides, in multiples of bytes!
+    data::Ptr{T}
     readonly::Bool
-
-    function PyArray_Info(a::PyObject)
-        ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
-        typestr = convert(AbstractString, ai["typestr"])
-        T = npy_typestrs[typestr[2:end]]
-        datatuple = convert(Tuple{Int,Bool}, ai["data"])
-        sz = convert(Vector{Int}, ai["shape"])
-        local st
-        try
-            st = isempty(sz) ? Int[] : convert(Vector{Int}, ai["strides"])
-        catch
-            # default is C-order contiguous
-            st = similar(sz)
-            st[end] = sizeof(T)
-            for i = length(sz)-1:-1:1
-                st[i] = st[i+1]*sz[i+1]
-            end
-        end
-        return new(T,
-                   (ENDIAN_BOM == 0x04030201 && typestr[1] == '<')
-                   || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
-                   || typestr[1] == '|',
-                   sz, st,
-                   convert(Ptr{Cvoid}, datatuple[1]),
-                   datatuple[2])
-    end
 end
 
-aligned(i::PyArray_Info) = #  FIXME: also check pointer alignment?
-  all(m -> m == 0, mod.(i.st, sizeof(i.T))) # strides divisible by elsize
+function PyArray_Info(a::PyObject)
+    ai = PyDict{String,PyObject,true}(a["__array_interface__"])
+    typestr = convert(String, ai["typestr"])
+    T = npy_typestrs[typestr[2:end]]
+    datatuple = convert(Tuple{Int,Bool}, ai["data"])
+    sz = convert(Tuple{Vararg{Int}}, ai["shape"])
+    N = length(sz)
+    st = if isempty(sz)
+        ()
+    else
+        stq = get(ai, "strides", PyNULL())
+        if stq.o == pynothing[] || stq.o == C_NULL
+            default_stride(sz, T)
+        else
+            convert(Tuple{Vararg{Int}}, stq)
+        end
+    end
+    return PyArray_Info{T,N}((ENDIAN_BOM == 0x04030201 && typestr[1] == '<')
+               || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
+               || typestr[1] == '|',
+               sz, st,
+               convert(Ptr{Cvoid}, datatuple[1]),
+               datatuple[2])
+end
+
+aligned(i::PyArray_Info{T,N}) where {T,N} = #  FIXME: also check pointer alignment?
+  all(m -> m == 0, mod.(i.st, sizeof(T))) # strides divisible by elsize
+
+eltype(i::PyArray_Info{T,N}) where {T,N} = T
+ndims(i::PyArray_Info{T,N})  where {T,N} = N
+
+function default_stride(sz::NTuple{N, Int}, ::Type{T}) where {T,N}
+    stv = Vector{Int}(N)
+    stv[end] = sizeof(T)
+    for i = N-1:-1:1
+        stv[i] = stv[i+1]*sz[i+1]
+    end
+    ntuple(i->stv[i], N)
+end
 
 # whether a contiguous array in column-major (Fortran, Julia) order
-function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
+function f_contiguous(T::Type, sz::NTuple{N,Int}, st::NTuple{N,Int}) where N
     if prod(sz) == 1
         return true
     end
     if st[1] != sizeof(T)
         return false
     end
-    for j = 2:length(st)
+    for j = 2:N
         if st[j] != st[j-1] * sz[j-1]
             return false
         end
@@ -281,8 +290,11 @@ function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
     return true
 end
 
-f_contiguous(i::PyArray_Info) = f_contiguous(i.T, i.sz, i.st)
-c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,1))
+f_contiguous(T::Type, sz::NTuple{N1,Int}, st::NTuple{N2,Int}) where {N1,N2} =
+    error("stride and size are different lengths, size: $sz, strides: $sz")
+
+f_contiguous(i::PyArray_Info{T,N}) where {T,N} = f_contiguous(T, i.sz, i.st)
+c_contiguous(i::PyArray_Info{T,N}) where {T,N} = f_contiguous(T, reverse(i.sz), reverse(i.st))
 
 #########################################################################
 # PyArray: no-copy wrapper around NumPy ndarray
@@ -305,7 +317,7 @@ mutable struct PyArray{T,N} <: AbstractArray{T,N}
     o::PyObject
     info::PyArray_Info
     dims::Dims
-    st::Vector{Int}
+    st::NTuple{N,Int}
     f_contig::Bool
     c_contig::Bool
     data::Ptr{T}
@@ -315,7 +327,7 @@ mutable struct PyArray{T,N} <: AbstractArray{T,N}
             throw(ArgumentError("only NPY_ARRAY_ALIGNED arrays are supported"))
         elseif !info.native
             throw(ArgumentError("only native byte-order arrays are supported"))
-        elseif info.T != T
+        elseif eltype(info) != T
             throw(ArgumentError("inconsistent type in PyArray constructor"))
         elseif length(info.sz) != N || length(info.st) != N
             throw(ArgumentError("inconsistent ndims in PyArray constructor"))
@@ -328,13 +340,20 @@ end
 
 function PyArray(o::PyObject)
     info = PyArray_Info(o)
-    return PyArray{info.T, length(info.sz)}(o, info)
+    return PyArray{eltype(info), length(info.sz)}(o, info)
 end
 
 size(a::PyArray) = a.dims
 ndims(a::PyArray{T,N}) where {T,N} = N
 
 similar(a::PyArray, T, dims::Dims) = Array{T}(undef, dims)
+
+function setdata!{T,N}(a::PyArray{T,N}, o::PyObject, pybufinfo=PyBuffer())
+    PyBuffer!(pybufinfo, o, PyBUF_ND_CONTIGUOUS)
+    dataptr = pybufinfo.buf.buf
+    a.data = reinterpret(Ptr{T}, dataptr)
+    a
+end
 
 function copy(a::PyArray{T,N}) where {T,N}
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
@@ -455,7 +474,7 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
+            copy(PyArray{T, length(info.sz)}(o, info)) # will check T == eltype(info)
         catch
             return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
         end
@@ -468,7 +487,7 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T,N}(o, info)) # will check T == info.T and N == length(info.sz)
+            copy(PyArray{T,N}(o, info)) # will check T,N == eltype(info),ndims(info)
         catch
             nd = length(info.sz)
             if nd != N

@@ -86,6 +86,9 @@ function Base.stride(b::PyBuffer, d::Integer)
     return Int(unsafe_load(b.buf.strides, d))
 end
 
+# Strides in bytes
+Base.strides(b::PyBuffer) = ((stride(b,i) for i in 1:b.buf.ndim)...,)
+
 # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
 iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
@@ -93,7 +96,7 @@ iscontiguous(b::PyBuffer) =
 
 #############################################################################
 # pybuffer constant values from Include/object.h
-const PyBUF_MAX_NDIM = convert(Cint, 64)
+const PyBUF_MAX_NDIM = convert(Cint, 64) # == 0x0040, and not in spec?
 const PyBUF_SIMPLE    = convert(Cint, 0)
 const PyBUF_WRITABLE  = convert(Cint, 0x0001)
 const PyBUF_FORMAT    = convert(Cint, 0x0004)
@@ -103,10 +106,14 @@ const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
 const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
+const PyBUF_ND_CONTIGUOUS = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND | PyBUF_STRIDES | PyBUF_ANY_CONTIGUOUS)
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
-    b = PyBuffer()
+    return PyBuffer!(PyBuffer(), o, flags)
+end
+
+function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Any, Cint), o, b, flags)
@@ -152,6 +159,55 @@ function Base.write(io::IO, b::PyBuffer)
     else
         return writedims(io, b, 0, 1)
     end
+end
+
+# ref: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
+const pybuf_typestrs = Dict{String,DataType}("?"=>Bool,
+                           "b"=>Int8,        "B"=>UInt8,
+                           "h"=>Int16,       "H"=>UInt16,
+                           "i"=>Int32,       "I"=>UInt32,
+                           "l"=>Int64,       "L"=>UInt64,
+                           "q"=>Int128,      "Q"=>UInt128,
+                           "e"=>Float16,     "f"=>Float32,
+                           "d"=>Float64,     "g"=>Void, # Float128?
+                           "c8"=>ComplexF32, "c16"=>ComplexF64,)
+                            # "O"=>PyPtr, "O$(div(Sys.WORD_SIZE,8))"=>PyPtr)
+
+get_typestr(pybuf::PyBuffer) = unsafe_string(convert(Ptr{UInt8}, pybuf.buf.format))
+
+function array_info(pybuf::PyBuffer)
+    typestr = get_typestr(pybuf)
+    native_byteorder = length(typestr) == 1 ||
+        (ENDIAN_BOM == 0x04030201 && typestr[1] == '<') ||
+        (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
+    pybuf_typestrs[typestr[end:end]], native_byteorder
+end
+
+function PyArrayInfoFromBuffer(o::PyObject)
+    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
+    # XXX pyincref buffer? and add a finalizer to the array that calls pydecref?
+    T, native_byteorder = array_info(pybuf)
+    sz = size(pybuf)
+    N = length(sz)
+    strd = strides(pybuf)
+    isreadonly = pybuf.buf.readonly==1
+    return PyArray_Info{T,N}(native_byteorder, sz, strd, pybuf.buf.buf, isreadonly)
+end
+
+function PyArrayFromBuffer(o::PyObject)
+    info = PyArrayInfoFromBuffer(o::PyObject)
+    PyArray{eltype(info), length(info.sz)}(o, info)
+end
+
+function ArrayFromBuffer(o::PyObject)
+    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
+    # XXX pyincref buffer? and add a finalizer to the array that calls pydecref?
+    T, native_byteorder = array_info(pybuf)
+    !native_byteorder && error("Only native endian format supported, typestr: '$(get_typestr(pybuf))'")
+    T == Void && error("Array datatype '$(get_typestr(pybuf))' not supported")
+    # TODO more checks on strides etc
+    arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), size(pybuf), false)
+    f_contiguous(T, strides(pybuf), size(pybuf)) ? arr : PermutedDimsArray(arr, (pybuf.buf.ndim:-1:1))
 end
 
 #############################################################################
