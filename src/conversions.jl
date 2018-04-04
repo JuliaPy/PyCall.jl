@@ -404,7 +404,8 @@ include("numpy.jl")
 # scipy scalar array members, grrr.
 function is_mapping_object(o::PyObject)
     pyisinstance(o, @pyglobalobj :PyDict_Type) ||
-    (pyquery((@pyglobal :PyMapping_Check), o) && ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items") == 1)
+    (pyquery((@pyglobal :PyMapping_Check), o) &&
+      ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items") == 1)
 end
 
 """
@@ -420,7 +421,7 @@ mutable struct PyDict{K,V,isdict} <: AbstractDict{K,V}
     # isdict = true for python dict, otherwise is a generic Mapping object
 
     function PyDict{K,V,isdict}(o::PyObject) where {K,V,isdict}
-        if o.o != C_NULL && !is_mapping_object(o)
+        if !isdict && o.o != C_NULL && !is_mapping_object(o)
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         return new{K,V,isdict}(o)
@@ -711,24 +712,22 @@ function pysequence_query(o::PyObject)
     # problems
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        return typetuple([pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len])
+        return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
     elseif ispybytearray(o)
         return Vector{UInt8}
+    elseif !haskey(o, "__array_interface__")
+        # only handle PyList for now
+        return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
     else
-        try
-            otypestr = get(o["__array_interface__"], PyObject, "typestr")
-            typestr = convert(AbstractString, otypestr)
-            T = npy_typestrs[typestr[2:end]]
-            if T == PyPtr
-                T = PyObject
-            end
-            return Array{T}
-        catch
-            # only handle PyList for now
-            return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
+        otypestr = get(o["__array_interface__"], PyObject, "typestr")
+        typestr = convert(AbstractString, otypestr) # Could this just be String now?
+        T = npy_typestrs[typestr[2:end]]
+        if T == PyPtr
+            T = PyObject
         end
+        return Array{T}
     end
 end
 
