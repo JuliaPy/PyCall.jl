@@ -369,9 +369,9 @@ end
         "foo docstring"
         return 0
     """
-    global foo = py"foo"
+    global foo354 = py"foo"
     # use 'content' since `Text` objects test equality by object identity
-    @test @doc(foo).content == "foo docstring"
+    @test @doc(foo354).content == "foo docstring"
 
     # binary operators
     for b in (4, PyObject(4))
