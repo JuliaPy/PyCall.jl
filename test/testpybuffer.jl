@@ -3,9 +3,15 @@ using Compat.Test, PyCall, Compat
 pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
 pyutf8(s::String) = pyutf8(PyObject(s))
 
-const np = pyimport("numpy")
-
 @testset "PyBuffer" begin
+    np = pyimport("numpy")
+    # arrpyo = pyimport("array")["array"]=>PyObject
+    # listpyo = pybuiltin("list")=>PyObject
+    arrpy = pyimport("array")["array"]
+    listpy = pybuiltin("list")
+    arrpyo(args...)  = pycall(arrpy, PyObject, args...)
+    listpyo(args...) = pycall(listpy, PyObject, args...)
+
     @testset "String Buffers" begin
         b = PyCall.PyBuffer(pyutf8("test string"))
         @test ndims(b) == 1

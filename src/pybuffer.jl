@@ -96,7 +96,6 @@ iscontiguous(b::PyBuffer) =
 
 #############################################################################
 # pybuffer constant values from Include/object.h
-const PyBUF_MAX_NDIM = convert(Cint, 64) # == 0x0040, and not in spec?
 const PyBUF_SIMPLE    = convert(Cint, 0)
 const PyBUF_WRITABLE  = convert(Cint, 0x0001)
 const PyBUF_FORMAT    = convert(Cint, 0x0004)
@@ -183,31 +182,71 @@ function Base.write(io::IO, b::PyBuffer)
 end
 
 # ref: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
-const pybuf_typestrs = Dict{String,DataType}("?"=>Bool,
+
+const standard_typestrs = Dict{String,DataType}(
+                           "?"=>Bool,        "P"=>Ptr{Void},
                            "b"=>Int8,        "B"=>UInt8,
                            "h"=>Int16,       "H"=>UInt16,
                            "i"=>Int32,       "I"=>UInt32,
-                           "l"=>Int64,       "L"=>UInt64,
-                           "q"=>Int128,      "Q"=>UInt128,
+                           "l"=>Int32,       "L"=>UInt32,
+                           "q"=>Int64,       "Q"=>UInt64,
                            "e"=>Float16,     "f"=>Float32,
                            "d"=>Float64,     "g"=>Void, # Float128?
-                           "c8"=>ComplexF32, "c16"=>ComplexF64,)
-                            # "O"=>PyPtr, "O$(div(Sys.WORD_SIZE,8))"=>PyPtr)
+                           "Z8"=>ComplexF32, "Z16"=>ComplexF64,
+                           "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
-get_typestr(pybuf::PyBuffer) = unsafe_string(convert(Ptr{UInt8}, pybuf.buf.format))
+const native_typestrs = Dict{String,DataType}(
+                           "?"=>Bool,        "P"=>Ptr{Void},
+                           "b"=>Int8,        "B"=>UInt8,
+                           "h"=>Cshort,      "H"=>Cushort,
+                           "i"=>Cint,        "I"=>Cuint,
+                           "l"=>Clong,       "L"=>Culong,
+                           "q"=>Clonglong,   "Q"=>Culonglong,
+                           "e"=>Float16,     "f"=>Cfloat,
+                           "d"=>Cdouble,     "g"=>Void, # Float128?
+                           "Z8"=>ComplexF32, "Z16"=>ComplexF64,
+                           "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
-function array_info(pybuf::PyBuffer)
-    typestr = get_typestr(pybuf)
-    native_byteorder = length(typestr) == 1 ||
-        (ENDIAN_BOM == 0x04030201 && typestr[1] == '<') ||
-        (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
-    pybuf_typestrs[typestr[end:end]], native_byteorder
+get_format_str(pybuf::PyBuffer) = unsafe_string(convert(Ptr{UInt8}, pybuf.buf.format))
+
+function array_format(pybuf::PyBuffer)
+    # a NULL-terminated format-string ... indicating what is in each element of memory.
+    # TODO: handle more cases: https://www.python.org/dev/peps/pep-3118/#additions-to-the-struct-string-syntax
+    # refs: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
+    #       https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/_internal.py#L490
+    #
+
+    # "NULL implies standard unsigned bytes ("B")" --pep 3118
+    pybuf.buf.format == C_NULL && return UInt8, true
+
+    fmt_str = get_format_str(pybuf)
+    native_byteorder = true
+    type_start_idx = 1
+    typestrs = standard_typestrs
+    if length(fmt_str) > 1
+        type_start_idx = 2
+        if fmt_str[1] == '='
+        elseif fmt_str[1] == '<'
+            native_byteorder = ENDIAN_BOM == 0x04030201
+        elseif fmt_str[1] == '>' || fmt_str =='!'
+            native_byteorder = ENDIAN_BOM == 0x01020304
+        elseif fmt_str[1] == '@' || fmt_str[1] == '^'
+            typestrs = native_typestrs
+        elseif fmt_str[1] == "Z"
+            type_start_idx = 1
+        else
+            error("Unsupported format string: \"$fmt_str\"")
+        end
+    end
+    typestrs[fmt_str[type_start_idx:end]], native_byteorder
 end
 
+array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_CONTIGUOUS))
+
 function PyArrayInfoFromBuffer(o::PyObject)
+    # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
     pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
-    # XXX pyincref buffer? and add a finalizer to the array that calls pydecref?
-    T, native_byteorder = array_info(pybuf)
+    T, native_byteorder = array_format(pybuf)
     sz = size(pybuf)
     N = length(sz)
     strd = strides(pybuf)

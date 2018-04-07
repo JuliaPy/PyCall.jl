@@ -263,11 +263,11 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test o[:real] == 1
     end
 
-    # []-based sequence access
-    let a1=[5,8,6], a2=rand(3,4), a3=rand(3,4,5), o1=PyObject(a1), o2=PyObject(a2), o3=PyObject(a3)
+    @testset "[]-based sequence access" begin
+        a1=[5,8,6]; a2=rand(3,4); a3=rand(3,4,5); o1=PyObject(a1); o2=PyObject(a2); o3=PyObject(a3)
         @test [o1[i] for i in eachindex(a1)] == a1
         @test [o1[end-(i-1)] for i in eachindex(a1)] == reverse(a1)
-        @test o2[1] == collect(a2[1,:])
+        @test all(o2[1] == collect(a2[1,:]))
         @test length(o1) == length(o2) == length(o3) == 3
         o1[end-1] = 7
         @test o1[2] == 7
@@ -277,7 +277,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         if PyCall.npy_initialized
             @test [o2[i,j] for i=1:3, j=1:4] == a2
             @test [o3[i,j,k] for i=1:3, j=1:4, k=1:5] == a3
-            @test o3[2,3] == collect(a3[2,3,:])
+            @test all(o3[2,3] == collect(a3[2,3,:]))
             o2[2,3] = 8
             @test o2[2,3] == 8
             o3[2,3,4] = 9

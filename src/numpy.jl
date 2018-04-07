@@ -276,7 +276,8 @@ end
 
 # whether a contiguous array in column-major (Fortran, Julia) order
 function f_contiguous(T::Type, sz::NTuple{N,Int}, st::NTuple{N,Int}) where N
-    if prod(sz) == 1
+    if prod(sz) == 1 || length(sz) == 1
+        # 0 or 1-dim arrays should default to f-contiguous in julia
         return true
     end
     if st[1] != sizeof(T)
