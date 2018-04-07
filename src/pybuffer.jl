@@ -120,6 +120,27 @@ function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     return b
 end
 
+"""
+`isbuftype(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_ND_CONTIGUOUS)`
+Returns true if the python object `o` supports the buffer protocol. False if not.
+"""
+function isbuftype(o::Union{PyObject,PyPtr})
+    # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
+    # so we can't access it easily. It basically just checks if PyObject_GetBuffer exists
+    # So we'll just try call PyObject_GetBuffer and check for success/failure
+    b = PyBuffer()
+    ret = ccall((@pysym :PyObject_GetBuffer), Cint,
+                     (PyPtr, Any, Cint), o, b, PyBUF_ND_CONTIGUOUS)
+    if ret != 0
+        pyerr_clear()
+    else
+        # handle pointer types
+        T, native_byteorder = array_format(b)
+        T <: Ptr && (ret = 1)
+    end
+    return ret == 0
+end
+
 #############################################################################
 
 # recursive function to write buffer dimension by dimension, starting at

@@ -749,13 +749,11 @@ function pysequence_query(o::PyObject)
         return AbstractRange
     elseif ispybytearray(o)
         return Vector{UInt8}
-    elseif !haskey(o, "__array_interface__")
+    elseif !isbuftype(o)
         # only handle PyList for now
         return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
     else
-        otypestr = get(o["__array_interface__"], PyObject, "typestr")
-        typestr = convert(AbstractString, otypestr) # Could this just be String now?
-        T = npy_typestrs[typestr[2:end]]
+        T, native_byteorder = array_format(o)
         if T == PyPtr
             T = PyObject
         end

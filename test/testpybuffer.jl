@@ -22,4 +22,11 @@ const np = pyimport("numpy")
         # Not supported, so throws
         @test_throws ErrorException ArrayFromBuffer(wrong_endian_arr)
     end
+
+    @testset "isbuftype" begin
+        @test isbuftype(PyObject(0)) == false
+        @test isbuftype(listpyo((1.0:10.0...))) == false
+        @test isbuftype(arrpyo("d", 1.0:10.0)) == true
+        @test isbuftype(PyObject([1:10...])) == true
+    end
 end
