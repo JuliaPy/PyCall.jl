@@ -1,4 +1,5 @@
 using Compat.Test, PyCall, Compat
+using PyCall: f_contiguous, PyBUF_ND_CONTIGUOUS, array_format
 
 pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
 pyutf8(s::String) = pyutf8(PyObject(s))
@@ -27,6 +28,18 @@ pyutf8(s::String) = pyutf8(PyObject(s))
                                                dtype=wrong_endian_str*"i2")
         # Not supported, so throws
         @test_throws ErrorException ArrayFromBuffer(wrong_endian_arr)
+    end
+
+    @testset "ArrayFromBuffer" begin
+        ao = arrpyo("d", 1.0:10.0)
+        pybuf = PyBuffer(ao, PyBUF_ND_CONTIGUOUS)
+        T, native_byteorder = array_format(pybuf)
+        @test T == Float64
+        @test native_byteorder == true
+        @test size(pybuf) == (10,)
+        @test strides(pybuf) == (sizeof(T),)
+        @test !(ArrayFromBuffer(ao) isa PermutedDimsArray)
+        @test ArrayFromBuffer(ao) isa Array
     end
 
     @testset "isbuftype" begin

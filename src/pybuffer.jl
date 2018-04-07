@@ -260,14 +260,16 @@ function PyArrayFromBuffer(o::PyObject)
 end
 
 function ArrayFromBuffer(o::PyObject)
+    # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
     pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
-    # XXX pyincref buffer? and add a finalizer to the array that calls pydecref?
-    T, native_byteorder = array_info(pybuf)
-    !native_byteorder && error("Only native endian format supported, typestr: '$(get_typestr(pybuf))'")
-    T == Void && error("Array datatype '$(get_typestr(pybuf))' not supported")
+    T, native_byteorder = array_format(pybuf)
+    !native_byteorder && error("Only native endian format supported, format string: '$(get_format_str(pybuf))'")
+    T == Void && error("Array datatype '$(get_format_str(pybuf))' not supported")
     # TODO more checks on strides etc
     arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), size(pybuf), false)
-    f_contiguous(T, strides(pybuf), size(pybuf)) ? arr : PermutedDimsArray(arr, (pybuf.buf.ndim:-1:1))
+    !f_contiguous(T, size(pybuf), strides(pybuf)) &&
+        (arr = PermutedDimsArray(arr, (pybuf.buf.ndim:-1:1)))
+    return arr
 end
 
 #############################################################################
