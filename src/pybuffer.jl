@@ -207,6 +207,9 @@ const native_typestrs = Dict{String,DataType}(
                            "Z8"=>ComplexF32, "Z16"=>ComplexF64,
                            "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
+const typestrs_native =
+    Dict{DataType, String}(zip(values(native_typestrs), keys(native_typestrs)))
+
 get_format_str(pybuf::PyBuffer) = unsafe_string(convert(Ptr{UInt8}, pybuf.buf.format))
 
 function array_format(pybuf::PyBuffer)
@@ -214,7 +217,7 @@ function array_format(pybuf::PyBuffer)
     # TODO: handle more cases: https://www.python.org/dev/peps/pep-3118/#additions-to-the-struct-string-syntax
     # refs: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
     #       https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/_internal.py#L490
-    #
+    #       https://docs.python.org/2/library/struct.html#byte-order-size-and-alignment
 
     # "NULL implies standard unsigned bytes ("B")" --pep 3118
     pybuf.buf.format == C_NULL && return UInt8, true
@@ -263,8 +266,10 @@ function ArrayFromBuffer(o::PyObject)
     # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
     pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
     T, native_byteorder = array_format(pybuf)
-    !native_byteorder && error("Only native endian format supported, format string: '$(get_format_str(pybuf))'")
-    T == Void && error("Array datatype '$(get_format_str(pybuf))' not supported")
+    !native_byteorder && throw(ArgumentError(
+      "Only native endian format supported, format string: '$(get_format_str(pybuf))'"))
+    T == Void && throw(ArgumentError(
+      "Array datatype '$(get_format_str(pybuf))' not supported"))
     # TODO more checks on strides etc
     arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), size(pybuf), false)
     !f_contiguous(T, size(pybuf), strides(pybuf)) &&

@@ -27,7 +27,8 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             pycall(np["ndarray"], PyObject, 2; buffer=UInt8[0,1,3,2],
                                                dtype=wrong_endian_str*"i2")
         # Not supported, so throws
-        @test_throws ErrorException ArrayFromBuffer(wrong_endian_arr)
+        @test_throws ArgumentError ArrayFromBuffer(wrong_endian_arr)
+        @test_throws ArgumentError PyArrayFromBuffer(wrong_endian_arr)
     end
 
     @testset "ArrayFromBuffer" begin
