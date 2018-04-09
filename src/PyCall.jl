@@ -177,7 +177,7 @@ include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
-include("fasttuples.jl")
+include("get.jl")
 
 #########################################################################
 
@@ -760,27 +760,6 @@ macro pycall(ex)
     T = ex.args[2]
     :(pycall($(map(esc,[kwargs; func; T; args])...)))
 end
-
-#########################################################################
-# Once Julia lets us overload ".", we will use [] to access items, but
-# for now we can define "get".
-
-function get(o::PyObject, returntype::TypeTuple, k, default)
-    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
-    if r == C_NULL
-        pyerr_clear()
-        default
-    else
-        convert(returntype, PyObject(r))
-    end
-end
-
-get(o::PyObject, returntype::TypeTuple, k) =
-    convert(returntype, PyObject(@pycheckn ccall((@pysym :PyObject_GetItem),
-                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
-
-get(o::PyObject, k, default) = get(o, PyAny, k, default)
-get(o::PyObject, k) = get(o, PyAny, k)
 
 function delete!(o::PyObject, k)
     e = ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))

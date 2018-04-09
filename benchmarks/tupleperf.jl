@@ -11,8 +11,13 @@ let
     tpl = convert(PyObject, (1:tuplen...))
 
     tplidx = rand(0:(tuplen-1))
-    results["standard get"] = @benchmark get($tpl, PyObject, $tplidx)
+    results["standard get"] = @benchmark get($tpl, PyObject, PyObject($tplidx))
     println("standard get:\n"); display(results["standard get"])
+    println("--------------------------------------------------")
+
+    tplidx = rand(0:(tuplen-1))
+    results["faster get"] = @benchmark get($tpl, PyObject, $tplidx)
+    println("faster get:\n"); display(results["faster get"])
     println("--------------------------------------------------")
 
     tplidx = rand(0:(tuplen-1))
