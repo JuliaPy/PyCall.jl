@@ -1,8 +1,5 @@
 using PyCall, BenchmarkTools, DataStructures
 
-# This would be put in __init__
-PyCall.pytuple_type_ptr[] = cglobal(@pysym :PyTuple_Type)
-
 results = OrderedDict{String,Any}()
 let
     np = pyimport("numpy")
@@ -21,16 +18,6 @@ let
     tplidx = rand(0:(tuplen-1))
     results["get!"] = @benchmark get!($res, $tpl, PyObject, $tplidx)
     println("get!:\n"); display(results["get!"])
-    println("--------------------------------------------------")
-
-    tplidx = rand(0:(tuplen-1))
-    results["getwpyisinst!"] = @benchmark getwpyisinst!($res, $tpl, PyObject, $tplidx)
-    println("getwpyisinst!:\n"); display(results["getwpyisinst!"])
-    println("--------------------------------------------------")
-
-    tplidx = rand(0:(tuplen-1))
-    results["getwtuple_ptr!"] = @benchmark getwtuple_ptr!($res, $tpl, PyObject, $tplidx)
-    println("getwtuple_ptr!:\n"); display(results["getwtuple_ptr!"])
     println("--------------------------------------------------")
 
     tplidx = rand(0:(tuplen-1))

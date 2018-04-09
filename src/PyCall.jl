@@ -10,11 +10,12 @@ export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
+       unsafe_gettpl!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
-       eltype, get, delete!, empty!, length, isempty, start, done,
+       eltype, get, get!, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
@@ -133,6 +134,12 @@ end
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
     dest.o = src.o
+    return pyincref(dest)
+end
+
+function Base.copy!(dest::PyObject, src::PyPtr)
+    pydecref(dest)
+    dest.o = src
     return pyincref(dest)
 end
 
