@@ -136,7 +136,7 @@ function pystealref!(o::PyObject)
 end
 
 function Base.copy!(dest::PyObject, src::PyObject)
-    pydecref(dest)
+    pydecref_(dest.o)
     dest.o = src.o
     return pyincref(dest)
 end
