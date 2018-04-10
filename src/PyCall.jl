@@ -98,8 +98,12 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
+function pydecref_(o::PyPtr)
+    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+end
+
 function pydecref(o::PyObject)
-    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o.o)
+    pydecref_(o.o)
     o.o = PyPtr_NULL
     o
 end
@@ -138,9 +142,9 @@ function Base.copy!(dest::PyObject, src::PyObject)
 end
 
 function Base.copy!(dest::PyObject, src::PyPtr)
-    pydecref(dest)
+    pydecref_(dest.o)
     dest.o = src
-    return pyincref(dest)
+    return pyincref_(dest.o)
 end
 
 pyisinstance(o::PyObject, t::PyObject) =

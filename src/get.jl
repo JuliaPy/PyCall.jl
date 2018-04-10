@@ -2,8 +2,11 @@
 # Once Julia lets us overload ".", we will use [] to access items, but
 # for now we can define "get".
 
-function get(o::PyObject, returntype::TypeTuple, k, default)
-    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
+###############################
+# get with k<:Any and a default
+###############################
+function get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k, default)
+    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o, PyObject(k))
     if r == C_NULL
         pyerr_clear()
         default
@@ -12,27 +15,58 @@ function get(o::PyObject, returntype::TypeTuple, k, default)
     end
 end
 
-get(o::PyObject, returntype::TypeTuple, k) =
-    convert(returntype, PyObject(@pycheckn ccall((@pysym :PyObject_GetItem),
-                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
+get(o::PyObject, returntype::TypeTuple, k, default) =
+  get!(PyNULL(), o, returntype, k, default)
 
+# returntype defaults to PyAny
+get!(ret::PyObject, o::PyObject, k, default) = get!(ret, o, PyAny, k, default)
 get(o::PyObject, k, default) = get(o, PyAny, k, default)
+
+###############################
+# get with k<:Any
+###############################
+function get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k)
+    pydecref(ret)
+    ret.o = @pycheckn ccall((@pysym :PyObject_GetItem),
+                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))
+    return convert(returntype, ret)
+end
+
+get(o::PyObject, returntype::TypeTuple, k) = get!(PyNULL(), o, returntype, k)
+
+# returntype defaults to PyAny
+get!(ret::PyObject, o::PyObject, k) = get!(ret, o, PyAny, k)
 get(o::PyObject, k) = get(o, PyAny, k)
 
+###############################
+# get with k<:Integer
+###############################
 function get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k::Integer)
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
         copy!(ret, @pycheckn ccall(@pysym(:PyTuple_GetItem), PyPtr, (PyPtr, Cint), o, k))
     elseif pyisinstance(o, @pyglobalobj :PyList_Type)
         copy!(ret, @pycheckn ccall(@pysym( :PyList_GetItem), PyPtr, (PyPtr, Cint), o, k))
     else
-        pydecref(ret)
-        ret.o = @pycheckn ccall((@pysym :PyObject_GetItem),
-                                     PyPtr, (PyPtr,PyPtr), o, PyObject(k))
+        return get!(ret, o, returntype, PyObject(k))
     end
-    convert(returntype, ret)
+    return convert(returntype, ret)
 end
 
-get(o::PyObject, returntype::TypeTuple, k::Integer) = get!(PyNULL(), o, returntype, k)
+get(o::PyObject, returntype::TypeTuple, k::Integer) =
+    get!(PyNULL(), o, returntype, k)
+
+# default to PyObject(k) methods for no returntype, and default variants
+get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k::Integer, default) =
+    get!(ret, o, returntype, PyObject(k), default)
+
+get!(ret::PyObject, o::PyObject, k::Integer) = get!(ret, o, PyObject(k))
+
+get!(ret::PyObject, o::PyObject, k::Integer, default) =
+    get!(ret, o, PyObject(k), default)
+
+###############################
+# unsafe_gettpl!
+###############################
 
 # struct PyTuple_struct
 # refs:
@@ -49,8 +83,6 @@ function unsafe_gettpl!(ret::PyObject, o::PyObject, returntype::TypeTuple, k::In
     pytype_ptr = unsafe_load(o.o).ob_type
     # get address of ob_item (just after the end of the struct)
     itemsptr = Base.reinterpret(Ptr{PyPtr}, o.o + sizeof(PyVar_struct))
-    pydecref(ret)
-    ret.o = unsafe_load(itemsptr, k)
-    pyincref_(ret.o)
+    copy!(ret, unsafe_load(itemsptr, k+1)) # unsafe_load is 1-based
     return convert(returntype, ret)
 end
