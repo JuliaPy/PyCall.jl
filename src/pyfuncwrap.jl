@@ -82,6 +82,7 @@ function (pf::PyFuncWrap{P, AT, N, RT})() where {P, AT, N, RT}
         retptr = ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), pf.o,
                         pf.pyargsptr, kw)
         pyincref_(retptr)
+        pydecref(pf.ret)
         pf.ret.o = retptr
     finally
         sigatomic_end()
