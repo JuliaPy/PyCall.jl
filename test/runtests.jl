@@ -538,3 +538,5 @@ end
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
 end
+
+include("test_pyfuncwrap.jl")
