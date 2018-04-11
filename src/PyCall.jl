@@ -4,7 +4,7 @@ module PyCall
 
 using Compat, VersionParsing
 
-export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
+export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
@@ -690,6 +690,56 @@ function pybuiltin(name)
 end
 
 #########################################################################
+const oargs = Array{PyObject}(32)
+const pyargsref = Ref{PyPtr}()
+const cur_args_size = Ref{Int}(0)
+"""
+Low-level version of `pycall!(ret, o, ...)` that always returns `PyObject`.
+"""
+function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args...; kwargs...)
+    nargs = length(args)
+    # oargs = Array{PyObject}(nargs)
+    sigatomic_begin()
+    try
+        if nargs != cur_args_size[]
+            @pycheckz ccall((@pysym :_PyTuple_Resize), Cint,
+                                 (Ptr{PyPtr}, Int,), pyargsref, nargs)
+            cur_args_size[] = nargs
+        end
+        # pyincref_(pyargsref[])
+        # pyargs = PyObject(pyargsref[]) # change to pyincref_ (and pydecref later) to avoid the PyObject?
+
+        for i = 1:nargs
+            oargs[i] = PyObject(args[i])
+            @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
+                             (PyPtr,Int,PyPtr), pyargsref[], i-1, oargs[i])
+            pyincref(oargs[i]) # PyTuple_SetItem steals the reference
+        end
+        # if isempty(kwargs)
+            kw = C_NULL
+        # else
+        #     kw = PyObject(Dict{AbstractString, Any}([Pair(string(k), v) for (k, v) in kwargs]))
+        # end
+        retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
+                        pyargsref[], kw)
+        pyincref_(retptr)
+        pydecref(ret)
+        ret.o = retptr
+        return ret #::PyObject
+    finally
+        sigatomic_end()
+    end
+end
+
+pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
+    return convert(returntype, _pycall!(pyobj, o, args...; kwargs...))
+
+pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, returntype::Type{PyObject},
+       args...; kwargs...) = return _pycall!(pyobj, o, args...; kwargs...)
+
+pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
+    return convert(PyAny, _pycall!(pyobj, o, args...; kwargs...))
+
 
 """
 Low-level version of `pycall(o, ...)` that always returns `PyObject`.

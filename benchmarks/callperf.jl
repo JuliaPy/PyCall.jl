@@ -6,6 +6,7 @@ let
     np = pyimport("numpy")
     nprand = np["random"]["rand"]
     nprand_pyo(sz...) = pycall(nprand, PyObject, sz...)
+    nprand_pyo!(ret::PyObject, sz...) = pycall!(ret, nprand, PyObject, sz...)
     ret = PyNULL()
     args_lens = (0,3,7,12,17)
     arr_sizes = (ntuple(i->1, len) for len in args_lens)
@@ -16,6 +17,10 @@ let
         arr_size_str = args_lens[i] < 5 ? "$arr_size" : "$(args_lens[i])*(1,1,...)"
         results["nprand_pyo $arr_size_str"] = @benchmark $nprand_pyo($arr_size...)
         println("nprand_pyo $arr_size_str:\n"); display(results["nprand_pyo $arr_size_str"])
+        println("--------------------------------------------------")
+
+        results["nprand_pyo! $arr_size_str"] = @benchmark $nprand_pyo!($ret, $arr_size...)
+        println("nprand_pyo! $arr_size_str:\n"); display(results["nprand_pyo! $arr_size_str"])
         println("--------------------------------------------------")
 
         results["nprand_wrap $arr_size_str"] = @benchmark $nprand_wrap($arr_size...)

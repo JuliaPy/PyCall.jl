@@ -143,6 +143,8 @@ function __init__()
                   1, [""], 0)
         end
 
+        pyargsref[] = ccall((@pysym :PyTuple_New), PyPtr, (Int,), 0)
+        
         # Some Python code checks sys.ps1 to see if it is running
         # interactively, and refuses to be interactive otherwise.
         # (e.g. Matplotlib: see PyPlot#79)
