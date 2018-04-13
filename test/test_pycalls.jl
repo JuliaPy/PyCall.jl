@@ -26,10 +26,10 @@ using Compat.Test, PyCall
     @test all(npzeros2dwrap_pyarray((arr_size, "d", "C")) .== npzeros_pyarray(arr_size))
     @test all(npzeros2dwrap_pyarray() .== npzeros_pyarray(arr_size))
 
-    @testset "setarg(s)!" begin
+    @testset "pysetarg(s)!" begin
         arr_size = (3,3)
         # set arg 1, then call without args, old args should be unchanged
-        setarg!(npzeros2dwrap_pyo, arr_size, 1)
+        pysetarg!(npzeros2dwrap_pyo, arr_size, 1)
         int32mat_pyo = npzeros2dwrap_pyo()
         @test np["array_equal"](int32mat_pyo, npzeros_pyo(arr_size))
         @test int32mat_pyo["dtype"] == np["dtype"]("d")
@@ -37,14 +37,14 @@ using Compat.Test, PyCall
         @test int32mat_pyo["shape"] == arr_size
 
         # set arg 2 (data type), then call without args
-        setarg!(npzeros2dwrap_pyo, "i", 2)
+        pysetarg!(npzeros2dwrap_pyo, "i", 2)
         int32mat_pyo1 = npzeros2dwrap_pyo()
         @test int32mat_pyo1["dtype"] == np["dtype"]("i")
         @test int32mat_pyo1["flags"]["c_contiguous"] == true
         @test int32mat_pyo1["shape"] == arr_size
 
         # set arg 3 (order - C or Fortran), then call without args
-        setarg!(npzeros2dwrap_pyo, "F", 3)
+        pysetarg!(npzeros2dwrap_pyo, "F", 3)
         int32mat_pyo2 = npzeros2dwrap_pyo()
         @test int32mat_pyo2["flags"]["f_contiguous"] == true
         @test int32mat_pyo2["dtype"] == np["dtype"]("i")
@@ -52,7 +52,7 @@ using Compat.Test, PyCall
 
         # set all args then call without args
         arr_size = (4,4)
-        setargs!(npzeros2dwrap_pyo, (arr_size, "c", "F"), 3)
+        pysetargs!(npzeros2dwrap_pyo, (arr_size, "c", "F"), 3)
         cmplxmat_pyo = npzeros2dwrap_pyo()
         @test cmplxmat_pyo["dtype"] == np["dtype"]("c")
         @test cmplxmat_pyo["flags"]["f_contiguous"] == true

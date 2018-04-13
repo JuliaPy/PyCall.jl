@@ -51,6 +51,7 @@ Convert `args` to `PyObject`s, and set them as the elements of the Python tuple
 pointed to by `pyargsptr`
 """
 function pysetargs!(pyargsptr::PyPtr, args, N::Int)
+    println("nargs is $N")
     for i = 1:N
         pysetarg!(pyargsptr, args[i], i)
     end
