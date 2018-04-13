@@ -10,7 +10,8 @@ export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
+       pywrapfn, setarg!, setargs!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -727,10 +728,10 @@ end
 Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
 """
 pycall_legacy(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
-    return convert(returntype, _pycall(o, args...; kwargs...))::returntype
+    return convert(returntype, _pycall_legacy(o, args...; kwargs...)) #::returntype
 
 pycall_legacy(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
-    return convert(PyAny, _pycall(o, args...; kwargs...))
+    return convert(PyAny, _pycall_legacy(o, args...; kwargs...))
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but

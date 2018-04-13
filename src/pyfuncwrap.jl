@@ -77,10 +77,10 @@ pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwarg
 Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
 """
 pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
-    return convert(returntype, _pycall(PyNULL(), o, args, kwargs))::returntype
+    return convert(returntype, _pycall!(PyNULL(), o, args, kwargs))::returntype
 
 pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
-    return convert(PyAny, _pycall(PyNULL(), o, args, kwargs))
+    return convert(PyAny, _pycall!(PyNULL(), o, args, kwargs))
 
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
 PyAny(o::PyObject) = convert(PyAny, o)
@@ -104,54 +104,50 @@ macro pycall(ex)
 end
 
 #########################################################################
-struct PyFuncWrap{P<:Union{PyObject,PyPtr}, N, RT}
-    o::P
-    pyargsptr::PyPtr
-    ret::PyObject
-end
-
 """
 ```
-PyFuncWrap(o::P, argtypes::Tuple #= of Types =#, returntype::Type)
+pywrapfn(o::PyObject, nargs::Int, returntype::Type{T}=PyObject) where T
 ```
 
 Wrap a callable PyObject/PyPtr to reduce the number of allocations made for
 passing its arguments, and its return value, sometimes providing a speedup.
-Mainly useful for functions called in a tight loop, particularly if most or
-all of the arguments to the function don't change.
+Mainly useful for functions called in a tight loop. After wrapping, arguments
+should be passed in tuple, rather than directly, e.g. `wrappedfn((a,b))` rather
+than `wrappedfn(a,b)`
 ```
 @pyimport numpy as np
-rand22fn = PyFuncWrap(np.random["rand"], (Int, Int), PyArray)
-setargs!(rand22fn, 2, 2)
+
+# wrap a 2-arg version of np.random.rand for creating random matrices
+randmatfn = pywrapfn(np.random["rand"], 2, PyArray)
+
+# n.b. rand would normally take multiple arguments, like so:
+a_random_matrix = np.random["rand"](7, 7)
+
+# but we call the wrapped version with a tuple instead, i.e.
+# rand22fn((4, 4)) not
+# rand22fn(4, 4)
 for i in 1:10^9
-    arr = rand22fn()
+    arr = rand22fn((4, 4))
     ...
 end
 ```
 """
-function PyFuncWrap(o::P, argtypes::Tuple{Vararg{<:Union{Tuple, Type}}},
-            returntype::Type{RT}=PyObject) where {P<:Union{PyObject,PyPtr}, RT}
-    N = length(argtypes)
-    pyargsptr = @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), N)
-    return PyFuncWrap{P, N, RT}(o, pyargsptr, PyNULL())
+function pywrapfn(o::PyObject, nargs::Int, returntype::Type{T}=PyObject) where T
+    pyargsptr = ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    ret = PyNULL()
+    wrappedfn(args) = convert(T, _pycall!(ret, pyargsptr, o, args, nargs, C_NULL))
+    wrappedfn() = convert(T, __pycall!(ret, pyargsptr, o, C_NULL))
+    return wrappedfn
 end
 
 """
 ```
 setargs!(pyargsptr::PyPtr, args...)
 ```
-Set the arguments to a python function wrapped in a PyFuncWrap, and convert them
+Set the arguments to a python function, and convert them
 to `PyObject`s that can be passed directly to python when the function is
-called. After the arguments have been set, the function can be efficiently
-called with `pf()`
+called.
 """
-function setargs!(pf::PyFuncWrap{P, N, RT}, args) where {P, N, RT}
-    for i = 1:N
-        setarg!(pf.pyargsptr, args[i], i)
-    end
-    nothing
-end
-
 function setargs!(pyargsptr::PyPtr, args::Tuple, N::Int)
     for i = 1:N
         setarg!(pyargsptr, args[i], i)
@@ -163,10 +159,10 @@ end
 ```
 setarg!(pyargsptr::PyPtr, arg, i::Integer=1)
 ```
-Set the `i`th argument to a python function wrapped in a PyFuncWrap, and convert
+Set the `i`th argument to a python function, and convert
 it to a `PyObject` that can be passed directly to python when the function is
-called. Useful if a function takes multiple arguments, but only one or two of
-them change, when calling the function in a tight loop
+called. Can be used if a function takes multiple arguments, but only one or two
+of them change, when the function is called in a tight loop.
 """
 function setarg!(pyargsptr::PyPtr, arg, i::Integer=1)
     pyarg = PyObject(arg)
@@ -174,14 +170,3 @@ function setarg!(pyargsptr::PyPtr, arg, i::Integer=1)
                      (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
     pyincref(pyarg) # PyTuple_SetItem steals the reference
 end
-
-function (pf::PyFuncWrap{P, N, RT})(args) where {P, N, RT}
-    setargs!(pf, args)
-    return pf()
-end
-
-"""
-Warning: if pf(args) or setargs(pf, ...) hasn't been called yet, this will likely segfault
-"""
-(pf::PyFuncWrap{P, N, RT})() where {P, N, RT} =
-    convert(RT, __pycall!(pf.ret, pf.pyargsptr, pf.o, C_NULL)) # C_NULL is keywords
