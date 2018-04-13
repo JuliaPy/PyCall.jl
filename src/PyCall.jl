@@ -169,7 +169,6 @@ include("pytype.jl")
 include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
-include("pyfuncwrap.jl")
 include("io.jl")
 
 #########################################################################
@@ -690,61 +689,12 @@ function pybuiltin(name)
 end
 
 #########################################################################
-const oargs = Array{PyObject}(32)
-const pyargsref = Ref{PyPtr}()
-const cur_args_size = Ref{Int}(0)
-"""
-Low-level version of `pycall!(ret, o, ...)` that always returns `PyObject`.
-"""
-function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args...; kwargs...)
-    nargs = length(args)
-    # oargs = Array{PyObject}(nargs)
-    sigatomic_begin()
-    try
-        if nargs != cur_args_size[]
-            @pycheckz ccall((@pysym :_PyTuple_Resize), Cint,
-                                 (Ptr{PyPtr}, Int,), pyargsref, nargs)
-            cur_args_size[] = nargs
-        end
-        # pyincref_(pyargsref[])
-        # pyargs = PyObject(pyargsref[]) # change to pyincref_ (and pydecref later) to avoid the PyObject?
-
-        for i = 1:nargs
-            oargs[i] = PyObject(args[i])
-            @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
-                             (PyPtr,Int,PyPtr), pyargsref[], i-1, oargs[i])
-            pyincref(oargs[i]) # PyTuple_SetItem steals the reference
-        end
-        # if isempty(kwargs)
-            kw = C_NULL
-        # else
-        #     kw = PyObject(Dict{AbstractString, Any}([Pair(string(k), v) for (k, v) in kwargs]))
-        # end
-        retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
-                        pyargsref[], kw)
-        pyincref_(retptr)
-        pydecref(ret)
-        ret.o = retptr
-        return ret #::PyObject
-    finally
-        sigatomic_end()
-    end
-end
-
-pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
-    return convert(returntype, _pycall!(pyobj, o, args...; kwargs...))
-
-pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, returntype::Type{PyObject},
-       args...; kwargs...) = return _pycall!(pyobj, o, args...; kwargs...)
-
-pycall!(pyobj::PyObject, o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
-    return convert(PyAny, _pycall!(pyobj, o, args...; kwargs...))
-
+include("pyfuncwrap.jl")
 
 """
 Low-level version of `pycall(o, ...)` that always returns `PyObject`.
 """
-function _pycall(o::Union{PyObject,PyPtr}, args...; kwargs...)
+function _pycall_legacy(o::Union{PyObject,PyPtr}, args...; kwargs...)
     oargs = map(PyObject, args)
     nargs = length(args)
     sigatomic_begin()
@@ -776,33 +726,11 @@ end
 
 Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
 """
-pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
+pycall_legacy(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
     return convert(returntype, _pycall(o, args...; kwargs...))::returntype
 
-pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
+pycall_legacy(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
     return convert(PyAny, _pycall(o, args...; kwargs...))
-
-(o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-PyAny(o::PyObject) = convert(PyAny, o)
-
-
-"""
-    @pycall func(args...)::T
-
-Convenience macro which turns `func(args...)::T` into pycall(func, T, args...)
-"""
-macro pycall(ex)
-    if !(isexpr(ex,:(::)) && isexpr(ex.args[1],:call))
-        throw(ArgumentError("Usage: @pycall func(args...)::T"))
-    end
-    func = ex.args[1].args[1]
-    args, kwargs = ex.args[1].args[2:end], []
-    if isexpr(args[1],:parameters)
-        kwargs, args = args[1], args[2:end]
-    end
-    T = ex.args[2]
-    :(pycall($(map(esc,[kwargs; func; T; args])...)))
-end
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
