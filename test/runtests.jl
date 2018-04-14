@@ -561,4 +561,4 @@ end
     @test (@pywith IgnoreError(true) error(); true)
 end
 
-include("test_pycalls.jl")
+include("test_pyfncall.jl")
