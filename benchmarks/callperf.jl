@@ -9,10 +9,12 @@ let
     ret = PyNULL()
     args_lens = (0,1,2,3,7,12,17)
     # args_lens = (1,3,7)
+    # args_lens = (3,)
     arr_sizes = (ntuple(i->1, len) for len in args_lens)
 
     for (i, arr_size) in enumerate(arr_sizes)
-        nprand_wrap = pywrapfn(nprand, length(arr_size))
+        nprand_pywrapfn = pywrapfn(nprand, length(arr_size))
+
         pyargsptr = ccall((@pysym :PyTuple_New), PyPtr, (Int,), length(arr_size))
         arr_size_str = args_lens[i] < 5 ? "$arr_size" : "$(args_lens[i])*(1,1,...)"
 
@@ -32,13 +34,13 @@ let
         println("_pycall! $arr_size_str:\n"); display(results["_pycall! $arr_size_str"])
         println("--------------------------------------------------")
 
-        results["nprand_wrap $arr_size_str"] = @benchmark $nprand_wrap($arr_size)
-        println("nprand_wrap $arr_size_str:\n"); display(results["nprand_wrap $arr_size_str"])
+        results["nprand_pywrapfn $arr_size_str"] = @benchmark $nprand_pywrapfn($arr_size)
+        println("nprand_pywrapfn $arr_size_str:\n"); display(results["nprand_pywrapfn $arr_size_str"])
         println("--------------------------------------------------")
 
-        # args already set by nprand_wrap calls above
-        results["nprand_wrap_noargs $arr_size_str"] = @benchmark $nprand_wrap()
-        println("nprand_wrap_noargs $arr_size_str:\n"); display(results["nprand_wrap_noargs $arr_size_str"])
+        # args already set by nprand_pywrapfn calls above
+        results["nprand_pywrapfn_noargs $arr_size_str"] = @benchmark $nprand_pywrapfn()
+        println("nprand_pywrapfn_noargs $arr_size_str:\n"); display(results["nprand_pywrapfn_noargs $arr_size_str"])
         println("--------------------------------------------------")
     end
 end

@@ -51,7 +51,7 @@ Convert `args` to `PyObject`s, and set them as the elements of the Python tuple
 pointed to by `pyargsptr`
 """
 function pysetargs!(pyargsptr::PyPtr, args, N::Int)
-    println("nargs is $N")
+    # println("nargs is $N")
     for i = 1:N
         pysetarg!(pyargsptr, args[i], i)
     end
@@ -67,7 +67,7 @@ tuple pointed to by `pyargsptr`
 function pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
     pyarg = PyObject(arg)
     pyincref(pyarg) # PyTuple_SetItem steals the reference
-    @show unsafe_load(pyargsptr).ob_refcnt
+    # @show unsafe_load(pyargsptr).ob_refcnt
     @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
                      (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
 end
@@ -151,13 +151,34 @@ macro pycall(ex)
 end
 
 #########################################################################
+struct PyWrapFn{N, RT}
+    o::PyPtr
+    pyargsptr::PyPtr
+    ret::PyObject
+end
+
+function PyWrapFn(o::Union{PyObject, PyPtr}, nargs::Int, returntype::Type=PyObject)
+    pyargsptr = ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    ret = PyNULL()
+    optr = o isa PyPtr ? o : o.o
+    return PyWrapFn{nargs, returntype}(optr, pyargsptr, ret)
+end
+
+(pf::PyWrapFn{N, RT})(args) where {N, RT} =
+    convert(RT, _pycall!(pf.ret, pf.pyargsptr, pf.o, args, N, C_NULL))
+
+(pf::PyWrapFn{N, RT})() where {N, RT} =
+    convert(RT, __pycall!(pf.ret, pf.pyargsptr, pf.o, C_NULL))
+
 """
 ```
 pywrapfn(o::PyObject, nargs::Int, returntype::Type{T}=PyObject) where T
 ```
+Wrap a callable PyObject/PyPtr possibly making calling it more performant. The
+wrapped version (of type `PyWrapFn`) reduces the number of allocations made for
+passing its arguments, and re-uses the same PyObject as its return value each
+time it is called.
 
-Wrap a callable PyObject/PyPtr to reduce the number of allocations made for
-passing its arguments, and its return value, sometimes providing a speedup.
 Mainly useful for functions called in a tight loop. After wrapping, arguments
 should be passed in a tuple, rather than directly, e.g. `wrappedfn((a,b))` rather
 than `wrappedfn(a,b)`.
@@ -180,27 +201,25 @@ for i in 1:10^9
 end
 ```
 """
-function pywrapfn(o::PyObject, nargs::Int, returntype::Type{T}=PyObject) where T
-    pyargsptr = ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
-    ret = PyNULL()
-    wrappedfn(args) = convert(T, _pycall!(ret, pyargsptr, o, args, nargs, C_NULL))
-    wrappedfn() = convert(T, __pycall!(ret, pyargsptr, o, C_NULL))
-
-    return wrappedfn
-end
+pywrapfn(o::PyObject, nargs::Int, returntype::Type=PyObject) =
+    PyWrapFn(o, nargs, returntype)
 
 """
 ```
-pysetargs!(w, args...)
+pysetargs!(w::PyWrapFn{N, RT}, args)
 ```
-Set the arguments to call a Python function wrapped with `w = pywrapfn(pyfun)`
+Set the arguments with which to call a Python function wrapped using
+`w = pywrapfn(pyfun, ...)`
 """
-pysetargs!(w, args, N::Int) = pysetargs!(w.pyargsptr, args, N)
+pysetargs!(pf::PyWrapFn{N, RT}, args) where {N, RT} =
+    pysetargs!(pf.pyargsptr, args, N)
 
 """
 ```
-pysetarg!(w::typeof{wrappedfn}, arg, i::Integer=1)
+pysetarg!(w::PyWrapFn{N, RT}, arg, i::Integer=1)
 ```
-Set argument the `i`th argument to be passed to the Python function wrapped by `w`
+Set the `i`th argument to be passed to a Python function previously
+wrapped with a call to `w = pywrapfn(pyfun, ...)`
 """
-pysetarg!(w, arg, i::Integer=1) = pysetarg!(w.pyargsptr, arg, i)
+pysetarg!(pf::PyWrapFn{N, RT}, arg, i::Integer=1) where {N, RT} =
+    pysetarg!(pf.pyargsptr, arg, i)

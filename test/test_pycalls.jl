@@ -52,7 +52,7 @@ using Compat.Test, PyCall
 
         # set all args then call without args
         arr_size = (4,4)
-        pysetargs!(npzeros2dwrap_pyo, (arr_size, "c", "F"), 3)
+        pysetargs!(npzeros2dwrap_pyo, (arr_size, "c", "F"))
         cmplxmat_pyo = npzeros2dwrap_pyo()
         @test cmplxmat_pyo["dtype"] == np["dtype"]("c")
         @test cmplxmat_pyo["flags"]["f_contiguous"] == true
