@@ -27,8 +27,27 @@ function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args,
     for n in length(pyarg_tuples):nargs
         push!(pyarg_tuples, @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), n))
     end
+    check_pyargsptr(nargs)
     pyargsptr = pyarg_tuples[nargs+1]
     return _pycall!(ret, pyargsptr, o, args, nargs, kw) #::PyObject
+end
+
+"""
+Handle the situation where a callee had previously called incref on the
+arguments tuple that was passed to it. We need to hold the only reference to the
+arguments tuple, since setting a tuple item is only allowed when there is just
+one reference to the tuple (tuples are supposed to be immutable in Python in all
+other cases). Note that this actually happens when creating new builtin
+exceptions, ref: https://github.com/python/cpython/blob/480ab05d5fee2b8fa161f799af33086a4e68c7dd/Objects/exceptions.c#L48
+OTOH this py"def foo(*args): global z; z=args" doesn't trigger this.
+Fortunately, this check for ob_refcnt is fast - only a few cpu clock cycles.
+"""
+function check_pyargsptr(nargs::Int)
+    if unsafe_load(pyarg_tuples[nargs+1]).ob_refcnt > 1
+        pydecref_(pyarg_tuples[nargs+1])
+        pyarg_tuples[nargs+1] =
+            @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    end
 end
 
 """
@@ -51,7 +70,6 @@ Convert `args` to `PyObject`s, and set them as the elements of the Python tuple
 pointed to by `pyargsptr`
 """
 function pysetargs!(pyargsptr::PyPtr, args, N::Int)
-    # println("nargs is $N")
     for i = 1:N
         pysetarg!(pyargsptr, args[i], i)
     end
@@ -67,7 +85,6 @@ tuple pointed to by `pyargsptr`
 function pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
     pyarg = PyObject(arg)
     pyincref(pyarg) # PyTuple_SetItem steals the reference
-    # @show unsafe_load(pyargsptr).ob_refcnt
     @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
                      (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
 end
@@ -211,8 +228,10 @@ pysetargs!(w::PyWrapFn{N, RT}, args)
 Set the arguments with which to call a Python function wrapped using
 `w = pywrapfn(pyfun, ...)`
 """
-pysetargs!(pf::PyWrapFn{N, RT}, args) where {N, RT} =
+function pysetargs!(pf::PyWrapFn{N, RT}, args) where {N, RT}
+    check_pyargsptr(pf)
     pysetargs!(pf.pyargsptr, args, N)
+end
 
 """
 ```
@@ -221,5 +240,18 @@ pysetarg!(w::PyWrapFn{N, RT}, arg, i::Integer=1)
 Set the `i`th argument to be passed to a Python function previously
 wrapped with a call to `w = pywrapfn(pyfun, ...)`
 """
-pysetarg!(pf::PyWrapFn{N, RT}, arg, i::Integer=1) where {N, RT} =
+function pysetarg!(pf::PyWrapFn{N, RT}, arg, i::Integer=1) where {N, RT}
+    check_pyargsptr(pf)
     pysetarg!(pf.pyargsptr, arg, i)
+end
+
+"""
+See check_pyargsptr(nargs::Int) above
+"""
+function check_pyargsptr(pf::PyWrapFn{N, RT}) where {N, RT}
+    if unsafe_load(pf.pyargsptr).ob_refcnt > 1
+        pydecref_(pf.pyargsptr)
+        pf.pyargsptr =
+            @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    end
+end
