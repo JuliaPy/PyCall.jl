@@ -1,5 +1,5 @@
 using PyCall, BenchmarkTools, DataStructures
-using PyCall: PyArrayInfoFromBuffer
+using PyCall: PyArray_Info
 
 results = OrderedDict{String,Any}()
 
@@ -22,11 +22,11 @@ let
         println("convert_pyarr $arr_size:\n"); display(results["convert_pyarr$arr_size"])
         println("--------------------------------------------------")
 
-        results["PyArrayInfoFromBuffer$arr_size"] = @benchmark $PyArrayInfoFromBuffer($pyo_arr)
-        println("PyArrayInfoFromBuffer $arr_size:\n"); display(results["PyArrayInfoFromBuffer$arr_size"])
+        results["PyArray_Info$arr_size"] = @benchmark $PyArray_Info($pyo_arr)
+        println("PyArray_Info $arr_size:\n"); display(results["PyArray_Info$arr_size"])
         println("--------------------------------------------------")
 
-        results["convert_pyarrbuf$arr_size"] = @benchmark $PyArrayFromBuffer($pyo_arr)
+        results["convert_pyarrbuf$arr_size"] = @benchmark $PyArray($pyo_arr)
         println("convert_pyarrbuf $arr_size:\n"); display(results["convert_pyarrbuf$arr_size"])
         println("--------------------------------------------------")
 
@@ -34,7 +34,7 @@ let
         println("convert_arr $arr_size:\n"); display(results["convert_arr$arr_size"])
         println("--------------------------------------------------")
 
-        results["convert_arrbuf$arr_size"] = @benchmark $ArrayFromBuffer($pyo_arr)
+        results["convert_arrbuf$arr_size"] = @benchmark $NoCopyArray($pyo_arr)
         println("convert_arrbuf $arr_size:\n"); display(results["convert_arrbuf$arr_size"])
         println("--------------------------------------------------")
 

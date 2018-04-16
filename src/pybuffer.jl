@@ -244,37 +244,4 @@ function array_format(pybuf::PyBuffer)
     typestrs[fmt_str[type_start_idx:end]], native_byteorder
 end
 
-array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_CONTIGUOUS))
-
-function PyArrayInfoFromBuffer(o::PyObject)
-    # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
-    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
-    T, native_byteorder = array_format(pybuf)
-    sz = size(pybuf)
-    N = length(sz)
-    strd = strides(pybuf)
-    isreadonly = pybuf.buf.readonly==1
-    return PyArray_Info{T,N}(native_byteorder, sz, strd, pybuf.buf.buf, isreadonly)
-end
-
-function PyArrayFromBuffer(o::PyObject)
-    info = PyArrayInfoFromBuffer(o::PyObject)
-    PyArray{eltype(info), length(info.sz)}(o, info)
-end
-
-function ArrayFromBuffer(o::PyObject)
-    # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
-    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
-    T, native_byteorder = array_format(pybuf)
-    !native_byteorder && throw(ArgumentError(
-      "Only native endian format supported, format string: '$(get_format_str(pybuf))'"))
-    T == Void && throw(ArgumentError(
-      "Array datatype '$(get_format_str(pybuf))' not supported"))
-    # TODO more checks on strides etc
-    arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), size(pybuf), false)
-    !f_contiguous(T, size(pybuf), strides(pybuf)) &&
-        (arr = PermutedDimsArray(arr, (pybuf.buf.ndim:-1:1)))
-    return arr
-end
-
 #############################################################################
