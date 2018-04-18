@@ -178,10 +178,11 @@ function PyWrapFn(o::Union{PyObject, PyPtr}, nargs::Int, returntype::Type=PyObje
     pyargsptr = ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
     ret = PyNULL()
     optr = o isa PyPtr ? o : o.o
+    pyincref_(optr)
     return PyWrapFn{nargs, returntype}(optr, pyargsptr, ret)
 end
 
-(pf::PyWrapFn{N, RT})(args) where {N, RT} =
+(pf::PyWrapFn{N, RT})(args...) where {N, RT} =
     convert(RT, _pycall!(pf.ret, pf.pyargsptr, pf.o, args, N, C_NULL))
 
 (pf::PyWrapFn{N, RT})() where {N, RT} =

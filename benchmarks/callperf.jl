@@ -8,7 +8,7 @@ let
     nprand = np["random"]["rand"]
     ret = PyNULL()
     args_lens = (0,1,2,3,7,12,17)
-    # args_lens = (1,3,7)
+    # args_lens = (7,3,1)
     # args_lens = (3,)
     arr_sizes = (ntuple(i->1, len) for len in args_lens)
 
@@ -34,7 +34,7 @@ let
         println("_pycall! $arr_size_str:\n"); display(results["_pycall! $arr_size_str"])
         println("--------------------------------------------------")
 
-        results["nprand_pywrapfn $arr_size_str"] = @benchmark $nprand_pywrapfn($arr_size)
+        results["nprand_pywrapfn $arr_size_str"] = @benchmark $nprand_pywrapfn($arr_size...)
         println("nprand_pywrapfn $arr_size_str:\n"); display(results["nprand_pywrapfn $arr_size_str"])
         println("--------------------------------------------------")
 
