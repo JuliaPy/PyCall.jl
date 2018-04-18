@@ -43,7 +43,7 @@ OTOH this py"def foo(*args): global z; z=args" doesn't trigger this.
 Fortunately, this check for ob_refcnt is fast - only a few cpu clock cycles.
 """
 function check_pyargsptr(nargs::Int)
-    if unsafe_load(pyarg_tuples[nargs+1]).ob_refcnt > 1
+    if nargs > 0 && unsafe_load(pyarg_tuples[nargs+1]).ob_refcnt > 1
         pydecref_(pyarg_tuples[nargs+1])
         pyarg_tuples[nargs+1] =
             @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
