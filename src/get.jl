@@ -11,7 +11,11 @@ function get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k, default)
         pyerr_clear()
         default
     else
-        convert(returntype, PyObject(r))
+        if r != ret.o
+            pydecref_(ret.o)
+            ret.o = r
+        end
+        convert(returntype, ret)
     end
 end
 
@@ -26,9 +30,12 @@ get(o::PyObject, k, default) = get(o, PyAny, k, default)
 # get with k<:Any
 ###############################
 function get!(ret::PyObject, o::PyObject, returntype::TypeTuple, k)
-    pydecref(ret)
-    ret.o = @pycheckn ccall((@pysym :PyObject_GetItem),
+    r = @pycheckn ccall((@pysym :PyObject_GetItem),
                                  PyPtr, (PyPtr,PyPtr), o, PyObject(k))
+    if r != ret.o
+        pydecref_(ret.o)
+        ret.o = r
+    end
     return convert(returntype, ret)
 end
 

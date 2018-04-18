@@ -135,16 +135,15 @@ function pystealref!(o::PyObject)
     return optr
 end
 
-function Base.copy!(dest::PyObject, src::PyObject)
-    pydecref_(dest.o)
-    dest.o = src.o
-    return pyincref(dest)
-end
+Base.copy!(dest::PyObject, src::PyObject) = Base.copy!(dest, src.o)
 
 function Base.copy!(dest::PyObject, src::PyPtr)
-    pydecref_(dest.o)
-    dest.o = src
-    return pyincref_(dest.o)
+    if dest.o != src
+        pyincref_(src)
+        pydecref_(dest.o)
+        dest.o = src
+    end
+    return dest
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
