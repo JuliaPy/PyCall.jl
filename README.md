@@ -40,13 +40,16 @@ the `python` program (if any) in your PATH.
 The advantage of a Conda-based configuration is particularly
 compelling if you are installing PyCall in order to use packages like
 [PyPlot.jl](https://github.com/stevengj/PyPlot.jl) or
-[SymPy.jl](https://github.com/jverzani/SymPy.jl), as these can then
+[SymPy.jl](https://github.com/JuliaPy/SymPy.jl), as these can then
 automatically install their Python dependencies.  (To exploit this in
 your own packages, use the `pyimport_conda` function described below.)
 
 ### Specifying the Python version
 
-If you want to use a different version of Python than the default, you can change the Python version by setting the `PYTHON` environment variable to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.  In Julia:
+If you want to use a different version of Python than the default, you
+can change the Python version by setting the `PYTHON` environment variable
+to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.
+In Julia:
 
     ENV["PYTHON"] = "... path of the python program you want ..."
     Pkg.build("PyCall")
@@ -55,7 +58,8 @@ Note also that you will need to re-run `Pkg.build("PyCall")` if your
 `python` program changes significantly (e.g. you switch to a new
 Python distro, or you switch from Python 2 to Python 3).
 
-To force Julia to use its own Python distribution, via Conda, simply set `ENV["PYTHON"]` to the empty string `""` and re-run `Pkg.build("PyCall")`.
+To force Julia to use its own Python distribution, via Conda, simply
+set `ENV["PYTHON"]` to the empty string `""` and re-run `Pkg.build("PyCall")`.
 
 The current Python version being used is stored in the `pyversion`
 global variable of the `PyCall` module.  You can also look at
@@ -78,10 +82,9 @@ if you switch virtualenvs.  If you want to switch PyCall to use a
 different virtualenv, then you should switch virtualenvs and run
 `rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
 
-**Note:** Usually, the necessary libraries are
-installed along with Python, but [pyenv on
-MacOS](https://github.com/stevengj/PyCall.jl/issues/122) requires you
-to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
+**Note:** Usually, the necessary libraries are installed along with
+Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122)
+requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
 pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
 currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
 As a general rule, we tend to recommend the [Anaconda Python
@@ -228,7 +231,7 @@ return type.
 Assuming you have NumPy installed (true by default if you use Conda),
 then a Julia `a::Array` of NumPy-compatible elements is converted
 by `PyObject(a)` into a NumPy wrapper for the *same data*, i.e. without
-copying the data.   Julia arrays are stored in [column-major order](https://en.wikipedia.org/wiki/Row-major_order),
+copying the data.  Julia arrays are stored in [column-major order](https://en.wikipedia.org/wiki/Row-major_order),
 and since NumPy supports column-major arrays this is not a problem.
 
 However, the *default* ordering of NumPy arrays created in *Python* is row-major, and some Python packages will throw an error if you try to pass them column-major NumPy arrays.  To deal with this, you can use `PyReverseDims(a)` to pass a Julia array as a row-major NumPy array with the dimensions *reversed*. For example, if `a` is a 3x4x5 Julia array, then `PyReverseDims(a)` passes it as a 5x4x3 NumPy row-major array (without making a copy of the underlying data).
