@@ -117,7 +117,7 @@ function find_libpython(python::AbstractString)
             if isdir(libpath)
                 print(libpath, ":\n")
                 for file in readdir(libpath)
-                    if contains(file, "pyth")
+                    if occursin("pyth", file)
                         println("    ", file)
                     end
                 end

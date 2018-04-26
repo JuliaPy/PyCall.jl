@@ -1,4 +1,5 @@
-using Compat.Test, PyCall, Compat
+using PyCall, Compat
+using Compat.Test, Compat.Dates, Compat.Serialization
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -106,9 +107,9 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test roundtripeq([])
     @test convert(Array{PyAny,1}, PyObject(Any[1 2 3; 4 5 6])) == Any[Any[1,2,3],Any[4,5,6]]
     if PyCall.npy_initialized
-        @test roundtripeq(begin A = Array{Int}(); A[1] = 3; A; end)
+        @test roundtripeq(begin A = Array{Int}(undef); A[1] = 3; A; end)
     end
-    @test convert(PyAny, PyObject(begin A = Array{Any}(); A[1] = 3; A; end)) == 3
+    @test convert(PyAny, PyObject(begin A = Array{Any}(undef); A[1] = 3; A; end)) == 3
 
     array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
     @test array2py2arrayeq(rand(3))
@@ -155,8 +156,8 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
     @test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
 
-    # fixme: is there any nontrivial mimewritable test we can do?
-    @test !mimewritable("text/html", PyObject(1))
+    # fixme: is there any nontrivial showable test we can do?
+    @test !showable("text/html", PyObject(1))
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
     # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
@@ -165,7 +166,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
     # IO (issue #107)
     #@test roundtripeq(stdout) # No longer true since #250
-    let buf = IOBuffer(false, true), obuf = PyObject(buf)
+    let buf = Compat.IOBuffer(read=false, write=true), obuf = PyObject(buf)
         @test !obuf[:isatty]()
         @test obuf[:writable]()
         @test !obuf[:readable]()
@@ -437,16 +438,11 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test PyNULL() == deserialize(seekstart(b))
     end
 
-    # issue #389
-    @pydef mutable struct EmptyClass
-    end
-
     # @pycall macro expands correctly
     _pycall = GlobalRef(PyCall,:pycall)
     @test macroexpand(@__MODULE__, :(@pycall foo(bar)::T)) == :($(_pycall)(foo, T, bar))
     @test macroexpand(@__MODULE__, :(@pycall foo(bar, args...)::T)) == :($(_pycall)(foo, T, bar, args...))
     @test macroexpand(@__MODULE__, :(@pycall foo(bar; kwargs...)::T)) == :($(_pycall)(foo, T, bar; kwargs...))
-
 
     # basic @pywith functionality
     fname = tempname()
@@ -461,43 +457,11 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         rm(fname,force=true)
     end
 
-    # @pywith errors correctly handled
-    @pydef mutable struct IgnoreError
-        function __init__(self, ignore)
-            self[:ignore] = ignore
-        end
-        __enter__(self) = ()
-        __exit__(self, typ, value, tb) = self[:ignore]
-    end
-
-    # @pydef example from README
-    @pydef type Doubler <: PyCall.builtin[:AssertionError]
-        __init__(self, x=10) = (self[:x] = x)
-        function my_method(self, arg1::Number)
-            return arg1 + 20
-        end
-        type_str(self, obj::T) where T = string(T)
-        x2.get(self) = self[:x] * 2
-        function x2.set!(self, new_val)
-            self[:x] = new_val / 2
-        end
-    end
-    d = Doubler(5)
-    @test d[:x] == 5
-    d[:x2] = 30
-    @test d[:x] == 15
-    @test d[:type_str](10) == string(Int)
-    @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
-
-
-    @test_throws ErrorException @pywith IgnoreError(false) error()
-    @test (@pywith IgnoreError(true) error(); true)
-
-    @test contains(Base.Docs.doc(PyObject(1)).content, "integer")
-    @test contains(Base.Docs.doc(PyObject(py"lambda x: x+1")).content, "no docstring")
+    @test occursin("integer", Base.Docs.doc(PyObject(1)).content)
+    @test occursin("no docstring", Base.Docs.doc(PyObject(py"lambda x: x+1")).content)
 
     let b = rand(UInt8, 1000)
-        @test Vector{UInt8}(pybytes(b)) == b == Vector{UInt8}(pybytes(String(b)))
+        @test convert(Vector{UInt8}, pybytes(b)) == b == convert(Vector{UInt8}, pybytes(String(copy(b))))
     end
 
     let t = convert(Tuple, PyObject((3,34)))
@@ -546,4 +510,45 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
     @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === 5
+end
+
+######################################################################
+#@pydef tests: type declarations need to happen at top level
+
+# issue #389
+@pydef mutable struct EmptyClass
+end
+
+# @pywith errors correctly handled
+@pydef mutable struct IgnoreError
+    function __init__(self, ignore)
+        self[:ignore] = ignore
+    end
+    __enter__(self) = ()
+    __exit__(self, typ, value, tb) = self[:ignore]
+end
+
+# @pydef example from README
+@pydef mutable struct Doubler <: PyCall.builtin[:AssertionError]
+    __init__(self, x=10) = (self[:x] = x)
+    function my_method(self, arg1::Number)
+        return arg1 + 20
+    end
+    type_str(self, obj::T) where T = string(T)
+    x2.get(self) = self[:x] * 2
+    function x2.set!(self, new_val)
+        self[:x] = new_val / 2
+    end
+end
+
+@testset "pydef" begin
+    d = Doubler(5)
+    @test d[:x] == 5
+    d[:x2] = 30
+    @test d[:x] == 15
+    @test d[:type_str](10) == string(Int)
+    @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
+
+    @test_throws ErrorException @pywith IgnoreError(false) error()
+    @test (@pywith IgnoreError(true) error(); true)
 end

@@ -79,7 +79,7 @@ function npyinitialize()
     catch e
         error("could not read __multiarray_api.h to parse PyArray_API ", e)
     end
-    hdr = replace(hdr, r"\\\s*\n", " "); # rm backslashed newlines
+    hdr = replace(hdr, r"\\\s*\n"=>" "); # rm backslashed newlines
     r = r"^#define\s+([A-Za-z]\w*)\s+\(.*\bPyArray_API\s*\[\s*([0-9]+)\s*\]\s*\)\s*$"m # regex to match #define PyFoo (... PyArray_API[nnn])
     PyArray_API_length = 0
     for m in eachmatch(r, hdr) # search for max index into PyArray_API
@@ -334,14 +334,14 @@ end
 size(a::PyArray) = a.dims
 ndims(a::PyArray{T,N}) where {T,N} = N
 
-similar(a::PyArray, T, dims::Dims) = Array{T}(uninitialized, dims)
+similar(a::PyArray, T, dims::Dims) = Array{T}(undef, dims)
 
 function copy(a::PyArray{T,N}) where {T,N}
     if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
         B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
         return permutedims(B, (N:-1:1))
     end
-    A = Array{T}(uninitialized, a.dims)
+    A = Array{T}(undef, a.dims)
     if a.f_contig
         ccall(:memcpy, Cvoid, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
         return A
@@ -446,7 +446,7 @@ function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        A = Array{pyany_toany(T)}(uninitialized, len)
+        A = Array{pyany_toany(T)}(undef, len)
         py2array(T, A, o, 1, 1)
     end
 end
@@ -457,7 +457,7 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
         try
             copy(PyArray{T, length(info.sz)}(o, info)) # will check T == info.T
         catch
-            return py2array(T, Array{pyany_toany(T)}(uninitialized, info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
         end
     catch
         py2array(T, o)
@@ -474,7 +474,7 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
             if nd != N
                 throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
             end
-            return py2array(T, Array{pyany_toany(T)}(uninitialized, info.sz...), o, 1, 1)
+            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
         end
     catch
         A = py2array(T, o)

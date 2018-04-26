@@ -27,7 +27,7 @@ macro with_ioraise(expr)
 end
 
 function jl_io_readline(io::IO, nb)
-    d = Compat.readline(io, chomp=false)
+    d = Compat.readline(io, keep=true)
     if sizeof(d) > nb ≥ 0
         error("byte-limited readline is not yet supported by PyCall")
     end
@@ -38,14 +38,14 @@ function jl_io_readlines(io::IO, nb)
     ret = PyObject[]
     nread = 0
     while (nb < 0 || nread ≤ nb) && !eof(io)
-        d = Compat.readline(io, chomp=false)
+        d = Compat.readline(io, keep=true)
         nread += sizeof(d)
         push!(ret, PyObject(d))
     end
     return ret
 end
 
-isseekable(io) = method_exists(seek, Tuple{typeof(io), Int64})
+isseekable(io) = hasmethod(seek, Tuple{typeof(io), Int64})
 isseekable(io::IOBuffer) = io.seekable
 
 function jl_io_seek(io::IO, offset, whence)
@@ -85,7 +85,7 @@ function pyio_initialize()
             function flush(self)
                 @with_ioraise begin
                     io = pyio_jl(self)
-                    if method_exists(flush, Tuple{typeof(io)})
+                    if hasmethod(flush, Tuple{typeof(io)})
                         flush(io)
                     end
                 end

@@ -411,7 +411,7 @@ documentation `?pyfunction` and `?pyfunctionret` for more information.
 For instance,
 
     @pyimport numpy.polynomial as P
-    @pydef type Doubler <: P.Polynomial
+    @pydef mutable struct Doubler <: P.Polynomial
         function __init__(self, x=10)
             self[:x] = x
         end
@@ -441,7 +441,7 @@ The method arguments and return values are automatically converted between Julia
 
 `@pydef` allows for multiple inheritance of Python classes:
 
-    @pydef type SomeType <: (BaseClass1, BaseClass2)
+    @pydef mutable struct SomeType <: (BaseClass1, BaseClass2)
         ...
     end
 
@@ -450,7 +450,7 @@ Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter):
     using PyCall
     @pyimport Tkinter as tk
 
-    @pydef type SampleApp <: tk.Tk
+    @pydef mutable struct SampleApp <: tk.Tk
         __init__(self, args...; kwargs...) = begin
             tk.Tk[:__init__](self, args...; kwargs...)
             self[:label] = tk.Label(text="Hello, world!")

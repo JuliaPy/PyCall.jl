@@ -1,12 +1,17 @@
 using Compat.Serialization
 import Compat.Serialization: serialize, deserialize
+if VERSION < v"0.7.0-DEV.3476"
+    import Base.Serializer: serialize_type
+else
+    import Compat.Serialization: serialize_type
+end
 
 const _pickle = PyNULL()
 
 pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
 
 function serialize(s::AbstractSerializer, pyo::PyObject)
-    Serializer.serialize_type(s, PyObject)
+    serialize_type(s, PyObject)
     if ispynull(pyo)
         serialize(s, pyo.o)
     else

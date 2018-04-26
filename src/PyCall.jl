@@ -16,8 +16,8 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
-       append!, insert!, prepend!, mimewritable, unsafe_convert
-import Compat: pushfirst!, popfirst!
+       append!, insert!, prepend!, unsafe_convert
+import Compat: pushfirst!, popfirst!, firstindex, lastindex
 
 # Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -607,7 +607,7 @@ string otherwise.
 """
 function anaconda_conda()
     # Anaconda Python seems to always include "Anaconda" in the version string.
-    if conda || !contains(unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())), "conda")
+    if conda || !occursin("conda", unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())))
         return ""
     end
     aconda = joinpath(dirname(pyprogramname), "conda")
@@ -811,8 +811,9 @@ getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2))
 setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py(i2)), v)
 getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
 setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
-Base.endof(o::PyObject) = length(o)
 length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+firstindex(o::PyObject) = 1
+lastindex(o::PyObject) = length(o)
 
 function splice!(a::PyObject, i::Integer)
     v = a[i]
@@ -885,6 +886,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
+    showable = VERSION < v"0.7.0-DEV.4047" ? :mimewritable : :showable
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
             if !ispynull(o) && haskey(o, $method)
@@ -893,7 +895,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
             end
             throw(MethodError(show, (io, mime, o)))
         end
-        mimewritable(::$mime, o::PyObject) =
+        Base.$showable(::$mime, o::PyObject) =
             !ispynull(o) && haskey(o, $method) && let meth = o[$method]
                 meth.o != pynothing[] &&
                 pycall(meth, PyObject).o != pynothing[]

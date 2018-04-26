@@ -104,12 +104,12 @@ function interpolate_pycode(code::AbstractString)
     numlocals = 0
     localprefix = "__julia_localvar_$(_localvar_counter[])_"
     _localvar_counter[] += 1
-    while i <= endof(code)
+    while i <= lastindex(code)
         c = code[i]
         newstate = get(pyFSM, (state, c), '?')
         if newstate == '$' # Julia expression to interpolate
             i += 1
-            i > endof(code) && error("unexpected end of string after \$")
+            i > lastindex(code) && error("unexpected end of string after \$")
             interp_literal = false
             if code[i] == '$' # $$foo pastes the string foo into the Python code
                 i += 1
@@ -130,7 +130,7 @@ function interpolate_pycode(code::AbstractString)
             if newstate == '?' # cases that need special handling
                 if state == 'p'
                     if c == '"' # either " or """ string
-                        if i + 2 <= endof(code) && code[i+1] == '"' && code[i+2] == '"'
+                        if i + 2 <= lastindex(code) && code[i+1] == '"' && code[i+2] == '"'
                             i = i + 2
                             newstate = 't'
                         else
@@ -148,7 +148,7 @@ function interpolate_pycode(code::AbstractString)
                 elseif state == 'B'
                     newstate = 't'
                 elseif state == 't'
-                    if c == '"' && i + 2 <= endof(code) && code[i+1] == '"' && code[i+2] == '"'
+                    if c == '"' && i + 2 <= lastindex(code) && code[i+1] == '"' && code[i+2] == '"'
                         i = i + 2
                         newstate = 'p'
                     end
@@ -201,7 +201,7 @@ macro py_str(code, options...)
         push!(code_expr.args, code[i0:prevind(code,i)], esc(locals[i]))
         i0 = i
     end
-    push!(code_expr.args, code[i0:endof(code)])
+    push!(code_expr.args, code[i0:lastindex(code)])
     if input_type == Py_eval_input
         removelocals = Expr(:block, [:(delete!(m, $v)) for v in keys(locals)]...)
     else

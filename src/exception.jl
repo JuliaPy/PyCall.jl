@@ -13,7 +13,7 @@ mutable struct PyError <: Exception
     # PyErr_Occurred returns non-NULL, and clears the Python error
     # indicator.
     function PyError(msg::AbstractString)
-        exc = Array{PyPtr}(uninitialized, 3)
+        exc = Array{PyPtr}(undef, 3)
         pexc = convert(UInt, pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
         ccall((@pysym :PyErr_Fetch), Cvoid, (UInt,UInt,UInt),

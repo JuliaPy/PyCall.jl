@@ -193,7 +193,7 @@ convert(::Type{Function}, po::PyObject) =
 # Tuple conversion.  Julia Pairs are treated as Python tuples.
 
 function PyObject(t::Union{Tuple,Pair})
-    len = endof(t) # endof, not length, because of julia#14924
+    len = lastindex(t) # lastindex, not length, because of julia#14924
     o = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), len))
     for i = 1:len
         oi = PyObject(t[i])
@@ -341,7 +341,7 @@ end
 array2py(A::AbstractArray) = array2py(A, 1, 1)
 
 PyObject(A::AbstractArray) =
-   ndims(A) <= 1 || method_exists(stride, Tuple{typeof(A),Int}) ? array2py(A) :
+   ndims(A) <= 1 || hasmethod(stride, Tuple{typeof(A),Int}) ? array2py(A) :
    pyjlwrap_new(A)
 
 function py2array(T, A::Array{TA,N}, o::PyObject,
@@ -406,7 +406,7 @@ end
 
 function py2array(T, o::PyObject)
     dims = pyarray_dims(o)
-    A = Array{pyany_toany(T)}(uninitialized, dims)
+    A = Array{pyany_toany(T)}(undef, dims)
     py2array(T, A, o, 1, 1)
 end
 
@@ -417,7 +417,7 @@ function convert(::Type{Vector{T}}, o::PyObject) where T
         pyerr_clear()
         throw(ArgumentError("expected Python sequence"))
     end
-    py2array(T, Array{pyany_toany(T)}(uninitialized, len), o, 1, 1)
+    py2array(T, Array{pyany_toany(T)}(undef, len), o, 1, 1)
 end
 
 convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
