@@ -812,6 +812,7 @@ setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py
 getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
 setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
 length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+size(o::PyObject) = (length(o),)
 firstindex(o::PyObject) = 1
 lastindex(o::PyObject) = length(o)
 

@@ -346,7 +346,7 @@ function copy(a::PyArray{T,N}) where {T,N}
         ccall(:memcpy, Cvoid, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
         return A
     else
-        return copy!(A, a)
+        return copyto!(A, a)
     end
 end
 

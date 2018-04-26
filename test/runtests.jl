@@ -414,7 +414,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
     # updating operators .+= etcetera
     let o = PyObject(Any[1,2]), c = o
-        o .+= Any[3,4]
+        broadcast!(+, o, o, Any[3,4]) # o .+= x doesn't work yet in 0.7
         @test collect(o) == [1,2,3,4]
         @test o.o == c.o # updated in-place
     end
@@ -510,6 +510,12 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
     @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === 5
+
+    # broadcasting scalars
+    let o = PyObject(3) .+ [1,4]
+        @test o isa Vector{PyObject}
+        @test o == [4,7]
+    end
 end
 
 ######################################################################
