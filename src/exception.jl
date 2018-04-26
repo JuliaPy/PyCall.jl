@@ -29,15 +29,15 @@ function show(io::IO, e::PyError)
           isempty(e.msg) ? e.msg : string(" (",e.msg,")"),
           " ")
 
-    if e.T.o == C_NULL
+    if ispynull(e.T)
         println(io, "None")
     else
         println(io, pystring(e.T), "\n", pystring(e.val))
     end
 
-    if e.traceback.o != C_NULL
+    if !ispynull(e.traceback)
         o = pycall(format_traceback, PyObject, e.traceback)
-        if o.o != C_NULL
+        if !ispynull(o)
             for s in PyVector{AbstractString}(o)
                 print(io, s)
             end
@@ -48,13 +48,14 @@ end
 #########################################################################
 # Conversion of Python exceptions into Julia exceptions
 
+# whether a Python exception has occurred
+pyerr_occurred() = ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
+
 # call to discard Python exceptions
 pyerr_clear() = ccall((@pysym :PyErr_Clear), Cvoid, ())
 
 function pyerr_check(msg::AbstractString, val::Any)
-    if ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
-        throw(PyError(msg))
-    end
+    pyerr_occurred() && throw(PyError(msg))
     val # the val argument is there just to pass through to the return value
 end
 

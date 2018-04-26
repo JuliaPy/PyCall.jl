@@ -24,33 +24,65 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
-# Numpy scalars need to be converted to ordinary Python scalars with
-# the item() method before passing to the Python API conversion functions
-asscalar(o::PyObject) = pyisinstance(o, npy_number) ? pycall(o["item"], PyObject) : o
+# numpy scalars need o.item() conversion in Python 3
+unsafe_asscalar(o) = PyObject(ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, "item"))
 
-convert(::Type{T}, po::PyObject) where {T<:Integer} =
-  convert(T, @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), asscalar(po)))
+function convert(::Type{T}, po::PyObject) where {T<:Integer}
+    i = ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
+    if pyerr_occurred()
+      if haskey(po, "item")
+          pyerr_clear()
+          i = @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), unsafe_asscalar(po))
+      else
+          throw(PyError(string(PyInt_AsSsize_t)))
+      end
+    end
+    return T(i)
+end
 
 if Sys.WORD_SIZE == 32
-  convert(::Type{T}, po::PyObject) where {T<:Union{Int64,UInt64}} =
-    @pycheck(ccall((@pysym :PyLong_AsLongLong), UInt64, (PyPtr,), asscalar(po))) % T
+    function convert(::Type{T}, po::PyObject) where {T<:Union{Int64,UInt64}}
+        i = ccall(@pysym(:PyLong_AsLongLong), UInt64, (PyPtr,), po)
+        if pyerr_occurred()
+            if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
+                pyerr_clear()
+                i = @pycheck ccall(@pysym(:PyLong_AsLongLong), UInt64, (PyPtr,), unsafe_asscalar(po))
+            else
+                throw(PyError("PyLong_AsLongLong"))
+            end
+        end
+        return i % T
+    end
 end
 
 convert(::Type{Bool}, po::PyObject) =
     0 != @pycheck ccall(@pysym(:PyObject_IsTrue), Cint, (PyPtr,), po)
 
-convert(::Type{T}, po::PyObject) where {T<:Real} =
-  convert(T, @pycheck ccall((@pysym :PyFloat_AsDouble), Cdouble, (PyPtr,), asscalar(po)))
+function convert(::Type{T}, po::PyObject) where {T<:Real}
+    x = ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), po)
+    if pyerr_occurred()
+      if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
+          pyerr_clear()
+          x = @pycheck ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), unsafe_asscalar(po))
+      else
+          throw(PyError("PyFloat_AsDouble"))
+      end
+    end
+    return T(x)
+end
 
-function convert(::Type{T}, po_::PyObject) where T<:Complex
-    po = asscalar(po_)
-    convert(T,
-            begin
-                re = @pycheck ccall((@pysym :PyComplex_RealAsDouble),
-                                    Cdouble, (PyPtr,), po)
-                complex(re, ccall((@pysym :PyComplex_ImagAsDouble),
-                                  Cdouble, (PyPtr,), po))
-            end)
+function convert(::Type{T}, po::PyObject) where T<:Complex
+    x = ccall(@pysym(:PyComplex_RealAsDouble), Cdouble, (PyPtr,), po)
+    if pyerr_occurred()
+      if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
+          pyerr_clear()
+          po = unsafe_asscalar(po)
+          x = @pycheck ccall(@pysym(:PyComplex_RealAsDouble), Cdouble, (PyPtr,), po)
+      else
+          throw(PyError("PyComplex_RealAsDouble"))
+      end
+    end
+    return T(x, ccall(@pysym(:PyComplex_ImagAsDouble), Cdouble, (PyPtr,), po))
 end
 
 convert(::Type{Nothing}, po::PyObject) = nothing
@@ -217,7 +249,7 @@ Alternatively, `PyVector` can be used as the return type for a `pycall` that ret
 mutable struct PyVector{T} <: AbstractVector{T}
     o::PyObject
     function PyVector{T}(o::PyObject) where T
-        if o.o == C_NULL
+        if ispynull(o)
             throw(ArgumentError("cannot make PyVector from NULL PyObject"))
         end
         new{T}(o)
@@ -421,7 +453,7 @@ mutable struct PyDict{K,V,isdict} <: AbstractDict{K,V}
     # isdict = true for python dict, otherwise is a generic Mapping object
 
     function PyDict{K,V,isdict}(o::PyObject) where {K,V,isdict}
-        if !isdict && o.o != C_NULL && !is_mapping_object(o)
+        if !isdict && !ispynull(o) && !is_mapping_object(o)
             throw(ArgumentError("only Dict and Mapping objects can be converted to PyDict"))
         end
         return new{K,V,isdict}(o)
@@ -609,7 +641,7 @@ const mpmath = PyNULL()
 const mpf = PyNULL()
 const mpc = PyNULL()
 function mpmath_init()
-    if mpmath.o == C_NULL
+    if ispynull(mpmath)
         copy!(mpmath, pyimport("mpmath"))
         copy!(mpf, mpmath["mpf"])
         copy!(mpc, mpmath["mpc"])
@@ -787,7 +819,7 @@ function pytype_query(o::PyObject, default::TypeTuple=PyObject)
 end
 
 function convert(::Type{PyAny}, o::PyObject)
-    if (o.o == C_NULL)
+    if ispynull(o)
         return o
     end
     try

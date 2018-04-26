@@ -3,11 +3,11 @@ import Compat.Serialization: serialize, deserialize
 
 const _pickle = PyNULL()
 
-pickle() = _pickle.o == C_NULL ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
+pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
 
 function serialize(s::AbstractSerializer, pyo::PyObject)
     Serializer.serialize_type(s, PyObject)
-    if pyo.o == C_NULL
+    if ispynull(pyo)
         serialize(s, pyo.o)
     else
         b = PyBuffer(pycall(pickle()["dumps"], PyObject, pyo))

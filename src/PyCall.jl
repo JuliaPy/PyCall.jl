@@ -4,12 +4,12 @@ module PyCall
 
 using Compat, VersionParsing
 
-export pycall, pyimport, pybuiltin, PyObject, PyReverseDims,
+export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
-       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, @pydef,
+       pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
        pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
@@ -89,6 +89,14 @@ someobject)`.   This procedure will properly handle Python's reference counting
 """
 PyNULL() = PyObject(PyPtr_NULL)
 
+"""
+    ispynull(o::PyObject)
+
+Test where `o` contains a `NULL` pointer to a Python object, i.e. whether
+it is equivalent to a `PyNULL()` object.
+"""
+ispynull(o::PyObject) = o.o == PyPtr_NULL
+
 function pydecref(o::PyObject)
     ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o.o)
     o.o = PyPtr_NULL
@@ -129,7 +137,7 @@ function Base.copy!(dest::PyObject, src::PyObject)
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
-  t.o != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
+  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
 
 pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
@@ -151,7 +159,7 @@ include("pyinit.jl")
 include("exception.jl")
 include("gui.jl")
 
-pytypeof(o::PyObject) = o.o == C_NULL ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
+pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
 
 #########################################################################
 
@@ -201,7 +209,7 @@ in Python, but unlike `repr` it should never fail (falling back to `str` or to
 printing the raw pointer if necessary).
 """
 function pystring(o::PyObject)
-    if o.o == C_NULL
+    if ispynull(o)
         return "NULL"
     else
         s = ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
@@ -238,7 +246,7 @@ const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
 hashsalt(x) = hash(x, pysalt)
 
 function hash(o::PyObject)
-    if o.o == C_NULL
+    if ispynull(o)
         hashsalt(C_NULL)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
@@ -260,7 +268,7 @@ end
 # conversion.
 
 function getindex(o::PyObject, s::AbstractString)
-    if (o.o == C_NULL)
+    if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
@@ -274,7 +282,7 @@ end
 getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
 function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
-    if (o.o == C_NULL)
+    if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
     if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
@@ -286,7 +294,7 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
 end
 
 function haskey(o::PyObject, s::Union{Symbol,AbstractString})
-    if (o.o == C_NULL)
+    if ispynull(o)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
@@ -385,28 +393,46 @@ else
     DeactivatePyActCtx(cookie) = nothing
 end
 
+function _pyimport(name::AbstractString)
+    cookie = ActivatePyActCtx()
+    try
+        return PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
+    finally
+        DeactivatePyActCtx(cookie)
+    end
+end
+
+"""
+    pyimport_e(s::AbstractString)
+
+Like `pyimport(s)`, but returns an `ispynull(o) == true` object if
+the module cannot be imported rather than throwing an error.
+"""
+function pyimport_e(name::AbstractString)
+    o = _pyimport(name)
+    ispynull(o) && pyerr_clear()
+    return o
+end
+
 """
     pyimport(s::AbstractString)
 
 Import the Python module `s` (a string or symbol) and return a pointer to it (a `PyObject`). Functions or other symbols in the module may then be looked up by s[name] where name is a string (for the raw PyObject) or symbol (for automatic type-conversion). Unlike the @pyimport macro, this does not define a Julia module and members cannot be accessed with `s.name`
 """
 function pyimport(name::AbstractString)
-    cookie = ActivatePyActCtx()
-    try
-        return PyObject(@pycheckn ccall((@pysym :PyImport_ImportModule), PyPtr,
-                                        (Cstring,), name))
-    catch e
-        # on importerror, add a bit more information to the
-        # exception message to help with common user confusions
-        # about installing packages.
-        if isa(e, PyError) && e.T.o == @pyglobalobjptr(:PyExc_ImportError)
-            msg = """
+    o = _pyimport(name)
+    if ispynull(o)
+        if pyerr_occurred()
+            e = PyError("PyImport_ImportModule")
+            if e.T.o == @pyglobalobjptr(:PyExc_ImportError)
+                # Expand message to help with common user confusions.
+                msg = """
 The Python package $name could not be found by pyimport. Usually this means
 that you did not install $name in the Python version being used by PyCall.
 
 """
-            if conda
-                msg = msg * """
+                if conda
+                    msg = msg * """
 PyCall is currently configured to use the Julia-specific Python distribution
 installed by the Conda.jl package.  To install the $name module, you can
 use `pyimport_conda("$(escape_string(name))", PKG)`, where PKG is the Anaconda
@@ -419,8 +445,8 @@ you can re-configure PyCall with that Python.   As explained in the PyCall
 documentation, set ENV["PYTHON"] to the path/name of the python executable
 you want to use, run Pkg.build("PyCall"), and re-launch Julia.
 """
-            else
-                msg = msg * """
+                else
+                    msg = msg * """
 PyCall is currently configured to use the Python version at:
 
 $python
@@ -442,14 +468,15 @@ where PKG is the Anaconda package the contains the module $name,
 or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
+                end
+                e.msg *= "\n\n" * msg * "\n"
             end
-            e.msg *= "\n\n" * msg * "\n"
+            throw(e)
+        else
+            error("PyImport_ImportModule failed mysteriously") # non-Python error?
         end
-        rethrow(e)
-    finally
-        DeactivatePyActCtx(cookie)
     end
-    obj
+    return o
 end
 pyimport(name::Symbol) = pyimport(string(name))
 
@@ -860,14 +887,14 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
-            if o.o != C_NULL && haskey(o, $method)
+            if !ispynull(o) && haskey(o, $method)
                 r = pycall(o[$method], PyObject)
                 r.o != pynothing[] && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
         end
         mimewritable(::$mime, o::PyObject) =
-            o.o != C_NULL && haskey(o, $method) && let meth = o[$method]
+            !ispynull(o) && haskey(o, $method) && let meth = o[$method]
                 meth.o != pynothing[] &&
                 pycall(meth, PyObject).o != pynothing[]
             end

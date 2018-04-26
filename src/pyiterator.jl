@@ -25,7 +25,7 @@ function next(po::PyObject, s)
     end
 end
 
-done(po::PyObject, s) = s[1].o == C_NULL
+done(po::PyObject, s) = ispynull(s[1])
 
 # issue #216
 function Base.collect(::Type{T}, o::PyObject) where T

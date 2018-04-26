@@ -57,7 +57,7 @@ import Base: <, <=, ==, !=, >, >=, isequal, isless
 for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
                 (:>, Py_GT), (:>=, Py_GE), (:isequal, Py_EQ), (:isless, Py_LT))
     @eval function $op(o1::PyObject, o2::PyObject)
-        if o1.o == C_NULL || o2.o == C_NULL
+        if ispynull(o1) || ispynull(o2)
             return $(py==Py_EQ || py==Py_NE || op==:isless ? :($op(o1.o, o2.o)) : false)
         elseif is_pyjlwrap(o1) && is_pyjlwrap(o2)
             return $op(unsafe_pyjlwrap_to_objref(o1.o),
@@ -80,5 +80,5 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
     end
 end
 # default to false since hash(x) != hash(PyObject(x)) in general
-isequal(o1::PyObject, o2::Any) = o1.o != C_NULL && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(o1.o), o2) : false
+isequal(o1::PyObject, o2::Any) = !ispynull(o1) && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(o1.o), o2) : false
 isequal(o1::Any, o2::PyObject) = isequal(o2, o1)

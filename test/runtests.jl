@@ -19,14 +19,19 @@ struct TestConstruct
     x
 end
 
-pymodule_exists(s::AbstractString) = try
-    pyimport(s)
-    true
-catch
-    false
-end
+pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
 @testset "PyCall" begin
+    # conversion of NumPy scalars before npy_initialized by array conversions (#481)
+    np = pyimport_e("numpy")
+    if !ispynull(np) # numpy is installed, so test
+        let o = get(pycall(np["array"], PyObject, 1:3), PyObject, 2)
+            @test convert(Int32, o) === Int32(3)
+            @test convert(Int64, o) === Int64(3)
+            @test convert(Complex{Int}, o) === 3+0im
+        end
+    end
+
     # test handling of type-tuple changes in Julia 0.4
     import PyCall.pyany_toany
     @test pyany_toany(Int) == Int
@@ -302,13 +307,16 @@ end
     let x = PyNULL(), y = copy!(x, PyObject(314159))
         @test Int(x) == Int(y) == 314159
     end
+    @test ispynull(PyNULL())
+    @test !ispynull(PyObject(3))
+    @test ispynull(pydecref(PyObject(3)))
 
-    @test pyimport_conda("inspect", "not a conda package").o != C_NULL
+    @test !ispynull(pyimport_conda("inspect", "not a conda package"))
     import Conda
     if PyCall.conda
         # import pyzmq to test PR #294
         let already_installed = "pyzmq" ∈ Conda._installed_packages()
-            @test pyimport_conda("zmq", "pyzmq").o != C_NULL
+            @test !ispynull(pyimport_conda("zmq", "pyzmq"))
             @test "pyzmq" ∈ Conda._installed_packages()
             if !already_installed
                 Conda.rm("pyzmq")
