@@ -537,4 +537,5 @@ end
     @test pyfunctionret(factorial, Float64, Int)(3) === 6.0
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
+    @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === 5
 end
