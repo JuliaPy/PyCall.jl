@@ -117,7 +117,7 @@ function pyfunctionret(f, returntype, argtypes...; kwtypes...)
         return pyfunction((args...; kws...) -> pyjlwrap_new(f(args...; kws...)),
                           argtypes...; kwtypes...)
     elseif returntype === nothing
-        return pyfunction((args...; kws...) -> begin pyjlwrap_new(f(args...; kws...)); nothing; end,
+        return pyfunction((args...; kws...) -> begin f(args...; kws...); nothing; end,
                           argtypes...; kwtypes...)
     else
         return pyfunction((args...; kws...) -> returntype(f(args...; kws...)),
