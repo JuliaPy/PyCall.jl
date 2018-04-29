@@ -5,6 +5,11 @@ os:
 julia:
     - 0.6
     - nightly
+addons:
+  apt:
+    packages:
+      - python-numpy
+      - python3-numpy
 env:
   global:
     - PYCALL_DEBUG_BUILD="yes"

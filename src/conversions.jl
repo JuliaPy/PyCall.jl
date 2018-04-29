@@ -25,7 +25,7 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 # conversions to Julia types from PyObject
 
 # numpy scalars need o.item() conversion in Python 3
-unsafe_asscalar(o) = PyObject(ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, "item"))
+unsafe_asscalar(o) = pycall(PyObject(ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, "item")), PyObject)
 
 function convert(::Type{T}, po::PyObject) where {T<:Integer}
     i = ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
