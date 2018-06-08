@@ -155,7 +155,6 @@ PyObject(o::PyObject) = o
 
 #########################################################################
 
-include("pyinit.jl")
 include("exception.jl")
 include("gui.jl")
 
@@ -913,6 +912,10 @@ Docs.getdoc(o::PyObject) = Text(String(o["__doc__"]))
 
 include("pyeval.jl")
 include("serialize.jl")
+
+#########################################################################
+
+include("pyinit.jl")
 
 #########################################################################
 # Precompilation: just an optimization to speed up initialization.
