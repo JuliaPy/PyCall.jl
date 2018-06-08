@@ -332,8 +332,8 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
               catch
                   [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
-    eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
-                 Expr(:export, exports...)))
+    Core.eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
+                                              Expr(:export, exports...)))
     m
 end
 

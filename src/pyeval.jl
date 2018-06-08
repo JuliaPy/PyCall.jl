@@ -196,7 +196,7 @@ macro py_str(code, options...)
                                   :(m[$v] = PyObject($(esc(ex)))) :
                                   nothing) for (v,ex) in locals]...)
     code_expr = Expr(:call, esc(:(Base.string)))
-    i0 = start(code)
+    i0 = firstindex(code)
     for i in sort!(collect(filter(k -> isa(k,Integer), keys(locals))))
         push!(code_expr.args, code[i0:prevind(code,i)], esc(locals[i]))
         i0 = i

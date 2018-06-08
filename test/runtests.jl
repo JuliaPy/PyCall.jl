@@ -195,8 +195,8 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test obuf[:readlines]() == ["hello\n", "again"]
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-        @test Vector{UInt8}(obuf[:read](5)) == b"hello"
-        @test Vector{UInt8}(obuf[:readall]()) == b"\nagain"
+        @test codeunits(obuf[:read](5)) == b"hello"
+        @test codeunits(obuf[:readall]()) == b"\nagain"
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
         @test obuf[:encoding] == "UTF-8"

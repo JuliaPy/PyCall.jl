@@ -282,7 +282,11 @@ function f_contiguous(T::Type, sz::Vector{Int}, st::Vector{Int})
 end
 
 f_contiguous(i::PyArray_Info) = f_contiguous(i.T, i.sz, i.st)
-c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,1))
+@static if VERSION >= v"0.7.0-DEV.4534" # julia#26369
+    c_contiguous(i::PyArray_Info) = f_contiguous(i.T, reverse(i.sz,dims=1), reverse(i.st,dims=1))
+else
+    c_contiguous(i::PyArray_Info) = f_contiguous(i.T, flipdim(i.sz,1), flipdim(i.st,1))
+end
 
 #########################################################################
 # PyArray: no-copy wrapper around NumPy ndarray
