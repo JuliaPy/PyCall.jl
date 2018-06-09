@@ -14,7 +14,7 @@ mutable struct PyError <: Exception
     # indicator.
     function PyError(msg::AbstractString)
         exc = Array{PyPtr}(undef, 3)
-        pexc = convert(UInt, pointer(exc))
+        pexc = UInt(pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
         ccall((@pysym :PyErr_Fetch), Cvoid, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))

@@ -93,16 +93,16 @@ iscontiguous(b::PyBuffer) =
 
 #############################################################################
 # pybuffer constant values from Include/object.h
-const PyBUF_MAX_NDIM = convert(Cint, 64)
-const PyBUF_SIMPLE    = convert(Cint, 0)
-const PyBUF_WRITABLE  = convert(Cint, 0x0001)
-const PyBUF_FORMAT    = convert(Cint, 0x0004)
-const PyBUF_ND        = convert(Cint, 0x0008)
-const PyBUF_STRIDES        = convert(Cint, 0x0010) | PyBUF_ND
-const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
-const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
-const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
-const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
+const PyBUF_MAX_NDIM = Cint(64)
+const PyBUF_SIMPLE    = Cint(0)
+const PyBUF_WRITABLE  = Cint(0x0001)
+const PyBUF_FORMAT    = Cint(0x0004)
+const PyBUF_ND        = Cint(0x0008)
+const PyBUF_STRIDES        = Cint(0x0010) | PyBUF_ND
+const PyBUF_C_CONTIGUOUS   = Cint(0x0020) | PyBUF_STRIDES
+const PyBUF_F_CONTIGUOUS   = Cint(0x0040) | PyBUF_STRIDES
+const PyBUF_ANY_CONTIGUOUS = Cint(0x0080) | PyBUF_STRIDES
+const PyBUF_INDIRECT       = Cint(0x0100) | PyBUF_STRIDES
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
@@ -127,7 +127,7 @@ function writedims(io::IO, b::PyBuffer, offset, d)
         end
     else
         @assert d == b.buf.ndim
-        p = convert(Ptr{UInt8}, pointer(b)) + offset
+        p = Ptr{UInt8}(pointer(b)) + offset
         for i = 1:size(b,d)
             # would be nicer not to write this one byte at a time,
             # but the alternative seems to be to create an Array
@@ -147,7 +147,7 @@ function Base.write(io::IO, b::PyBuffer)
 
     if iscontiguous(b)
         # (note that 0-dimensional buffers are always contiguous)
-        return write(io, pointer_to_array(convert(Ptr{UInt8}, pointer(b)),
+        return write(io, pointer_to_array(Ptr{UInt8}(pointer(b)),
                                           sizeof(b)))
     else
         return writedims(io, b, 0, 1)

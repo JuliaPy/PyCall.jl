@@ -237,13 +237,13 @@ mutable struct PyArray_Info
 
     function PyArray_Info(a::PyObject)
         ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
-        typestr = convert(AbstractString, ai["typestr"])
+        typestr = AbstractString(ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
-        datatuple = convert(Tuple{Int,Bool}, ai["data"])
-        sz = convert(Vector{Int}, ai["shape"])
+        datatuple = Tuple{Int,Bool}(ai["data"])
+        sz = Vector{Int}(ai["shape"])
         local st
         try
-            st = isempty(sz) ? Int[] : convert(Vector{Int}, ai["strides"])
+            st = isempty(sz) ? Int[] : Vector{Int}(ai["strides"])
         catch
             # default is C-order contiguous
             st = similar(sz)
@@ -257,7 +257,7 @@ mutable struct PyArray_Info
                    || (ENDIAN_BOM == 0x01020304 && typestr[1] == '>')
                    || typestr[1] == '|',
                    sz, st,
-                   convert(Ptr{Cvoid}, datatuple[1]),
+                   Ptr{Cvoid}(datatuple[1]),
                    datatuple[2])
     end
 end
@@ -443,9 +443,7 @@ summary(a::PyArray{T}) where {T} = string(Base.dims2string(size(a)), " ",
 
 PyObject(a::PyArray) = a.o
 
-convert(::Type{PyArray}, o::PyObject) = PyArray(o)
-
-function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
+function (::Type{Array{T, 1}})(o::PyObject) where T<:NPY_TYPES
     try
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
@@ -455,7 +453,7 @@ function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
     end
 end
 
-function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
+function (::Type{Array{T}})(o::PyObject) where T<:NPY_TYPES
     try
         info = PyArray_Info(o)
         try
@@ -468,7 +466,7 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:NPY_TYPES
     end
 end
 
-function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
+function (::Type{Array{T,N}})(o::PyObject) where {T<:NPY_TYPES,N}
     try
         info = PyArray_Info(o)
         try
@@ -489,16 +487,16 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:NPY_TYPES,N}
     end
 end
 
-function convert(::Type{Array{PyObject}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr}, o))
+function (::Type{Array{PyObject}})(o::PyObject)
+    map(pyincref, Array{PyPtr}(o))
 end
 
-function convert(::Type{Array{PyObject,1}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr, 1}, o))
+function (::Type{Array{PyObject,1}})(o::PyObject)
+    map(pyincref, Array{PyPtr, 1}(o))
 end
 
-function convert(::Type{Array{PyObject,N}}, o::PyObject) where N
-    map(pyincref, convert(Array{PyPtr, N}, o))
+function (::Type{Array{PyObject,N}})(o::PyObject) where N
+    map(pyincref, Array{PyPtr, N}(o))
 end
 
 #########################################################################

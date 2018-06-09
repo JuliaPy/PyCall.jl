@@ -19,7 +19,7 @@ function next(po::PyObject, s)
     sigatomic_begin()
     try
         nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-        return (convert(PyAny, s[1]), (nxt, s[2]))
+        return (PyAny(s[1]), (nxt, s[2]))
     finally
         sigatomic_end()
     end
