@@ -22,6 +22,8 @@ struct PyError <: Exception
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         new(msg, PyObject(exc[1]), PyObject(exc[2]), PyObject(exc[3]))
     end
+
+    PyError(msg::AbstractString, e::PyError) = new(msg, e.T, e.val, e.traceback)
 end
 
 function show(io::IO, e::PyError)

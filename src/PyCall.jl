@@ -463,7 +463,7 @@ or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
                 end
-                e.msg *= "\n\n" * msg * "\n"
+                e = PyError(string(e.msg, "\n\n", msg, "\n"), e)
             end
             throw(e)
         else
