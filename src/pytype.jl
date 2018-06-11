@@ -3,10 +3,10 @@
 ################################################################
 # Python expects the PyMethodDef and similar strings to be constants,
 # so we define anonymous globals to hold them, returning the pointer
-const prevent_gc = Any[]
+const permanent_strings = String[]
 function gstring_ptr(name::AbstractString, s::AbstractString)
     g = String(s)
-    push!(prevent_gc, g)
+    push!(permanent_strings, g)
     unsafe_convert(Ptr{UInt8}, g)
 end
 

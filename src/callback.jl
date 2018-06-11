@@ -7,25 +7,6 @@
 
 ################################################################
 
-# Define a Python method/function object from f(PyPtr,PyPtr)::PyPtr.
-function pymethod(f::Function, name::AbstractString, flags::Integer)
-    # Python expects the PyMethodDef structure to be a *constant*,
-    # so we define an anonymous global to hold it.  Also, in 0.7,
-    # @cfunction on $f returns a CFunction object that needs to
-    # avoid garbage collection, so we store this in our global as well.
-    cf = ((flags & METH_KEYWORDS) == 0 ?
-          @cfunction($f, PyPtr, (PyPtr,PyPtr)) :
-          @cfunction($f, PyPtr, (PyPtr,PyPtr,PyPtr)))
-    cfp = Base.unsafe_convert(Ptr{Cvoid}, cf)
-    def = gensym("PyMethodDef")
-    @eval const $def = (Ref(PyMethodDef($name, $cfp, $flags)), $cf)
-    PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
-                             (Ref{PyMethodDef}, Ptr{Cvoid}, Ptr{Cvoid}),
-                             eval(def)[1], C_NULL, C_NULL))
-end
-
-################################################################
-
 # To pass an arbitrary Julia object to Python, we wrap it
 # in a jlwrap Python class, where jlwrap.__call__
 # executes the pyjlwrap_call function in Julia, which

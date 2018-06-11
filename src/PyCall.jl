@@ -160,14 +160,6 @@ pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have n
 
 #########################################################################
 
-include("gc.jl")
-
-# make a PyObject that embeds a reference to keep, to prevent Julia
-# from garbage-collecting keep until o is finalized.
-PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
-
-#########################################################################
-
 const TypeTuple = Union{Type,NTuple{N, Type}} where {N}
 include("pybuffer.jl")
 include("conversions.jl")
@@ -176,6 +168,14 @@ include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
+
+#########################################################################
+
+include("gc.jl")
+
+# make a PyObject that embeds a reference to keep, to prevent Julia
+# from garbage-collecting keep until o is finalized.
+PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 # Pretty-printing PyObject
