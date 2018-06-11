@@ -62,6 +62,13 @@ end
 #########################################################################
 
 function __init__()
+    # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
+    # if e.g. you checkout Conda master, and we'll need to re-build PyCall
+    # for something like pyimport_conda to continue working.
+    if conda && dirname(python) != abspath(Conda.PYTHONDIR)
+        error("Using Conda.jl python, but location of $python seems to have moved to $(Conda.PYTHONDIR).  Re-run Pkg.build(\"PyCall\") and restart Julia.")
+    end
+
     # issue #189
     libpy_handle = libpython === nothing ? C_NULL :
         Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)

@@ -16,7 +16,7 @@ env:
   matrix:
     - PYTHON=python  # python 2.7
     - PYTHON=python3 # python 3.5
-    - PYTHON=Conda-python # not actually a python version, here to test Conda.jl's python
+    - PYTHON=Conda # not actually a python version, here to test Conda.jl's python
 matrix:
   exclude:
     - os: osx
