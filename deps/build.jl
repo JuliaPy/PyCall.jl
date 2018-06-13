@@ -163,7 +163,7 @@ try # make sure deps.jl file is removed on error
                      (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
             vers = isempty(py) || py == "Conda" ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
-                if isempty(py)
+                if isempty(py) || py == "Conda"
                     throw(UseCondaPython())
                 else
                     error("Python version $vers < 2.7 is not supported")
