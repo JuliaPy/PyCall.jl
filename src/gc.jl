@@ -21,14 +21,6 @@ end
 
 const weakref_callback_obj = PyNULL() # weakref_callback Python method
 
-function pygc_finalize()
-    pydecref(weakref_callback_obj)
-    empty!(pycall_gc)
-end
-
-
-################################################################
-
 # Python expects the PyMethodDef structure to be a constant, so
 # we put it in a global to prevent gc.
 const weakref_callback_meth = Ref{PyMethodDef}()
