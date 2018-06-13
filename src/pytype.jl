@@ -64,21 +64,15 @@ struct PyGetSetDef
     closure::Ptr{Cvoid} # pass-through thunk, may be NULL
 end
 
-function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
-    PyGetSetDef(gstring_ptr(name, name),
-                @cfunction($get, PyPtr, (PyPtr,Ptr{Cvoid})),
-                @cfunction($set, Int, (PyPtr,PyPtr,Ptr{Cvoid})),
-                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
-                C_NULL)
-end
-
-function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString="")
-    PyGetSetDef(gstring_ptr(name, name),
-                @cfunction($get, PyPtr, (PyPtr,Ptr{Cvoid})),
-                C_NULL,
-                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
-                C_NULL)
-end
+# probably should be changed to macro to avoid interpolating into @cfunction:
+# (commented out for now since we aren't actually using it)
+# function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
+#     PyGetSetDef(gstring_ptr(name, name),
+#                 @cfunction($get, PyPtr, (PyPtr,Ptr{Cvoid})),
+#                 @cfunction($set, Int, (PyPtr,PyPtr,Ptr{Cvoid})),
+#                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
+#                 C_NULL)
+# end
 
 # used as sentinel value to end attribute arrays:
 PyGetSetDef() = PyGetSetDef(NULL_UInt8_Ptr, C_NULL, C_NULL, NULL_UInt8_Ptr, C_NULL)
