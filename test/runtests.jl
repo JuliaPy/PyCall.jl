@@ -425,7 +425,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test convert(Bool, PyObject(Any[])) === false
     @test convert(Bool, PyObject(17.3)) === true
     @test convert(Bool, PyObject(Any[0])) === true
-    @test Bool(PyVector{PyObject}(PyObject([false]))[1]) === false
+    @test convert(Bool, PyVector{PyObject}(PyObject([false]))[1]) === false
 
     # serialization
     let py_sum_obj = pybuiltin("sum")

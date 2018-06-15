@@ -906,7 +906,7 @@ end
 #########################################################################
 # Expose Python docstrings to the Julia doc system
 
-Docs.getdoc(o::PyObject) = Text(String(o["__doc__"]))
+Docs.getdoc(o::PyObject) = Text(convert(String, o["__doc__"]))
 
 #########################################################################
 
