@@ -842,7 +842,7 @@ end
 
 if VERSION >= v"0.7.0-DEV.3152" # julia#23273
     (::Type{T})(po::PyObject) where
-        {T<:Union{PyAny,Number,Nothing,AbstractString,Symbol,Array,Ptr{Cvoid},
-        Function,Tuple,Pair,PyVector,PyDict,Dict,AbstractRange,PyArray,PyObject,
-        Dates.AbstractTime}} = convert(T, po)
+        {T<:Union{Number,Nothing,AbstractString,Symbol,Array,Ptr{Cvoid},
+        Function,Tuple,Pair,Dict,AbstractRange,Dates.AbstractTime}} =
+        convert(T, po)
 end
