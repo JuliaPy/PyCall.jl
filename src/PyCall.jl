@@ -13,7 +13,7 @@ export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
-       convert, pointer, summary, show, haskey, keys, values,
+       convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
@@ -149,6 +149,8 @@ pyquery(q::Ptr{Cvoid}, o::PyObject) =
 unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
 
 # use constructor for generic conversions to PyObject
+convert(::Type{PyObject}, o) = PyObject(o)
+convert(::Type{PyObject}, o::PyObject) = o
 PyObject(o::PyObject) = o
 
 #########################################################################
@@ -185,16 +187,18 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 Return a string representation of `o` corresponding to `str(o)` in Python.
 """
-pystr(o::PyObject) = AbstractString(PyObject(@pycheckn ccall((@pysym :PyObject_Str), PyPtr,
-                                                             (PyPtr,), o)))
+pystr(o::PyObject) = convert(AbstractString,
+                             PyObject(@pycheckn ccall((@pysym :PyObject_Str), PyPtr,
+                                                      (PyPtr,), o)))
 
 """
     pyrepr(o::PyObject)
 
 Return a string representation of `o` corresponding to `repr(o)` in Python.
 """
-pyrepr(o::PyObject) = AbstractString(PyObject(@pycheckn ccall((@pysym :PyObject_Repr), PyPtr,
-                                                              (PyPtr,), o)))
+pyrepr(o::PyObject) = convert(AbstractString,
+                              PyObject(@pycheckn ccall((@pysym :PyObject_Repr), PyPtr,
+                                                       (PyPtr,), o)))
 
 """
     pystring(o::PyObject)
@@ -216,7 +220,7 @@ function pystring(o::PyObject)
                 return string(o.o)
             end
         end
-        return AbstractString(PyObject(s))
+        return convert(AbstractString, PyObject(s))
     end
 end
 
@@ -228,7 +232,7 @@ function Base.Docs.doc(o::PyObject)
     if haskey(o, "__doc__")
         d = o["__doc__"]
         if d.o != pynothing[]
-            return Base.Docs.Text(AbstractString(d))
+            return Base.Docs.Text(convert(AbstractString, d))
         end
     end
     return Base.Docs.Text("Python object (no docstring found)")
@@ -274,7 +278,7 @@ function getindex(o::PyObject, s::AbstractString)
     return PyObject(p)
 end
 
-getindex(o::PyObject, s::Symbol) = PyAny(getindex(o, string(s)))
+getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
 
 function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     if ispynull(o)
@@ -318,12 +322,13 @@ For example, `@pyimport module as name` is equivalent to `const name = pywrap(py
 If the Python module contains identifiers that are reserved words in Julia (e.g. function), they cannot be accessed as `w.member`; one must instead use `w.pymember(:member)` (for the PyAny conversion) or w.pymember("member") (for the raw PyObject).
 """
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
-    members = Vector{Tuple{AbstractString,PyObject}}(pycall(inspect["getmembers"], PyObject, o))
+    members = convert(Vector{Tuple{AbstractString,PyObject}},
+                      pycall(inspect["getmembers"], PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     m = Module(mname, false)
-    consts = [Expr(:const, Expr(:(=), Symbol(x[1]), PyAny(x[2]))) for x in members]
+    consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
-                  Vector{Symbol}(o["__all__"])
+                  convert(Vector{Symbol}, o["__all__"])
               catch
                   [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
@@ -724,9 +729,11 @@ pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
     return convert(returntype, _pycall(o, args...; kwargs...))::returntype
 
 pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
-    return PyAny(_pycall(o, args...; kwargs...))
+    return convert(PyAny, _pycall(o, args...; kwargs...))
 
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+PyAny(o::PyObject) = convert(PyAny, o)
+
 
 """
     @pycall func(args...)::T

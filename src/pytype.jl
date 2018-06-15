@@ -41,17 +41,17 @@ const METH_O = 0x0008       # single argument (not wrapped in tuple)
 const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
-const NULL_UInt8_Ptr = Ptr{UInt8}(C_NULL)
+const NULL_UInt8_Ptr = convert(Ptr{UInt8}, C_NULL)
 function PyMethodDef(name::AbstractString, meth::Ptr{Cvoid}, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
                 meth,
-                Cint(flags),
+                convert(Cint, flags),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
 
 # used as sentinel value to end method arrays:
 PyMethodDef() = PyMethodDef(NULL_UInt8_Ptr, C_NULL,
-                            Cint(0), NULL_UInt8_Ptr)
+                            convert(Cint, 0), NULL_UInt8_Ptr)
 
 ################################################################
 # mirror of Python API types and constants from descrobject.h
@@ -89,9 +89,9 @@ struct PyMemberDef
     doc::Ptr{UInt8}
     PyMemberDef(name,typ,offset,flags,doc) =
         new(unsafe_convert(Ptr{UInt8},name),
-            Cint(typ),
-            Int(offset),
-            Cint(flags),
+            convert(Cint,typ),
+            convert(Int,offset),
+            convert(Cint,flags),
             unsafe_convert(Ptr{UInt8},doc))
 end
 
@@ -285,7 +285,7 @@ end
 # Often, PyTypeObject instances are global constants, which we initialize
 # to 0 via PyTypeObject() and then initialize at runtime via PyTypeObject!
 function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, basicsize::Integer)
-    t.tp_basicsize = Int(basicsize)
+    t.tp_basicsize = convert(Int, basicsize)
 
     # figure out Py_TPFLAGS_DEFAULT, depending on Python version
     t.tp_flags = # Py_TPFLAGS_DEFAULT =
@@ -335,7 +335,7 @@ function pyjlwrap_dealloc(o::PyPtr)
 end
 
 unsafe_pyjlwrap_to_objref(o::PyPtr) =
-  unsafe_pointer_to_objref(unsafe_load(Ptr{Ptr{Cvoid}}(o), 3))
+  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, o), 3))
 
 pyjlwrap_repr(o::PyPtr) =
     pystealref!(PyObject(o != C_NULL ? string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
@@ -364,7 +364,7 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
     attr_ = PyObject(attr__) # don't need pyincref because of finally clause below
     try
         f = unsafe_pyjlwrap_to_objref(self_)
-        attr = String(attr_)
+        attr = convert(String, attr_)
         if attr in ("__name__","func_name")
             return pystealref!(PyObject(string(f)))
         elseif attr in ("__doc__", "func_doc")
@@ -420,7 +420,7 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
                                  PyPtr, (Any,), pyT))
-    p = Ptr{Ptr{Cvoid}}(o.o)
+    p = convert(Ptr{Ptr{Cvoid}}, o.o)
     if isimmutable(value)
         # It is undefined to call `pointer_from_objref` on immutable objects.
         # The compiler is free to return basically anything since the boxing is not

@@ -1,10 +1,6 @@
 # Conversions between Julia and Python types for the PyCall module.
 
 #########################################################################
-# automatic conversion
-include("pyany.jl")
-
-#########################################################################
 # Conversions of simple types (numbers and nothing)
 
 # conversions from Julia types to PyObject:
@@ -31,7 +27,7 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 # numpy scalars need o.item() conversion in Python 3
 unsafe_asscalar(o) = pycall(PyObject(ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, "item")), PyObject)
 
-function (::Type{T})(po::PyObject) where {T<:Integer}
+function convert(::Type{T}, po::PyObject) where {T<:Integer}
     i = ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
     if pyerr_occurred()
       if haskey(po, "item")
@@ -45,7 +41,7 @@ function (::Type{T})(po::PyObject) where {T<:Integer}
 end
 
 if Sys.WORD_SIZE == 32
-    function (::Type{T})(po::PyObject) where {T<:Union{Int64,UInt64}}
+    function convert(::Type{T}, po::PyObject) where {T<:Union{Int64,UInt64}}
         i = ccall(@pysym(:PyLong_AsLongLong), UInt64, (PyPtr,), po)
         if pyerr_occurred()
             if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
@@ -59,10 +55,10 @@ if Sys.WORD_SIZE == 32
     end
 end
 
-(::Type{Bool})(po::PyObject) =
+convert(::Type{Bool}, po::PyObject) =
     0 != @pycheck ccall(@pysym(:PyObject_IsTrue), Cint, (PyPtr,), po)
 
-function (::Type{T})(po::PyObject) where {T<:Real}
+function convert(::Type{T}, po::PyObject) where {T<:Real}
     x = ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), po)
     if pyerr_occurred()
       if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
@@ -75,7 +71,7 @@ function (::Type{T})(po::PyObject) where {T<:Real}
     return T(x)
 end
 
-function (::Type{T})(po::PyObject) where T<:Complex
+function convert(::Type{T}, po::PyObject) where T<:Complex
     x = ccall(@pysym(:PyComplex_RealAsDouble), Cdouble, (PyPtr,), po)
     if pyerr_occurred()
       if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
@@ -89,12 +85,7 @@ function (::Type{T})(po::PyObject) where T<:Complex
     return T(x, ccall(@pysym(:PyComplex_ImagAsDouble), Cdouble, (PyPtr,), po))
 end
 
-function (::Type{Nothing})(po::PyObject)
-    po.o != pynothing[] && throw(ArgumentError("cannot convert non-None object to nothing"))
-    return nothing
-end
-
-(::Type{Any})(po::PyObject) = po
+convert(::Type{Nothing}, po::PyObject) = nothing
 
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
@@ -112,10 +103,10 @@ end
 
 const _ps_ptr= Ptr{UInt8}[C_NULL]
 const _ps_len = Int[0]
-function (::Type{T})(po::PyObject) where T<:AbstractString
+function convert(::Type{T}, po::PyObject) where T<:AbstractString
     if pyisinstance(po, @pyglobalobj :PyUnicode_Type)
-        T(PyObject(@pycheckn ccall(@pysym(PyUnicode_AsUTF8String),
-                                   PyPtr, (PyPtr,), po)))
+        convert(T, PyObject(@pycheckn ccall(@pysym(PyUnicode_AsUTF8String),
+                                             PyPtr, (PyPtr,), po)))
     else
         @pycheckz ccall(@pysym(PyString_AsStringAndSize),
                         Cint, (PyPtr, Ptr{Ptr{UInt8}}, Ptr{Int}),
@@ -127,7 +118,7 @@ end
 # TODO: should symbols be converted to a subclass of Python strings/bytes,
 #       so that PyAny conversion can convert it back to a Julia symbol?
 PyObject(s::Symbol) = PyObject(string(s))
-(::Type{Symbol})(po::PyObject) = Symbol(AbstractString(po))
+convert(::Type{Symbol}, po::PyObject) = Symbol(convert(AbstractString, po))
 
 #########################################################################
 # ByteArray conversions
@@ -139,7 +130,7 @@ PyObject(a::Vector{UInt8}) =
 ispybytearray(po::PyObject) =
   pyisinstance(po, @pyglobalobj :PyByteArray_Type)
 
-function (::Type{Vector{UInt8}})(po::PyObject)
+function convert(::Type{Vector{UInt8}}, po::PyObject)
     b = PyBuffer(po)
     iscontiguous(b) || error("a contiguous buffer is required")
     return copy(unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
@@ -152,29 +143,48 @@ end
 
 PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
-function (::Type{Ptr{Cvoid}})(po::PyObject)
+function convert(::Type{Ptr{Cvoid}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
         v = po["value"]
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL :
-          Ptr{Cvoid}(UInt(po["value"]))
+          convert(Ptr{Cvoid}, convert(UInt, po["value"]))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
                        Ptr{Cvoid}, (PyPtr,Ptr{UInt8}),
                        po, ccall((@pysym :PyCapsule_GetName),
                                  Ptr{UInt8}, (PyPtr,), po))
     else
-        Ptr{Cvoid}(UInt(po))
+        convert(Ptr{Cvoid}, convert(UInt, po))
     end
 end
 
 pyptr_query(po::PyObject) = pyisinstance(po, c_void_p_Type) || pyisinstance(po, @pyglobalobj(:PyCapsule_Type)) ? Ptr{Cvoid} : Union{}
 
 #########################################################################
+# for automatic conversions, I pass Vector{PyAny}, NTuple{N, PyAny}, etc.,
+# but since PyAny is an abstract type I need to convert this to Any
+# before actually creating the Julia object
+
+# I want to use a union, but this seems to confuse Julia's method
+# dispatch for the convert function in some circumstances
+# const PyAny = Union{PyObject, Int, Bool, Float64, ComplexF64, AbstractString, Function, Dict, Tuple, Array}
+abstract type PyAny end
+
+function pyany_toany(T::Type)
+    T === Vararg{PyAny} ? Vararg{Any} : T
+end
+pyany_toany(::Type{PyAny}) = Any
+pyany_toany(t::Type{T}) where {T<:Tuple} = Tuple{map(pyany_toany, t.types)...}
+
+# PyAny acts like Any for conversions, except for converting PyObject (below)
+convert(::Type{PyAny}, x) = x
+
+#########################################################################
 # Function conversion (see callback.jl for conversion the other way)
 # (rarely needed given call overloading in Julia 0.4)
 
-(::Type{Function})(po::PyObject) =
+convert(::Type{Function}, po::PyObject) =
     function fn(args...; kwargs...)
         pycall(po, PyAny, args...; kwargs...)
     end
@@ -208,19 +218,21 @@ tuptype(T::UnionAll,isva,i) = tuptype(T.body,isva,i)
 isvatuple(T::UnionAll) = isvatuple(T.body)
 isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameters[end])
 
-function (tt::Type{T})(o::PyObject) where {T<:Tuple}
+function convert(tt::Type{T}, o::PyObject) where T<:Tuple
     isva = isvatuple(T)
     len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if !istuplen(tt, isva, len)
         throw(BoundsError())
     end
-    ntuple(i -> convert(tuptype(T, isva, i), PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
-                                                            (PyPtr, Int), o, i-1))),
+    ntuple((i ->
+            convert(tuptype(T, isva, i),
+                    PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
+                                   (PyPtr, Int), o, i-1)))),
            len)
 end
 
-function (::Type{Pair{K,V}})(o::PyObject) where {K,V}
-    k, v = Tuple{K,V}(o)
+function convert(::Type{Pair{K,V}}, o::PyObject) where {K,V}
+    k, v = convert(Tuple{K,V}, o)
     return Pair(k, v)
 end
 
@@ -246,6 +258,8 @@ end
 
 PyVector(o::PyObject) = PyVector{PyAny}(o)
 PyObject(a::PyVector) = a.o
+convert(::Type{PyVector}, o::PyObject) = PyVector(o)
+convert(::Type{PyVector{T}}, o::PyObject) where {T} = PyVector{T}(o)
 unsafe_convert(::Type{PyPtr}, a::PyVector) = a.o.o
 PyVector(a::PyVector) = a
 PyVector(a::AbstractVector{T}) where {T} = PyVector{T}(array2py(a))
@@ -261,7 +275,7 @@ eltype(::Type{PyVector{T}}) where {T} = pyany_toany(T)
 size(a::PyVector) = (length(a.o),)
 
 getindex(a::PyVector) = getindex(a, 1)
-getindex(a::PyVector{T}, i::Integer) where {T} = T(PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
+getindex(a::PyVector{T}, i::Integer) where {T} = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), a, i-1)))
 
 setindex!(a::PyVector, v) = setindex!(a, v, 1)
 function setindex!(a::PyVector, v, i::Integer)
@@ -333,7 +347,7 @@ PyObject(A::AbstractArray) =
 function py2array(T, A::Array{TA,N}, o::PyObject,
                   dim::Integer, i::Integer) where {TA,N}
     if dim > N
-        A[i] = T(o)
+        A[i] = convert(T, o)
         return A
     elseif dim == N
         len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
@@ -342,8 +356,8 @@ function py2array(T, A::Array{TA,N}, o::PyObject,
         end
         s = stride(A, dim)
         for j = 0:len-1
-            A[i+j*s] = T(PyObject(ccall((@pysym :PySequence_GetItem),
-                                        PyPtr, (PyPtr, Int), o, j)))
+            A[i+j*s] = convert(T, PyObject(ccall((@pysym :PySequence_GetItem),
+                                                 PyPtr, (PyPtr, Int), o, j)))
         end
         return A
     else # dim < N: recursively extract list of lists into A
@@ -396,7 +410,7 @@ function py2array(T, o::PyObject)
     py2array(T, A, o, 1, 1)
 end
 
-function (::Type{Vector{T}})(o::PyObject) where T
+function convert(::Type{Vector{T}}, o::PyObject) where T
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if len < 0 || # not a sequence
        len+1 < 0  # object pretending to be a sequence of infinite length
@@ -406,8 +420,8 @@ function (::Type{Vector{T}})(o::PyObject) where T
     py2array(T, Array{pyany_toany(T)}(undef, len), o, 1, 1)
 end
 
-(::Type{Array})(o::PyObject) = map(identity, py2array(PyAny, o))
-(::Type{Array{T}})(o::PyObject) where {T} = py2array(T, o)
+convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
+convert(::Type{Array{T}}, o::PyObject) where {T} = py2array(T, o)
 
 PyObject(a::BitArray) = PyObject(Array(a))
 
@@ -456,14 +470,16 @@ PyDict(d::AbstractDict{K,V}) where {K,V} = PyDict{K,V}(PyObject(d))
 PyDict(d::AbstractDict{Any,Any}) = PyDict{PyAny,PyAny}(PyObject(d))
 PyDict(d::AbstractDict{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
 PyDict(d::AbstractDict{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
+convert(::Type{PyDict}, o::PyObject) = PyDict(o)
+convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
 
 haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
-keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = Vector{T}(PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
-values(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = Vector{T}(PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
+keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
+values(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
 
-keys(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = Vector{T}(pycall(d.o["keys"], PyObject))
-values(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = Vector{T}(pycall(d.o["values"], PyObject))
+keys(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["keys"], PyObject))
+values(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["values"], PyObject))
 haskey(d::PyDict{K,V,false}, key) where {K,V} = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
 
 similar(d::PyDict{K,V}) where {K,V} = Dict{pyany_toany(K),pyany_toany(V)}()
@@ -546,7 +562,7 @@ function next(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V}
     end
     ko = pyincref(itr.ka[]) # PyDict_Next returns
     vo = pyincref(itr.va[]) #   borrowed ref, so incref
-    (Pair(K(ko), V(vo)),
+    (Pair(convert(K,ko), convert(V,vo)),
      PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.i+1, itr.len))
  end
 
@@ -558,7 +574,7 @@ start(d::PyDict{K,V,false}) where {K,V} = start(pycall(d.o["items"], PyObject))
 done(d::PyDict{K,V,false}, s) where {K,V} = done(d.o, s)
 function next(d::PyDict{K,V,false}, s) where {K,V}
     nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-    return (Pair{K,V}(s[1]), (nxt, s[2]))
+    return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
 end
 
 #########################################################################
@@ -573,7 +589,7 @@ function PyObject(d::AbstractDict)
     return o
 end
 
-function (::Type{Dict{K,V}})(o::PyObject) where {K,V}
+function convert(::Type{Dict{K,V}}, o::PyObject) where {K,V}
     copy(PyDict{K,V}(o))
 end
 
@@ -596,7 +612,7 @@ function PyObject(r::AbstractRange{T}) where T<:Integer
     end
 end
 
-function (::Type{T})(o::PyObject) where T<:AbstractRange
+function convert(::Type{T}, o::PyObject) where T<:AbstractRange
     v = PyVector(o)
     len = length(v)
     if len == 0
@@ -652,14 +668,14 @@ function PyObject(x::Complex{BigFloat})
     pycall(mpc, PyObject, string(real(x)), string(imag(x)))
 end
 
-(::Type{BigFloat})(o::PyObject) = parse(BigFloat, pystr(o))
+convert(::Type{BigFloat}, o::PyObject) = parse(BigFloat, pystr(o))
 
-function (::Type{Complex{BigFloat}})(o::PyObject)
+function convert(::Type{Complex{BigFloat}}, o::PyObject)
     try
-        Complex{BigFloat}(BigFloat(o["real"]),
-                          BigFloat(o["imag"]))
+        Complex{BigFloat}(convert(BigFloat, o["real"]),
+                          convert(BigFloat, o["imag"]))
     catch
-        Complex{BigFloat}(Complex{Float64}(o))
+        convert(Complex{BigFloat}, convert(Complex{Float64}, o))
     end
 end
 
@@ -676,20 +692,144 @@ function PyObject(i::LongInt)
                              String(string(i)), C_NULL, 10))
 end
 
-(::Type{BigInt})(o::PyObject) = parse(BigInt, pystr(o))
+convert(::Type{BigInt}, o::PyObject) = parse(BigInt, pystr(o))
 
 #########################################################################
 # Dates (Calendar time)
 
 include("pydates.jl")
+#init_datetime() = nothing
+#pydate_query(o) = Union{}
 
 #########################################################################
-# In Julia 0.7, constructors do not fall back to convert.   So, we need
-# to explicitly define both constructors T(::PyObject) and conversion routines
-# convert(::Type{T}, ::PyObject).    (At some point, we may decide to deprecate
-# the convert methods.)
+# Inferring Julia types at runtime from Python objects:
+#
+# [Note that we sometimes use the PyFoo_Check API and sometimes we use
+#  PyObject_IsInstance(o, PyFoo_Type), since sometimes the former API
+#  is a macro (hence inaccessible in Julia).]
 
-convert(::Type{T}, po::PyObject) where
-    {T<:Union{PyAny,Number,Nothing,AbstractString,Symbol,Array,Ptr{Cvoid},
-     Function,Tuple,Pair,PyVector,PyDict,Dict,AbstractRange,PyArray,PyObject,
-     Dates.AbstractTime}} = T(po)
+# A type-query function f(o::PyObject) returns the Julia type
+# for use with the convert function, or Union{} if there isn't one.
+
+# TODO: In Python 3.x, the BigInt check here won't work since int == long.
+pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
+  (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
+  pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
+  pyisinstance(o, npy_integer) ? Int : Union{}
+
+pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : Union{}
+
+pycomplex_query(o::PyObject) =
+    pyisinstance(o, @pyglobalobj :PyComplex_Type) ||  pyisinstance(o, npy_complexfloating) ? ComplexF64 : Union{}
+
+pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? AbstractString : pyisinstance(o, @pyglobalobj :PyUnicode_Type) ? String : Union{}
+
+# Given call overloading, all PyObjects are callable already, so
+# we never automatically convert to Function.
+pyfunction_query(o::PyObject) = Union{}
+
+pynothing_query(o::PyObject) = o.o == pynothing[] ? Nothing : Union{}
+
+# We refrain from converting all objects that support the mapping protocol (PyMapping_Check)
+# to avoid converting types like Pandas `DataFrame` that are only lossily
+# representable as a Julia dictionary (issue #376).
+pydict_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyDict_Type) ? Dict{PyAny,PyAny} : Union{}
+
+typetuple(Ts) = Tuple{Ts...}
+
+function pysequence_query(o::PyObject)
+    # pyquery(:PySequence_Check, o) always succeeds according to the docs,
+    # but it seems we need to be careful; I've noticed that things like
+    # scipy define "fake" sequence types with intmax lengths and other
+    # problems
+    if pyisinstance(o, @pyglobalobj :PyTuple_Type)
+        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
+    elseif pyisinstance(o, pyxrange[])
+        return AbstractRange
+    elseif ispybytearray(o)
+        return Vector{UInt8}
+    elseif !haskey(o, "__array_interface__")
+        # only handle PyList for now
+        return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
+    else
+        otypestr = get(o["__array_interface__"], PyObject, "typestr")
+        typestr = convert(AbstractString, otypestr) # Could this just be String now?
+        T = npy_typestrs[typestr[2:end]]
+        if T == PyPtr
+            T = PyObject
+        end
+        return Array{T}
+    end
+end
+
+macro return_not_None(ex)
+    quote
+        T = $(esc(ex))
+        if T != Union{}
+            return T
+        end
+    end
+end
+
+const pytype_queries = Tuple{PyObject,Type}[]
+"""
+    pytype_mapping(pytype, jltype)
+
+Given a Python type object `pytype`, tell PyCall to convert it to
+`jltype` in `PyAny(object)` conversions.
+"""
+function pytype_mapping(py::PyObject, jl::Type)
+    for (i,(p,j)) in enumerate(pytype_queries)
+        if p == py
+            pytype_queries[i] = (py,jl)
+            return pytype_queries
+        end
+    end
+    push!(pytype_queries, (py,jl))
+end
+"""
+    pytype_query(o::PyObject, default=PyObject)
+
+Given a Python object `o`, return the corresponding
+native Julia type (defaulting to `default`) that we convert
+`o` to in `PyAny(o)` conversions.
+"""
+function pytype_query(o::PyObject, default::TypeTuple=PyObject)
+    # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
+    #       (A bit tricky to correctly handle Tuple and other containers.)
+    @return_not_None pyint_query(o)
+    pyisinstance(o, npy_bool) && return Bool
+    @return_not_None pyfloat_query(o)
+    @return_not_None pycomplex_query(o)
+    @return_not_None pystring_query(o)
+    @return_not_None pyfunction_query(o)
+    @return_not_None pydate_query(o)
+    @return_not_None pydict_query(o)
+    @return_not_None pysequence_query(o)
+    @return_not_None pyptr_query(o)
+    @return_not_None pynothing_query(o)
+    @return_not_None pymp_query(o)
+    for (py,jl) in pytype_queries
+        if pyisinstance(o, py)
+            return jl
+        end
+    end
+    return default
+end
+
+function convert(::Type{PyAny}, o::PyObject)
+    if ispynull(o)
+        return o
+    end
+    try
+        T = pytype_query(o)
+        if T == PyObject && is_pyjlwrap(o)
+            return unsafe_pyjlwrap_to_objref(o.o)
+        end
+        convert(T, o)
+    catch
+        pyerr_clear() # just in case
+        o
+    end
+end

@@ -15,8 +15,8 @@
 
 # convert Python args to Julia; overridden below for a FuncWrapper type
 # that allows the user to specify the argument types.
-julia_args(f, args) = PyAny(args)
-julia_kwarg(f, kw, arg) = PyAny(arg)
+julia_args(f, args) = convert(PyAny, args)
+julia_kwarg(f, kw, arg) = convert(PyAny, arg)
 
 function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
     args = PyObject(args_) # don't need pyincref because of finally clause below
@@ -59,8 +59,8 @@ struct FuncWrapper{T,F}
     kwargs::Dict{Symbol,Any}
 end
 (f::FuncWrapper)(args...; kws...) = f.f(args...; kws...)
-julia_args(f::FuncWrapper{T}, args) where {T} = T(args)
-julia_kwarg(f::FuncWrapper, kw, arg) = get(f.kwargs, kw, PyAny)(arg)
+julia_args(f::FuncWrapper{T}, args) where {T} = convert(T, args)
+julia_kwarg(f::FuncWrapper, kw, arg) = convert(get(f.kwargs, kw, PyAny), arg)
 
 FuncWrapper(f, kwargs, argtypes::Type) = FuncWrapper{argtypes,typeof(f)}(f, kwargs)
 

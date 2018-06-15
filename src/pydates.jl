@@ -123,9 +123,9 @@ function pydate_query(o::PyObject)
     end
 end
 
-function (::Type{Dates.DateTime})(o::PyObject)
+function convert(::Type{Dates.DateTime}, o::PyObject)
     if PyDate_Check(o)
-        dt = Ptr{UInt8}(o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
         if PyDateTime_Check(o)
             Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
                            unsafe_load(dt,3), unsafe_load(dt,4), # month, day
@@ -143,9 +143,9 @@ function (::Type{Dates.DateTime})(o::PyObject)
     end
 end
 
-function (::Type{Dates.Date})(o::PyObject)
+function convert(::Type{Dates.Date}, o::PyObject)
     if PyDate_Check(o)
-        dt = Ptr{UInt8}(o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
         Dates.Date((UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
                    unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
     else
@@ -155,7 +155,7 @@ end
 
 function delta_dsμ(o::PyObject)
     PyDelta_Check(o) || throw(ArgumentError("$o is not a timedelta instance"))
-    p = unsafe_load(Ptr{PyDateTime_Delta{Py_hash_t}}(o.o))
+    p = unsafe_load(convert(Ptr{PyDateTime_Delta{Py_hash_t}}, o.o))
     return (p.days, p.seconds, p.microseconds)
 end
 
@@ -163,17 +163,17 @@ end
 # that is not an exact multiple of the resulting unit?   For now,
 # follow the lead of Dates and truncate; see Julia issue #9169.
 
-function (::Type{Dates.Millisecond})(o::PyObject)
+function convert(::Type{Dates.Millisecond}, o::PyObject)
     (d,s,μs) = delta_dsμ(o)
     return Dates.Millisecond((86400d + s) * 1000 + div(μs, 1000))
 end
 
-function (::Type{Dates.Second})(o::PyObject)
+function convert(::Type{Dates.Second}, o::PyObject)
     (d,s,μs) = delta_dsμ(o)
     return Dates.Second(86400d + s + div(μs, 1000000))
 end
 
-function (::Type{Dates.Day})(o::PyObject)
+function convert(::Type{Dates.Day}, o::PyObject)
     (d,s,μs) = delta_dsμ(o)
     return Dates.Day(d + div(s + div(μs, 1000000), 86400))
 end
