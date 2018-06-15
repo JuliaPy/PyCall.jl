@@ -833,3 +833,16 @@ function convert(::Type{PyAny}, o::PyObject)
         o
     end
 end
+
+#########################################################################
+# In Julia 0.7, constructors do not fall back to convert.   So, we need
+# to explicitly define both constructors T(::PyObject) and conversion routines
+# convert(::Type{T}, ::PyObject).    (At some point, we may decide to deprecate
+# the convert methods.)
+
+if VERSION >= v"0.7.0-DEV.3152" # julia#23273
+    (::Type{T})(po::PyObject) where
+        {T<:Union{PyAny,Number,Nothing,AbstractString,Symbol,Array,Ptr{Cvoid},
+        Function,Tuple,Pair,PyVector,PyDict,Dict,AbstractRange,PyArray,PyObject,
+        Dates.AbstractTime}} = convert(T, po)
+end
