@@ -461,7 +461,9 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test occursin("no docstring", Base.Docs.doc(PyObject(py"lambda x: x+1")).content)
 
     let b = rand(UInt8, 1000)
-        @test convert(Vector{UInt8}, pybytes(b)) == b == convert(Vector{UInt8}, pybytes(String(copy(b))))
+        @test(convert(Vector{UInt8}, pybytes(b)) == b
+              == convert(Vector{UInt8}, pybytes(String(copy(b))))
+              == convert(Vector{UInt8}, pybytes(codeunits(String(copy(b))))))
     end
 
     let t = convert(Tuple, PyObject((3,34)))
