@@ -21,10 +21,9 @@ end
 
 const weakref_callback_obj = PyNULL() # weakref_callback Python method
 
-function pygc_finalize()
-    pydecref(weakref_callback_obj)
-    empty!(pycall_gc)
-end
+# Python expects the PyMethodDef structure to be a constant, so
+# we put it in a global to prevent gc.
+const weakref_callback_meth = Ref{PyMethodDef}()
 
 # "embed" a reference to jo in po, using the weak-reference mechanism
 function pyembed(po::PyObject, jo::Any)
@@ -32,9 +31,12 @@ function pyembed(po::PyObject, jo::Any)
     # the API needs to be changed to return the pointer.
     isimmutable(jo) && ArgumentError("pyembed: immutable argument not allowed")
     if ispynull(weakref_callback_obj)
-        weakref_callback_obj.o = pyincref(pymethod(weakref_callback,
-                                                   "weakref_callback",
-                                                   METH_O)).o
+        cf = @cfunction(weakref_callback, PyPtr, (PyPtr,PyPtr))
+        weakref_callback_meth[] = PyMethodDef("weakref_callback", cf, METH_O)
+        copy!(weakref_callback_obj,
+              PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
+                                       (Ref{PyMethodDef}, Ptr{Cvoid}, Ptr{Cvoid}),
+                                       weakref_callback_meth, C_NULL, C_NULL)))
     end
     wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr),
                          po, weakref_callback_obj)

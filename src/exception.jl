@@ -1,8 +1,8 @@
 #########################################################################
 # Wrapper around Python exceptions
 
-mutable struct PyError <: Exception
-    msg::AbstractString # message string from Julia context, or "" if none
+struct PyError <: Exception
+    msg::String # message string from Julia context, or "" if none
 
     # info returned by PyErr_Fetch/PyErr_Normalize
     T::PyObject
@@ -20,8 +20,10 @@ mutable struct PyError <: Exception
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         ccall((@pysym :PyErr_NormalizeException), Cvoid, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
-        new(msg, exc[1], exc[2], exc[3])
+        new(msg, PyObject(exc[1]), PyObject(exc[2]), PyObject(exc[3]))
     end
+
+    PyError(msg::AbstractString, e::PyError) = new(msg, e.T, e.val, e.traceback)
 end
 
 function show(io::IO, e::PyError)

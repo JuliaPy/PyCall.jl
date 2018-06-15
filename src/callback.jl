@@ -7,20 +7,6 @@
 
 ################################################################
 
-# Define a Python method/function object from f(PyPtr,PyPtr)::PyPtr.
-# Requires f to be a top-level function.
-function pymethod(f::Function, name::AbstractString, flags::Integer)
-    # Python expects the PyMethodDef structure to be a *constant*,
-    # so we define an anonymous global to hold it.
-    def = gensym("PyMethodDef")
-    @eval const $def = PyMethodDef[PyMethodDef($name, $f, $flags)]
-    PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
-                             (Ptr{PyMethodDef}, Ptr{Cvoid}, Ptr{Cvoid}),
-                             eval(def), C_NULL, C_NULL))
-end
-
-################################################################
-
 # To pass an arbitrary Julia object to Python, we wrap it
 # in a jlwrap Python class, where jlwrap.__call__
 # executes the pyjlwrap_call function in Julia, which

@@ -123,9 +123,17 @@ convert(::Type{Symbol}, po::PyObject) = Symbol(convert(AbstractString, po))
 #########################################################################
 # ByteArray conversions
 
-PyObject(a::Vector{UInt8}) =
+function PyObject(a::DenseVector{UInt8})
+  if stride(a,1) != 1
+    try
+        return NpyArray(a, true)
+    catch
+        return array2py(a) # fallback to non-NumPy version
+    end
+  end
   PyObject(@pycheckn ccall((@pysym :PyByteArray_FromStringAndSize),
                            PyPtr, (Ptr{UInt8}, Int), a, length(a)))
+end
 
 ispybytearray(po::PyObject) =
   pyisinstance(po, @pyglobalobj :PyByteArray_Type)

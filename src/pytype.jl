@@ -3,10 +3,10 @@
 ################################################################
 # Python expects the PyMethodDef and similar strings to be constants,
 # so we define anonymous globals to hold them, returning the pointer
-const prevent_gc = Any[]
+const permanent_strings = String[]
 function gstring_ptr(name::AbstractString, s::AbstractString)
     g = String(s)
-    push!(prevent_gc, g)
+    push!(permanent_strings, g)
     unsafe_convert(Ptr{UInt8}, g)
 end
 
@@ -42,11 +42,9 @@ const METH_CLASS = 0x0010 # for class methods
 const METH_STATIC = 0x0020 # for static methods
 
 const NULL_UInt8_Ptr = convert(Ptr{UInt8}, C_NULL)
-function PyMethodDef(name::AbstractString, meth::Function, flags::Integer, doc::AbstractString="")
+function PyMethodDef(name::AbstractString, meth::Ptr{Cvoid}, flags::Integer, doc::AbstractString="")
     PyMethodDef(gstring_ptr(name, name),
-                ((flags & METH_KEYWORDS) == 0 ?
-                 cfunction(meth, PyPtr, Tuple{PyPtr,PyPtr}) :
-                 cfunction(meth, PyPtr, Tuple{PyPtr,PyPtr,PyPtr})),
+                meth,
                 convert(Cint, flags),
                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc))
 end
@@ -66,21 +64,15 @@ struct PyGetSetDef
     closure::Ptr{Cvoid} # pass-through thunk, may be NULL
 end
 
-function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
-    PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Cvoid}}),
-                cfunction(set, Int, Tuple{PyPtr,PyPtr,Ptr{Cvoid}}),
-                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
-                C_NULL)
-end
-
-function PyGetSetDef(name::AbstractString, get::Function, doc::AbstractString="")
-    PyGetSetDef(gstring_ptr(name, name),
-                cfunction(get, PyPtr, Tuple{PyPtr,Ptr{Cvoid}}),
-                C_NULL,
-                isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
-                C_NULL)
-end
+# probably should be changed to macro to avoid interpolating into @cfunction:
+# (commented out for now since we aren't actually using it)
+# function PyGetSetDef(name::AbstractString, get::Function,set::Function, doc::AbstractString="")
+#     PyGetSetDef(gstring_ptr(name, name),
+#                 @cfunction($get, PyPtr, (PyPtr,Ptr{Cvoid})),
+#                 @cfunction($set, Int, (PyPtr,PyPtr,Ptr{Cvoid})),
+#                 isempty(doc) ? NULL_UInt8_Ptr : gstring_ptr(name, doc),
+#                 C_NULL)
+# end
 
 # used as sentinel value to end attribute arrays:
 PyGetSetDef() = PyGetSetDef(NULL_UInt8_Ptr, C_NULL, C_NULL, NULL_UInt8_Ptr, C_NULL)
@@ -403,44 +395,8 @@ const pyjlwrap_membername = "jl_value"
 const pyjlwrap_doc = "Julia jl_value_t* (Any object)"
 # other pointer-containing constants that need to be initialized at runtime
 const pyjlwrap_members = PyMemberDef[]
-const jlWrapType = PyTypeObject()
+const jlWrapType = PyTypeObject() # initialized by pyjlwrap_init in __init__
 const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = Ref(0x00000000)
-
-# called in __init__
-function pyjlwrap_init()
-    # PyMemberDef stores explicit pointers, hence must be initialized at runtime
-    push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
-                                        T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
-                                        pyjlwrap_doc),
-                            PyMemberDef(C_NULL,0,0,0,C_NULL))
-
-    # all cfunctions must be compiled at runtime
-    pyjlwrap_dealloc_ptr = cfunction(pyjlwrap_dealloc, Cvoid, Tuple{PyPtr})
-    pyjlwrap_repr_ptr = cfunction(pyjlwrap_repr, PyPtr, Tuple{PyPtr})
-    pyjlwrap_hash_ptr = cfunction(pyjlwrap_hash, UInt, Tuple{PyPtr})
-    pyjlwrap_hash32_ptr = cfunction(pyjlwrap_hash32, UInt32, Tuple{PyPtr})
-    pyjlwrap_call_ptr = cfunction(pyjlwrap_call, PyPtr, Tuple{PyPtr,PyPtr,PyPtr})
-    pyjlwrap_getattr_ptr = cfunction(pyjlwrap_getattr, PyPtr, Tuple{PyPtr,PyPtr})
-    pyjlwrap_getiter_ptr = cfunction(pyjlwrap_getiter, PyPtr, Tuple{PyPtr})
-
-    # detect at runtime whether we are using Stackless Python
-    try
-        pyimport("stackless")
-        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] = Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_
-    end
-
-    PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap)) do t::PyTypeObject
-        t.tp_flags |= Py_TPFLAGS_BASETYPE
-        t.tp_members = pointer(pyjlwrap_members);
-        t.tp_dealloc = pyjlwrap_dealloc_ptr
-        t.tp_repr = pyjlwrap_repr_ptr
-        t.tp_call = pyjlwrap_call_ptr
-        t.tp_getattro = pyjlwrap_getattr_ptr
-        t.tp_iter = pyjlwrap_getiter_ptr
-        t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
-                    pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
-    end
-end
 
 # use this to create a new jlwrap type, with init to set up custom members
 function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)

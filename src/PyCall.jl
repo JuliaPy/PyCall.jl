@@ -155,19 +155,10 @@ PyObject(o::PyObject) = o
 
 #########################################################################
 
-include("pyinit.jl")
 include("exception.jl")
 include("gui.jl")
 
 pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
-
-#########################################################################
-
-include("gc.jl")
-
-# make a PyObject that embeds a reference to keep, to prevent Julia
-# from garbage-collecting keep until o is finalized.
-PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 
@@ -179,6 +170,14 @@ include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
+
+#########################################################################
+
+include("gc.jl")
+
+# make a PyObject that embeds a reference to keep, to prevent Julia
+# from garbage-collecting keep until o is finalized.
+PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 #########################################################################
 # Pretty-printing PyObject
@@ -333,8 +332,8 @@ function pywrap(o::PyObject, mname::Symbol=:__anon__)
               catch
                   [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
-    eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
-                 Expr(:export, exports...)))
+    Core.eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
+                                              Expr(:export, exports...)))
     m
 end
 
@@ -469,7 +468,7 @@ or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
                 end
-                e.msg *= "\n\n" * msg * "\n"
+                e = PyError(string(e.msg, "\n\n", msg, "\n"), e)
             end
             throw(e)
         else
@@ -907,12 +906,16 @@ end
 #########################################################################
 # Expose Python docstrings to the Julia doc system
 
-Docs.getdoc(o::PyObject) = Text(String(o["__doc__"]))
+Docs.getdoc(o::PyObject) = Text(convert(String, o["__doc__"]))
 
 #########################################################################
 
 include("pyeval.jl")
 include("serialize.jl")
+
+#########################################################################
+
+include("pyinit.jl")
 
 #########################################################################
 # Precompilation: just an optimization to speed up initialization.

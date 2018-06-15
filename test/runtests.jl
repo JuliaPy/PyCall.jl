@@ -195,8 +195,8 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test obuf[:readlines]() == ["hello\n", "again"]
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-        @test Vector{UInt8}(obuf[:read](5)) == b"hello"
-        @test Vector{UInt8}(obuf[:readall]()) == b"\nagain"
+        @test codeunits(obuf[:read](5)) == b"hello"
+        @test codeunits(obuf[:readall]()) == b"\nagain"
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
         @test obuf[:encoding] == "UTF-8"
@@ -425,7 +425,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test convert(Bool, PyObject(Any[])) === false
     @test convert(Bool, PyObject(17.3)) === true
     @test convert(Bool, PyObject(Any[0])) === true
-    @test Bool(PyVector{PyObject}(PyObject([false]))[1]) === false
+    @test convert(Bool, PyVector{PyObject}(PyObject([false]))[1]) === false
 
     # serialization
     let py_sum_obj = pybuiltin("sum")
@@ -461,7 +461,9 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test occursin("no docstring", Base.Docs.doc(PyObject(py"lambda x: x+1")).content)
 
     let b = rand(UInt8, 1000)
-        @test convert(Vector{UInt8}, pybytes(b)) == b == convert(Vector{UInt8}, pybytes(String(copy(b))))
+        @test(convert(Vector{UInt8}, pybytes(b)) == b
+              == convert(Vector{UInt8}, pybytes(String(copy(b))))
+              == convert(Vector{UInt8}, pybytes(codeunits(String(copy(b))))))
     end
 
     let t = convert(Tuple, PyObject((3,34)))

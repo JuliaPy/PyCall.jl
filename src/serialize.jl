@@ -21,16 +21,19 @@ function serialize(s::AbstractSerializer, pyo::PyObject)
 end
 
 """
-    pybytes(b::Union{String,Vector{UInt8}})
+    pybytes(b::Union{String,DenseVector{UInt8}})
 
 Convert `b` to a Python `bytes` object.   This differs from the default
 `PyObject(b)` conversion of `String` to a Python string (which may fail if `b`
 does not contain valid Unicode), or from the default conversion of a
 `Vector{UInt8}` to a `bytearray` object (which is mutable, unlike `bytes`).
 """
-pybytes(b::Union{String,Array{UInt8}}) = PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
-                                                  PyPtr, (Ptr{UInt8}, Int),
-                                                  b, sizeof(b)))
+function pybytes(b::Union{String,DenseVector{UInt8}})
+    b isa String || stride(b,1) == 1 || throw(ArgumentError("pybytes requires stride-1 byte arrays"))
+    PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
+                             PyPtr, (Ptr{UInt8}, Int),
+                             b, sizeof(b)))
+end
 
 function deserialize(s::AbstractSerializer, t::Type{PyObject})
     b = deserialize(s)
