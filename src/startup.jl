@@ -20,7 +20,7 @@ symbols_present = false
 @static if Compat.Sys.iswindows()
     lpcbneeded = Ref{UInt32}()
     proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Cvoid}, ())
-    handles = Vector{Ptr{Cvoid}}(20)
+    handles = Vector{Ptr{Cvoid}}(undef, 20)
     if EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded) == 0
         resize!(handles, div(lpcbneeded[],sizeof(Ptr{Cvoid})))
         EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded)
@@ -49,7 +49,7 @@ if !symbols_present
     Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion_build)
 else
     @static if Compat.Sys.iswindows()
-        pathbuf = Vector{UInt16}(1024)
+        pathbuf = Vector{UInt16}(undef, 1024)
         ret = ccall(:GetModuleFileNameW, stdcall, UInt32,
             (Ptr{Cvoid}, Ptr{UInt16}, UInt32),
             libpy_handle, pathbuf, length(pathbuf))
