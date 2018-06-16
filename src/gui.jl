@@ -162,6 +162,7 @@ function qt_eventloop(sec::Real=50e-3)
     for QtModule in ("PyQt5", "PyQt4", "PySide")
         try
             return qt_eventloop(QtModule, sec)
+        catch
         end
     end
     error("no Qt module found")

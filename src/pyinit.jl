@@ -44,6 +44,7 @@ function pyjlwrap_init()
     try
         pyimport("stackless")
         Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] = Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_
+    catch
     end
 
     PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap)) do t::PyTypeObject
