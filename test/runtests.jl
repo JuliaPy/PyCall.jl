@@ -20,6 +20,8 @@ struct TestConstruct
     x
 end
 
+pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
+
 @testset "PyCall" begin
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
     np = pyimport_e("numpy")
