@@ -68,7 +68,11 @@ end
 
 # call doevent(status) every sec seconds
 function install_doevent(doevent, sec::Real)
-    return Base.Timer(doevent, sec, sec)
+    @static if VERSION < v"0.7.0-DEV.3526" # julia#25647
+        return Base.Timer(doevent, sec, sec)
+    else
+        return Base.Timer(doevent, sec, interval=sec)
+    end
 end
 
 # For PyPlot issue #181: recent pygobject releases emit a warning
