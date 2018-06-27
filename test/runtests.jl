@@ -284,9 +284,8 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
             @test o3[2,3,4] == 9
         end
     end
-
-    # list operations:
-    let o = PyObject(Any[8,3])
+    @testset "list operations" begin
+        lst = Any[8,3]; o = PyObject(lst)
         @test collect(push!(o, 5)) == [8,3,5]
         @test pop!(o) == 5 && collect(o) == [8,3]
         @test popfirst!(o) == 8 && collect(o) == [3]
@@ -294,11 +293,58 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test collect(prepend!(o, [5,4,2])) == [5,4,2,9,3]
         @test collect(append!(o, [1,6,8])) == [5,4,2,9,3,1,6,8]
         @test isempty(empty!(o))
+
+        # get! with preallocated return object
+        res = PyNULL()
+        lst = Any[8,3,5]; o = PyObject(lst) # re-init since emptied
+        lpyo = map(PyObject, lst)
+        for i in eachindex(lst)
+            @test get!(res, o, PyObject, i-1) == lpyo[i]
+            @test get!(res, o, i-1) == lst[i] # PyAny default
+        end
+
+        # get! with default if key not found
+        @test get!(res, o, PyObject, 3, 12) == 12
+        @test get!(res, o, 3, 12) == 12
     end
     let o = PyObject(Any[8,3])
         @test collect(append!(o, o)) == [8,3,8,3]
         push!(o, 1)
         @test collect(prepend!(o, o)) == [8,3,8,3,1,8,3,8,3,1]
+    end
+
+    @testset "tuple get" begin
+        tpl = ("a","b","c"); o = PyObject(tpl); tpl_os = map(PyObject, tpl)
+
+        # get with PyObject key
+        @test ((get(o, PyObject, PyObject(i-1)) for i in eachindex(tpl))...,) == tpl_os
+        # get with PyObject key and default
+        @test get(o, PyObject, PyObject(3), "z") == PyObject("z")
+
+        # get with Integer key
+        @test ((get(o, PyObject, PyObject(i-1)) for i in eachindex(tpl))...,) == tpl_os
+        # get with Integer key and default
+        @test get(o, PyObject, 3, "z") == PyObject("z")
+
+        # get!
+        res = PyNULL()
+        for i in eachindex(tpl)
+            @test get!(res, o, PyObject, i-1) == tpl_os[i]
+            @test get!(res, o, PyObject, PyObject(i-1)) == tpl_os[i]
+            @test get!(res, o, i-1) == tpl[i]
+            @test get!(res, o, PyObject(i-1)) == tpl[i]
+        end
+
+        # get! with default if key not found
+        @test get!(res, o, PyObject, 3, "z") == PyObject("z")
+        @test get!(res, o, PyObject, PyObject(3), "z") == PyObject("z")
+        @test get!(res, o, 3, "z") == PyObject("z")
+        @test get!(res, o, PyObject(3), "z") == PyObject("z")
+
+        # fast unsafe_gettpl!
+        for i in eachindex(tpl)
+            @test unsafe_gettpl!(res, o, PyObject, i-1) == tpl_os[i]
+        end
     end
 
     # issue #216:

@@ -10,11 +10,12 @@ export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
+       unsafe_gettpl!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
-       eltype, get, delete!, empty!, length, isempty, start, done,
+       eltype, get, get!, delete!, empty!, length, isempty, start, done,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
@@ -97,8 +98,12 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
+function pydecref_(o::PyPtr)
+    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+end
+
 function pydecref(o::PyObject)
-    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o.o)
+    pydecref_(o.o)
     o.o = PyPtr_NULL
     o
 end
@@ -130,10 +135,15 @@ function pystealref!(o::PyObject)
     return optr
 end
 
-function Base.copy!(dest::PyObject, src::PyObject)
-    pydecref(dest)
-    dest.o = src.o
-    return pyincref(dest)
+Base.copy!(dest::PyObject, src::PyObject) = Base.copy!(dest, src.o)
+
+function Base.copy!(dest::PyObject, src::PyPtr)
+    if dest.o != src
+        pyincref_(src)
+        pydecref_(dest.o)
+        dest.o = src
+    end
+    return dest
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
@@ -170,6 +180,7 @@ include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
+include("get.jl")
 
 #########################################################################
 
@@ -752,27 +763,6 @@ macro pycall(ex)
     T = ex.args[2]
     :(pycall($(map(esc,[kwargs; func; T; args])...)))
 end
-
-#########################################################################
-# Once Julia lets us overload ".", we will use [] to access items, but
-# for now we can define "get".
-
-function get(o::PyObject, returntype::TypeTuple, k, default)
-    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
-    if r == C_NULL
-        pyerr_clear()
-        default
-    else
-        convert(returntype, PyObject(r))
-    end
-end
-
-get(o::PyObject, returntype::TypeTuple, k) =
-    convert(returntype, PyObject(@pycheckn ccall((@pysym :PyObject_GetItem),
-                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
-
-get(o::PyObject, k, default) = get(o, PyAny, k, default)
-get(o::PyObject, k) = get(o, PyAny, k)
 
 function delete!(o::PyObject, k)
     e = ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))
