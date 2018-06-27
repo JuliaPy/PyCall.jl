@@ -328,15 +328,16 @@ cases where the Python return type is known can also improve
 performance, both by eliminating the overhead of runtime type inference
 and also by providing more type information to the Julia compiler.
 
-* `pycall(function::PyObject, returntype::Type, args...)`.   Call the given
-  Python `function` (typically looked up from a module) with the given
+* `pycall(pyfunc::PyObject, returntype::Type, args...)`.  Call the given
+  Python function `pyfunc` (typically looked up from a module) with the given
   `args...` (of standard Julia types which are converted automatically to
   the corresponding Python types if possible), converting the return value
   to `returntype` (use a `returntype` of `PyObject` to return the unconverted
   Python object reference, or of `PyAny` to request an automated conversion).
-  For convenience, a macro `@pycall` exists which automatically converts
-  `@pycall function(args...)::returntype` into
-  `pycall(function,returntype,args...)`.  
+    * For convenience, a macro `@pycall` exists which automatically converts
+  `@pycall pyfunc(args...)::returntype` into
+  `pycall(pyfunc,returntype,args...)`.
+    * Another equivalent is `(pyfunc=>returntype)(args...)`. Alternatively you can define `pyfunc_ret = pyfunc=>returntype`, then call `pyfunc_ret(args...)` instead of `pycall(pyfunc,returntype,args...)`
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).  Functions or other symbols

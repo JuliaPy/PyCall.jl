@@ -732,6 +732,7 @@ pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
     return convert(PyAny, _pycall(o, args...; kwargs...))
 
 (o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
+(ot::Pair{PyObject, <:TypeTuple})(args...; kws...) = pycall(ot[1], ot[2], args...; kws...)
 PyAny(o::PyObject) = convert(PyAny, o)
 
 
