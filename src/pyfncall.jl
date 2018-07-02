@@ -7,7 +7,7 @@ const pyarg_tuples = PyPtr[]
 Low-level version of `pycall!(ret, o, ...; kwargs...)`
 Sets `ret.o` to the result of the call, and returns `ret::PyObject`
 """
-function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, kwargs::Vector{Any})
+function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, kwargs)
     if isempty(kwargs)
         kw = C_NULL
     else
