@@ -1,26 +1,26 @@
 using Compat.Test, PyCall
 
+py"""
+def mklist(*args):
+    return list(args)
+"""
 @testset "pycall!" begin
-    np = pyimport("numpy")
-    ops = pyimport("operator")
-    eq = ops["eq"]
-    npzeros = np["zeros"]
+    pymklist = py"mklist"
     res = PyNULL()
-    npzeros_pyo(sz, dtype="d", order="F")     = pycall(npzeros, PyObject, sz, dtype, order)
-    npzeros_pyany(sz, dtype="d", order="F")   = pycall(npzeros, PyAny, sz, dtype, order)
-    npzeros_pyarray(sz, dtype="d", order="F") = pycall(npzeros, PyArray, sz, dtype, order)
 
-    npzeros_pyo!(ret, sz, dtype="d", order="F")     = pycall!(ret, npzeros, PyObject, sz, dtype, order)
-    npzeros_pyany!(ret, sz, dtype="d", order="F")   = pycall!(ret, npzeros, PyAny, sz, dtype, order)
-    npzeros_pyarray!(ret, sz, dtype="d", order="F") = pycall!(ret, npzeros, PyArray, sz, dtype, order)
-
-    arr_size = (3, 4)
+    function pycall_checks(res, pyf, RetType, args...)
+        pycall_res = pycall(pyf, RetType, args...)
+        res_converted = pycall!(res, pyf, RetType, args...)
+        @test convert(RetType, res) == res_converted
+        @test res_converted == pycall_res
+        RetType != PyAny && @test res_converted isa RetType
+    end
 
     @testset "basics" begin
-        @test np["array_equal"](npzeros_pyo!(res, arr_size), npzeros_pyo(arr_size))
-        @test all(npzeros_pyany!(res, arr_size) .== npzeros_pyany(arr_size))
-        @test all(npzeros_pyarray!(res, arr_size) .== npzeros_pyarray(arr_size))
-        @test npzeros_pyany!(res, arr_size) isa Array
-        @test npzeros_pyarray!(res, arr_size) isa PyArray
+        args = ("a", 2, 4.5)
+        for RetType in (PyObject, PyAny, Tuple)
+            pycall_checks(res, pymklist, RetType, args...)
+            gc()
+        end
     end
 end
