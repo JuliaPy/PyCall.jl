@@ -22,7 +22,7 @@ friendly format but you don't have the python tuple to hold the arguments
 (`pyargsptr`). Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
 """
 function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args,
-  nargs::Int=length(args), kw::Union{Ptr{Void}, PyObject}=C_NULL)
+  nargs::Int=length(args), kw::Union{Ptr{Nothing}, PyObject}=C_NULL)
     # pyarg_tuples[i] is a pointer to a python tuple of length i-1
     for n in length(pyarg_tuples):nargs
         push!(pyarg_tuples, @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), n))
@@ -57,7 +57,7 @@ Sets the tuple's values to the python version of your arguments, and calls the
 function. Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
 """
 function _pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
-  args, nargs::Int=length(args), kw::Union{Ptr{Void}, PyObject}=C_NULL)
+  args, nargs::Int=length(args), kw::Union{Ptr{Nothing}, PyObject}=C_NULL)
     pysetargs!(pyargsptr, args, nargs)
     return __pycall!(ret, pyargsptr, o, kw) #::PyObject
 end
@@ -95,7 +95,7 @@ have all their args set to Python values, so we can just call the function `o`.
 Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
 """
 function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
-  kw::Union{Ptr{Void}, PyObject})
+  kw::Union{Ptr{Nothing}, PyObject})
     sigatomic_begin()
     try
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,

@@ -20,7 +20,7 @@ def mklist(*args):
         args = ("a", 2, 4.5)
         for RetType in (PyObject, PyAny, Tuple)
             pycall_checks(res, pymklist, RetType, args...)
-            gc()
+            GC.gc()
         end
     end
 end
