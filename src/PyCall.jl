@@ -4,13 +4,14 @@ module PyCall
 
 using Compat, VersionParsing
 
-export pycall, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
+export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
-       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret
+       pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
+       pywrapfn, pysetarg!, pysetargs!
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -97,8 +98,13 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
+function pydecref_(o::PyPtr)
+    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+    return o
+end
+
 function pydecref(o::PyObject)
-    ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o.o)
+    pydecref_(o.o)
     o.o = PyPtr_NULL
     o
 end
@@ -689,69 +695,7 @@ function pybuiltin(name)
 end
 
 #########################################################################
-
-"""
-Low-level version of `pycall(o, ...)` that always returns `PyObject`.
-"""
-function _pycall(o::Union{PyObject,PyPtr}, args...; kwargs...)
-    oargs = map(PyObject, args)
-    nargs = length(args)
-    sigatomic_begin()
-    try
-        arg = PyObject(@pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,),
-                                       nargs))
-        for i = 1:nargs
-            @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
-                             (PyPtr,Int,PyPtr), arg, i-1, oargs[i])
-            pyincref(oargs[i]) # PyTuple_SetItem steals the reference
-        end
-        if isempty(kwargs)
-            ret = PyObject(@pycheckn ccall((@pysym :PyObject_Call), PyPtr,
-                                          (PyPtr,PyPtr,PyPtr), o, arg, C_NULL))
-        else
-            #kw = PyObject((AbstractString=>Any)[string(k) => v for (k, v) in kwargs])
-            kw = PyObject(Dict{AbstractString, Any}([Pair(string(k), v) for (k, v) in kwargs]))
-            ret = PyObject(@pycheckn ccall((@pysym :PyObject_Call), PyPtr,
-                                            (PyPtr,PyPtr,PyPtr), o, arg, kw))
-        end
-        return ret::PyObject
-    finally
-        sigatomic_end()
-    end
-end
-
-"""
-    pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...)
-
-Call the given Python function (typically looked up from a module) with the given args... (of standard Julia types which are converted automatically to the corresponding Python types if possible), converting the return value to returntype (use a returntype of PyObject to return the unconverted Python object reference, or of PyAny to request an automated conversion)
-"""
-pycall(o::Union{PyObject,PyPtr}, returntype::TypeTuple, args...; kwargs...) =
-    return convert(returntype, _pycall(o, args...; kwargs...))::returntype
-
-pycall(o::Union{PyObject,PyPtr}, ::Type{PyAny}, args...; kwargs...) =
-    return convert(PyAny, _pycall(o, args...; kwargs...))
-
-(o::PyObject)(args...; kws...) = pycall(o, PyAny, args...; kws...)
-PyAny(o::PyObject) = convert(PyAny, o)
-
-
-"""
-    @pycall func(args...)::T
-
-Convenience macro which turns `func(args...)::T` into pycall(func, T, args...)
-"""
-macro pycall(ex)
-    if !(isexpr(ex,:(::)) && isexpr(ex.args[1],:call))
-        throw(ArgumentError("Usage: @pycall func(args...)::T"))
-    end
-    func = ex.args[1].args[1]
-    args, kwargs = ex.args[1].args[2:end], []
-    if isexpr(args[1],:parameters)
-        kwargs, args = args[1], args[2:end]
-    end
-    T = ex.args[2]
-    :(pycall($(map(esc,[kwargs; func; T; args])...)))
-end
+include("pyfncall.jl")
 
 #########################################################################
 # Once Julia lets us overload ".", we will use [] to access items, but
