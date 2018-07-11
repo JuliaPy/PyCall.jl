@@ -1,5 +1,8 @@
 using PyCall, BenchmarkTools, DataStructures
-using PyCall: _pycall!, pycall_legacy
+using PyCall: _pycall!
+
+include("pywrapfn.jl")
+include("pycall_legacy.jl")
 
 results = OrderedDict{String,Any}()
 
