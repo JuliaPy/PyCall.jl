@@ -1,5 +1,5 @@
 using PyCall, Compat
-using Compat.Test, Compat.Dates, Compat.Serialization
+using Compat.Test, Compat.Dates, Compat.Serialization, Compat.Sockets
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -155,6 +155,12 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test roundtripeq(Dates.Second, Dates.Second(typemin(Int32)))
     @test roundtripeq(Dates.Day, Dates.Day(999999999)) # max allowed day timedelta
     @test roundtripeq(Dates.Day, Dates.Day(-999999999)) # min allowed day timedelta
+
+    # IP Addresses
+    @test roundtripeq(IPv4("0.0.0.0"))
+    @test roundtripeq(IPv4("255.255.255.255"))
+    @test roundtripeq(IPv6("::"))
+    @test roundtripeq(IPv6("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"))
 
     # fixme: is there any nontrivial showable test we can do?
     @test !showable("text/html", PyObject(1))

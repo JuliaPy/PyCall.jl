@@ -710,6 +710,44 @@ include("pydates.jl")
 #pydate_query(o) = Union{}
 
 #########################################################################
+# IP Addresses
+
+const ipaddress = PyNULL()
+function ipaddress_init()
+    if ispynull(ipaddress)
+        copy!(ipaddress, pyimport("ipaddress"))
+    end
+end
+
+function convert(::Type{IPv4}, o::PyObject)
+    ipaddress_init()
+    if pyisinstance(o, ipaddress["IPv4Address"])
+        IPv4(UInt32(o["_ip"]))
+    else
+        throw(ArgumentError("unknown IPv4 type $o"))
+    end
+end
+
+function convert(::Type{IPv6}, o::PyObject)
+    ipaddress_init()
+    if pyisinstance(o, ipaddress["IPv6Address"])
+        IPv6(UInt128(BigInt(o["_ip"])))
+    else
+        throw(ArgumentError("unknown IPv6 type $o"))
+    end
+end
+
+function PyObject(ip::IPv4)
+    ipaddress_init()
+    ipaddress["IPv4Address"](ip.host)
+end
+
+function PyObject(ip::IPv6)
+    ipaddress_init()
+    ipaddress["IPv6Address"](ip.host)
+end
+
+#########################################################################
 # Inferring Julia types at runtime from Python objects:
 #
 # [Note that we sometimes use the PyFoo_Check API and sometimes we use

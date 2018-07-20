@@ -19,6 +19,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        next, filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
+import Compat.Sockets: IPv4, IPv6
 
 # Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
