@@ -563,7 +563,7 @@ end
     @test d[:x] == 5
     d[:x2] = 30
     @test d[:x] == 15
-    @test d[:type_str](10) == string(Int)
+    @test d[:type_str](10) == string(PyInt)
     @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
