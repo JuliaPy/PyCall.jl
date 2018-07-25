@@ -22,6 +22,9 @@ end
 
 pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
+# default integer type for PyAny conversions
+const PyInt = pyversion < v"3" ? Int : Clonglong
+
 @testset "PyCall" begin
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
     np = pyimport_e("numpy")
@@ -224,7 +227,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     # conversion of numpy scalars
     pyanycheck(x::Any) = pyanycheck(typeof(x), PyObject(x))
     pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
-    @test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
+    @test pyanycheck(PyInt, PyVector{PyObject}(PyObject([1]))[1])
     @test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
     @test pyanycheck(ComplexF64, PyVector{PyObject}(PyObject([1.3+1im]))[1])
     @test pyanycheck(Bool, PyVector{PyObject}(PyObject([true]))[1])
@@ -478,7 +481,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     end
     for T in (Tuple{Vararg{PyAny}}, NTuple{2,Int}, Tuple{Int,Int}, Tuple{Vararg{Int}}, Tuple{Int,Vararg{Int}})
         let t = convert(T, PyObject((3,34)))
-            @test isa(t, Tuple{Int,Int})
+            @test isa(t, Tuple{PyInt,PyInt})
             @test t == (3,34)
         end
     end
@@ -512,12 +515,12 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     end
 
     # pyfunction
-    @test pyfunction(factorial, Int)(3) === 6
+    @test pyfunction(factorial, Int)(3) === PyInt(6)
     @test pyfunction(sin, Complex{Int})(3) === sin(3+0im)
     @test pyfunctionret(factorial, Float64, Int)(3) === 6.0
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
-    @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === 5
+    @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === PyInt(5)
 
     # broadcasting scalars
     let o = PyObject(3) .+ [1,4]
