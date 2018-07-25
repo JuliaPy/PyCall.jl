@@ -157,10 +157,21 @@ function writeifchanged(filename, str)
     end
 end
 
+# return the first arg that exists in the PATH
+function whichfirst(args...)
+    for x in args
+        if Compat.Sys.which(x) !== nothing
+            return x
+        end
+    end
+    return ""
+end
+
 try # make sure deps.jl file is removed on error
     python = try
         let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
-                     (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ? "python" : ""),
+                     (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ?
+                     whichfirst("python3", "python") : "Conda"),
             vers = isempty(py) || py == "Conda" ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
                 if isempty(py) || py == "Conda"

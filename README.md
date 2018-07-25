@@ -35,7 +35,7 @@ private to Julia (not in your `PATH`).  You can use the `Conda` Julia
 package to install more Python packages, and `import Conda` to print
 the `Conda.PYTHONDIR` directory where `python` was installed.
 On GNU/Linux systems, PyCall will default to using
-the `python` program (if any) in your PATH.
+the `python3` program (if any, otherwise `python`) in your PATH.
 
 The advantage of a Conda-based configuration is particularly
 compelling if you are installing PyCall in order to use packages like
@@ -48,7 +48,7 @@ your own packages, use the `pyimport_conda` function described below.)
 
 If you want to use a different version of Python than the default, you
 can change the Python version by setting the `PYTHON` environment variable
-to the path of the `python` executable and then re-running `Pkg.build("PyCall")`.
+to the path of the `python` (or `python3` etc.) executable and then re-running `Pkg.build("PyCall")`.
 In Julia:
 
     ENV["PYTHON"] = "... path of the python program you want ..."
@@ -251,7 +251,7 @@ a NumPy array (currently of numeric types or objects only).  Just use
 `PyArray` as the return type of a `pycall` returning an `ndarray`, or
 call `PyArray(o::PyObject)` on an `ndarray` object `o`.  (Technically,
 a `PyArray` works for any Python object that uses the NumPy array
-interface to provide a data pointer and shape information.)  
+interface to provide a data pointer and shape information.)
 
 Conversely, when passing arrays *to* Python, Julia `Array` types are
 converted to `PyObject` types *without* making a copy via NumPy,
@@ -336,7 +336,7 @@ and also by providing more type information to the Julia compiler.
   Python object reference, or of `PyAny` to request an automated conversion).
   For convenience, a macro `@pycall` exists which automatically converts
   `@pycall function(args...)::returntype` into
-  `pycall(function,returntype,args...)`.  
+  `pycall(function,returntype,args...)`.
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).  Functions or other symbols
