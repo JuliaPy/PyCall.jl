@@ -29,6 +29,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         let o = get(pycall(np["array"], PyObject, 1:3), PyObject, 2)
             @test convert(Int32, o) === Int32(3)
             @test convert(Int64, o) === Int64(3)
+            @test convert(Float64, o) === Float64(3)
             @test convert(Complex{Int}, o) === 3+0im
         end
     end
@@ -235,8 +236,13 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     let i = 12345678901234567890 # Int128
         @test PyObject(i) - i == 0
     end
-    let i = BigInt(12345678901234567890) # BigInt
-        @test PyObject(i) - i == 0
+    let i = BigInt(12345678901234567890), o = PyObject(i) # BigInt
+        @test o - i == 0
+        @test BigInt(o) == i
+        if pyversion >= v"3.2"
+            @test PyAny(o) == i == convert(Integer, o)
+            @test_throws InexactError Int64(o)
+        end
     end
 
     # bigfloat conversion

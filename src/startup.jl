@@ -103,17 +103,6 @@ else
     const PyString_Size = :PyBytes_Size
     const PyString_Type = :PyBytes_Type
 end
-if hassym(libpy_handle, :PyInt_Type)
-    const PyInt_Type = :PyInt_Type
-    const PyInt_FromSize_t = :PyInt_FromSize_t
-    const PyInt_FromSsize_t = :PyInt_FromSsize_t
-    const PyInt_AsSsize_t = :PyInt_AsSsize_t
-else
-    const PyInt_Type = :PyLong_Type
-    const PyInt_FromSize_t = :PyLong_FromSize_t
-    const PyInt_FromSsize_t = :PyLong_FromSsize_t
-    const PyInt_AsSsize_t = :PyLong_AsSsize_t
-end
 
 # hashes changed from long to intptr_t in Python 3.2
 const Py_hash_t = pyversion < v"3.2" ? Clong : Int

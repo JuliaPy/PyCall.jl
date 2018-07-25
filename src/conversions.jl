@@ -5,10 +5,17 @@
 
 # conversions from Julia types to PyObject:
 
-PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSize_t),
-                                                 PyPtr, (UInt,), i))
-PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(PyInt_FromSsize_t),
-                                                PyPtr, (Int,), i))
+@static if pyversion < v"3"
+    PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(:PyInt_FromSize_t),
+                                                    PyPtr, (UInt,), i))
+    PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(:PyInt_FromSsize_t),
+                                                    PyPtr, (Int,), i))
+else
+    PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromUnsignedLongLong),
+                                                    PyPtr, (Culonglong,), i))
+    PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromLongLong),
+                                                    PyPtr, (Clonglong,), i))
+end
 
 PyObject(b::Bool) = PyObject(@pycheckn ccall((@pysym :PyBool_FromLong),
                                              PyPtr, (Clong,), b))
@@ -24,66 +31,35 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
-# numpy scalars need o.item() conversion in Python 3
-unsafe_asscalar(o) = pycall(PyObject(ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, "item")), PyObject)
-
-function convert(::Type{T}, po::PyObject) where {T<:Integer}
-    i = ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), po)
-    if pyerr_occurred()
-      if haskey(po, "item")
-          pyerr_clear()
-          i = @pycheck ccall(@pysym(PyInt_AsSsize_t), Int, (PyPtr,), unsafe_asscalar(po))
-      else
-          throw(PyError(string(PyInt_AsSsize_t)))
-      end
+@static if pyversion < v"3"
+    convert(::Type{T}, po::PyObject) where {T<:Integer} =
+        T(@pycheck ccall(@pysym(:PyInt_AsSsize_t), Int, (PyPtr,), po))
+elseif pyversion < v"3.2"
+    convert(::Type{T}, po::PyObject) where {T<:Integer} =
+        T(@pycheck ccall(@pysym(:PyLong_AsLongLong), Clonglong, (PyPtr,), po))
+else
+    function convert(::Type{T}, po::PyObject) where {T<:Integer}
+        overflow = Ref{Cint}()
+        val = T(@pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow))
+        iszero(overflow[]) || throw(InexactError())
+        return val
     end
-    return T(i)
-end
-
-if Sys.WORD_SIZE == 32
-    function convert(::Type{T}, po::PyObject) where {T<:Union{Int64,UInt64}}
-        i = ccall(@pysym(:PyLong_AsLongLong), UInt64, (PyPtr,), po)
-        if pyerr_occurred()
-            if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
-                pyerr_clear()
-                i = @pycheck ccall(@pysym(:PyLong_AsLongLong), UInt64, (PyPtr,), unsafe_asscalar(po))
-            else
-                throw(PyError("PyLong_AsLongLong"))
-            end
-        end
-        return i % T
+    function convert(::Type{Integer}, po::PyObject)
+        overflow = Ref{Cint}()
+        val = @pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow)
+        iszero(overflow[]) || return convert(BigInt, po)
+        return val
     end
 end
 
 convert(::Type{Bool}, po::PyObject) =
     0 != @pycheck ccall(@pysym(:PyObject_IsTrue), Cint, (PyPtr,), po)
 
-function convert(::Type{T}, po::PyObject) where {T<:Real}
-    x = ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), po)
-    if pyerr_occurred()
-      if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
-          pyerr_clear()
-          x = @pycheck ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), unsafe_asscalar(po))
-      else
-          throw(PyError("PyFloat_AsDouble"))
-      end
-    end
-    return T(x)
-end
+convert(::Type{T}, po::PyObject) where {T<:Real} =
+    T(@pycheck ccall(@pysym(:PyFloat_AsDouble), Cdouble, (PyPtr,), po))
 
-function convert(::Type{T}, po::PyObject) where T<:Complex
-    x = ccall(@pysym(:PyComplex_RealAsDouble), Cdouble, (PyPtr,), po)
-    if pyerr_occurred()
-      if haskey(po, "item") # numpy scalars need po.item() conversion in Python 3
-          pyerr_clear()
-          po = unsafe_asscalar(po)
-          x = @pycheck ccall(@pysym(:PyComplex_RealAsDouble), Cdouble, (PyPtr,), po)
-      else
-          throw(PyError("PyComplex_RealAsDouble"))
-      end
-    end
-    return T(x, ccall(@pysym(:PyComplex_ImagAsDouble), Cdouble, (PyPtr,), po))
-end
+convert(::Type{T}, po::PyObject) where T<:Complex =
+    T(@pycheck ccall(@pysym(:PyComplex_AsCComplex), Complex{Cdouble}, (PyPtr,), po))
 
 convert(::Type{Nothing}, po::PyObject) = nothing
 
@@ -719,11 +695,16 @@ include("pydates.jl")
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or Union{} if there isn't one.
 
-# TODO: In Python 3.x, the BigInt check here won't work since int == long.
-pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyInt_Type) ?
-  (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
-  pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
-  pyisinstance(o, npy_integer) ? Int : Union{}
+@static if pyversion < v"3"
+    pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyInt_Type) ?
+        (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
+        pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
+        pyisinstance(o, npy_integer) ? Int : Union{}
+else
+    pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyLong_Type) ?
+        (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Integer) :
+        pyisinstance(o, npy_integer) ? Integer : Union{}
+end
 
 pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : Union{}
 
