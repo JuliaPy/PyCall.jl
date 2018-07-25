@@ -479,7 +479,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test isa(t, Tuple{PyObject,PyObject})
         @test t == (PyObject(3), PyObject(34))
     end
-    for T in (Tuple{Vararg{PyAny}}, NTuple{2,Int}, Tuple{Int,Int}, Tuple{Vararg{Int}}, Tuple{Int,Vararg{Int}})
+    for T in (Tuple{Vararg{PyAny}}, NTuple{2,PyInt}, Tuple{PyInt,PyInt}, Tuple{Vararg{PyInt}}, Tuple{PyInt,Vararg{PyInt}})
         let t = convert(T, PyObject((3,34)))
             @test isa(t, Tuple{PyInt,PyInt})
             @test t == (3,34)
