@@ -312,7 +312,7 @@ function NoCopyArray(o::PyObject)
     T, native_byteorder = array_format(pybuf)
     !native_byteorder && throw(ArgumentError(
       "Only native endian format supported, format string: '$(get_format_str(pybuf))'"))
-    T == Void && throw(ArgumentError(
+    T == Nothing && throw(ArgumentError(
       "Array datatype '$(get_format_str(pybuf))' not supported"))
     # TODO more checks on strides etc
     sz = size(pybuf)

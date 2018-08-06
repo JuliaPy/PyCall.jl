@@ -184,26 +184,28 @@ end
 # ref: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
 
 const standard_typestrs = Dict{String,DataType}(
-                           "?"=>Bool,        "P"=>Ptr{Void},
+                           "?"=>Bool,        "P"=>Ptr{Cvoid},
                            "b"=>Int8,        "B"=>UInt8,
                            "h"=>Int16,       "H"=>UInt16,
                            "i"=>Int32,       "I"=>UInt32,
                            "l"=>Int32,       "L"=>UInt32,
                            "q"=>Int64,       "Q"=>UInt64,
                            "e"=>Float16,     "f"=>Float32,
-                           "d"=>Float64,     "g"=>Void, # Float128?
+                           "d"=>Float64,     "g"=>Nothing, # Float128?
+                           # `Nothing` indicates no equiv Julia type
                            "Z8"=>ComplexF32, "Z16"=>ComplexF64,
                            "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
 const native_typestrs = Dict{String,DataType}(
-                           "?"=>Bool,        "P"=>Ptr{Void},
+                           "?"=>Bool,        "P"=>Ptr{Cvoid},
                            "b"=>Int8,        "B"=>UInt8,
                            "h"=>Cshort,      "H"=>Cushort,
                            "i"=>Cint,        "I"=>Cuint,
                            "l"=>Clong,       "L"=>Culong,
                            "q"=>Clonglong,   "Q"=>Culonglong,
                            "e"=>Float16,     "f"=>Cfloat,
-                           "d"=>Cdouble,     "g"=>Void, # Float128?
+                           "d"=>Cdouble,     "g"=>Nothing, # Float128?
+                           # `Nothing` indicates no equiv Julia type
                            "Z8"=>ComplexF32, "Z16"=>ComplexF64,
                            "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
