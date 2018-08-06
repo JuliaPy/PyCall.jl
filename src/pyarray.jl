@@ -59,11 +59,7 @@ f_contiguous(T::Type, sz::NTuple{N1,Int}, st::NTuple{N2,Int}) where {N1,N2} =
 
 f_contiguous(i::PyArray_Info{T,N}) where {T,N} = f_contiguous(T, i.sz, i.st)
 c_contiguous(i::PyArray_Info{T,N}) where {T,N} =
-    @static if VERSION >= v"0.7.0-DEV.4534" # julia#26369
-        f_contiguous(T, reverse(i.sz), reverse(i.st))
-    else
-        f_contiguous(T, flipdim(i.sz,1), flipdim(i.st,1))
-    end
+    f_contiguous(T, reverse(i.sz), reverse(i.st))
 
 
 #########################################################################
