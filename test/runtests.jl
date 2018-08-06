@@ -22,6 +22,9 @@ end
 
 pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
+# default integer type for PyAny conversions
+const PyInt = pyversion < v"3" ? Int : Clonglong
+
 @testset "PyCall" begin
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
     np = pyimport_e("numpy")
@@ -29,6 +32,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         let o = get(pycall(np["array"], PyObject, 1:3), PyObject, 2)
             @test convert(Int32, o) === Int32(3)
             @test convert(Int64, o) === Int64(3)
+            @test convert(Float64, o) === Float64(3)
             @test convert(Complex{Int}, o) === 3+0im
         end
     end
@@ -195,8 +199,8 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
         @test obuf[:readlines]() == ["hello\n", "again"]
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-        @test Vector{UInt8}(obuf[:read](5)) == b"hello"
-        @test Vector{UInt8}(obuf[:readall]()) == b"\nagain"
+        @test codeunits(obuf[:read](5)) == b"hello"
+        @test codeunits(obuf[:readall]()) == b"\nagain"
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
         @test obuf[:encoding] == "UTF-8"
@@ -223,7 +227,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     # conversion of numpy scalars
     pyanycheck(x::Any) = pyanycheck(typeof(x), PyObject(x))
     pyanycheck(T, o::PyObject) = isa(convert(PyAny, o), T)
-    @test pyanycheck(Int, PyVector{PyObject}(PyObject([1]))[1])
+    @test pyanycheck(PyInt, PyVector{PyObject}(PyObject([1]))[1])
     @test pyanycheck(Float64, PyVector{PyObject}(PyObject([1.3]))[1])
     @test pyanycheck(ComplexF64, PyVector{PyObject}(PyObject([1.3+1im]))[1])
     @test pyanycheck(Bool, PyVector{PyObject}(PyObject([true]))[1])
@@ -235,8 +239,13 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     let i = 12345678901234567890 # Int128
         @test PyObject(i) - i == 0
     end
-    let i = BigInt(12345678901234567890) # BigInt
-        @test PyObject(i) - i == 0
+    let i = BigInt(12345678901234567890), o = PyObject(i) # BigInt
+        @test o - i == 0
+        @test BigInt(o) == i
+        if pyversion >= v"3.2"
+            @test PyAny(o) == i == convert(Integer, o)
+            @test_throws InexactError Int64(o)
+        end
     end
 
     # bigfloat conversion
@@ -425,7 +434,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test convert(Bool, PyObject(Any[])) === false
     @test convert(Bool, PyObject(17.3)) === true
     @test convert(Bool, PyObject(Any[0])) === true
-    @test Bool(PyVector{PyObject}(PyObject([false]))[1]) === false
+    @test convert(Bool, PyVector{PyObject}(PyObject([false]))[1]) === false
 
     # serialization
     let py_sum_obj = pybuiltin("sum")
@@ -461,16 +470,18 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     @test occursin("no docstring", Base.Docs.doc(PyObject(py"lambda x: x+1")).content)
 
     let b = rand(UInt8, 1000)
-        @test convert(Vector{UInt8}, pybytes(b)) == b == convert(Vector{UInt8}, pybytes(String(copy(b))))
+        @test(convert(Vector{UInt8}, pybytes(b)) == b
+              == convert(Vector{UInt8}, pybytes(String(copy(b))))
+              == convert(Vector{UInt8}, pybytes(codeunits(String(copy(b))))))
     end
 
     let t = convert(Tuple, PyObject((3,34)))
         @test isa(t, Tuple{PyObject,PyObject})
         @test t == (PyObject(3), PyObject(34))
     end
-    for T in (Tuple{Vararg{PyAny}}, NTuple{2,Int}, Tuple{Int,Int}, Tuple{Vararg{Int}}, Tuple{Int,Vararg{Int}})
+    for T in (Tuple{Vararg{PyAny}}, NTuple{2,PyInt}, Tuple{PyInt,PyInt}, Tuple{Vararg{PyInt}}, Tuple{PyInt,Vararg{PyInt}})
         let t = convert(T, PyObject((3,34)))
-            @test isa(t, Tuple{Int,Int})
+            @test isa(t, Tuple{PyInt,PyInt})
             @test t == (3,34)
         end
     end
@@ -504,12 +515,12 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
     end
 
     # pyfunction
-    @test pyfunction(factorial, Int)(3) === 6
+    @test pyfunction(factorial, Int)(3) === PyInt(6)
     @test pyfunction(sin, Complex{Int})(3) === sin(3+0im)
     @test pyfunctionret(factorial, Float64, Int)(3) === 6.0
     @test pyfunctionret(factorial, nothing, Int)(3) === nothing
     @test PyCall.is_pyjlwrap(pycall(pyfunctionret(factorial, Any, Int), PyObject, 3))
-    @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === 5
+    @test pyfunctionret(max, Int, Vararg{Int})(3,4,5) === PyInt(5)
 
     # broadcasting scalars
     let o = PyObject(3) .+ [1,4]
@@ -552,11 +563,12 @@ end
     @test d[:x] == 5
     d[:x2] = 30
     @test d[:x] == 15
-    @test d[:type_str](10) == string(Int)
+    @test d[:type_str](10) == string(PyInt)
     @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
 end
 
+include("test_pyfncall.jl")
 include("testpybuffer.jl")

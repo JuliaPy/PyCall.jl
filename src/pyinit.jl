@@ -22,8 +22,54 @@ const pynothing = Ref{PyPtr}(0)
 const pyxrange = Ref{PyPtr}(0)
 
 #########################################################################
+# initialize jlWrapType for pytype.jl
+
+function pyjlwrap_init()
+    # PyMemberDef stores explicit pointers, hence must be initialized at runtime
+    push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
+                                        T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
+                                        pyjlwrap_doc),
+                            PyMemberDef(C_NULL,0,0,0,C_NULL))
+
+    # all cfunctions must be compiled at runtime
+    pyjlwrap_dealloc_ptr = @cfunction(pyjlwrap_dealloc, Cvoid, (PyPtr,))
+    pyjlwrap_repr_ptr = @cfunction(pyjlwrap_repr, PyPtr, (PyPtr,))
+    pyjlwrap_hash_ptr = @cfunction(pyjlwrap_hash, UInt, (PyPtr,))
+    pyjlwrap_hash32_ptr = @cfunction(pyjlwrap_hash32, UInt32, (PyPtr,))
+    pyjlwrap_call_ptr = @cfunction(pyjlwrap_call, PyPtr, (PyPtr,PyPtr,PyPtr))
+    pyjlwrap_getattr_ptr = @cfunction(pyjlwrap_getattr, PyPtr, (PyPtr,PyPtr))
+    pyjlwrap_getiter_ptr = @cfunction(pyjlwrap_getiter, PyPtr, (PyPtr,))
+
+    # detect at runtime whether we are using Stackless Python
+    try
+        pyimport("stackless")
+        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION[] = Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_
+    catch
+    end
+
+    PyTypeObject!(jlWrapType, "PyCall.jlwrap", sizeof(Py_jlWrap)) do t::PyTypeObject
+        t.tp_flags |= Py_TPFLAGS_BASETYPE
+        t.tp_members = pointer(pyjlwrap_members);
+        t.tp_dealloc = pyjlwrap_dealloc_ptr
+        t.tp_repr = pyjlwrap_repr_ptr
+        t.tp_call = pyjlwrap_call_ptr
+        t.tp_getattro = pyjlwrap_getattr_ptr
+        t.tp_iter = pyjlwrap_getiter_ptr
+        t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
+                    pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+    end
+end
+
+#########################################################################
 
 function __init__()
+    # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
+    # if e.g. you checkout Conda master, and we'll need to re-build PyCall
+    # for something like pyimport_conda to continue working.
+    if conda && dirname(python) != abspath(Conda.PYTHONDIR)
+        error("Using Conda.jl python, but location of $python seems to have moved to $(Conda.PYTHONDIR).  Re-run Pkg.build(\"PyCall\") and restart Julia.")
+    end
+
     # issue #189
     libpy_handle = libpython === nothing ? C_NULL :
         Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)

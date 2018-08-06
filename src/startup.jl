@@ -20,7 +20,7 @@ symbols_present = false
 @static if Compat.Sys.iswindows()
     lpcbneeded = Ref{UInt32}()
     proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Cvoid}, ())
-    handles = Vector{Ptr{Cvoid}}(20)
+    handles = Vector{Ptr{Cvoid}}(undef, 20)
     if EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded) == 0
         resize!(handles, div(lpcbneeded[],sizeof(Ptr{Cvoid})))
         EnumProcessModules(proc_handle, handles, sizeof(handles), lpcbneeded)
@@ -49,7 +49,7 @@ if !symbols_present
     Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion_build)
 else
     @static if Compat.Sys.iswindows()
-        pathbuf = Vector{UInt16}(1024)
+        pathbuf = Vector{UInt16}(undef, 1024)
         ret = ccall(:GetModuleFileNameW, stdcall, UInt32,
             (Ptr{Cvoid}, Ptr{UInt16}, UInt32),
             libpy_handle, pathbuf, length(pathbuf))
@@ -102,17 +102,6 @@ else
     const PyString_AsStringAndSize = :PyBytes_AsStringAndSize
     const PyString_Size = :PyBytes_Size
     const PyString_Type = :PyBytes_Type
-end
-if hassym(libpy_handle, :PyInt_Type)
-    const PyInt_Type = :PyInt_Type
-    const PyInt_FromSize_t = :PyInt_FromSize_t
-    const PyInt_FromSsize_t = :PyInt_FromSsize_t
-    const PyInt_AsSsize_t = :PyInt_AsSsize_t
-else
-    const PyInt_Type = :PyLong_Type
-    const PyInt_FromSize_t = :PyLong_FromSize_t
-    const PyInt_FromSsize_t = :PyLong_FromSsize_t
-    const PyInt_AsSsize_t = :PyLong_AsSsize_t
 end
 
 # hashes changed from long to intptr_t in Python 3.2
