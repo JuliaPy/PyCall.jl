@@ -118,7 +118,7 @@ ndims(a::PyArray{T,N}) where {T,N} = N
 
 similar(a::PyArray, T, dims::Dims) = Array{T}(undef, dims)
 
-function setdata!{T,N}(a::PyArray{T,N}, o::PyObject, pybufinfo=PyBuffer())
+function setdata!(a::PyArray{T,N}, o::PyObject, pybufinfo=PyBuffer()) where {T,N}
     PyBuffer!(pybufinfo, o, PyBUF_ND_CONTIGUOUS)
     dataptr = pybufinfo.buf.buf
     a.data = reinterpret(Ptr{T}, dataptr)
@@ -316,7 +316,11 @@ function NoCopyArray(o::PyObject)
       "Array datatype '$(get_format_str(pybuf))' not supported"))
     # TODO more checks on strides etc
     sz = size(pybuf)
-    arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, false)
+    @static if VERSION >= v"0.7.0-DEV.3526" # julia#25647
+        arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, own=false)
+    else
+        arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, false)
+    end
     !f_contiguous(T, sz, strides(pybuf)) &&
         (arr = PermutedDimsArray(reshape(arr, reverse(sz)), (pybuf.buf.ndim:-1:1)))
     return arr

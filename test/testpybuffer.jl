@@ -83,7 +83,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
 
     @testset "isbuftype" begin
         @test isbuftype(PyObject(0)) == false
-        @test isbuftype(listpyo((1.0:10.0...))) == false
+        @test isbuftype(listpyo((1.0:10.0...,))) == false
         @test isbuftype(arrpyo(1.0:10.0, "d")) == true
         @test isbuftype(PyObject([1:10...])) == true
     end
