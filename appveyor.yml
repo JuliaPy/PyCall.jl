@@ -107,10 +107,14 @@ environment:
   - JULIA_URL: "https://julialangnightlies-s3.julialang.org/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python34-x64"
     PYTHON: "C:\\Python34-x64\\python.exe"
-
+    
   - JULIA_URL: "https://julialangnightlies-s3.julialang.org/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "C:\\Python35-x64"
     PYTHON: "C:\\Python35-x64\\python.exe"
+    
+  - JULIA_URL: "https://julialangnightlies-s3.julialang.org/bin/winnt/x64/julia-latest-win64.exe"
+    PYTHONDIR: "C:\\Python37-x64"
+    PYTHON: "C:\\Python37-x64\\python.exe"
 
   - JULIA_URL: "https://julialangnightlies-s3.julialang.org/bin/winnt/x64/julia-latest-win64.exe"
     PYTHONDIR: "use_conda"
