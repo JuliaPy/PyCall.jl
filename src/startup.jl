@@ -30,12 +30,12 @@ symbols_present = false
         sym = ccall(:GetProcAddress, stdcall, Ptr{Cvoid},
             (Ptr{Cvoid}, Ptr{UInt8}), handle, "Py_GetVersion")
         sym != C_NULL || continue
-        symbols_present = true
+        global symbols_present = true
         global libpy_handle = handle
         break
     end
 else
-    symbols_present = hassym(proc_handle, :Py_GetVersion)
+    global symbols_present = hassym(proc_handle, :Py_GetVersion)
 end
 
 if !symbols_present
