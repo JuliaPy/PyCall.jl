@@ -315,7 +315,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # PyNULL and copy!
     let x = PyNULL(), y = copy!(x, PyObject(314159))
-        @test Int(x) == Int(y) == 314159
+        @test convert(Int, x) == convert(Int, y) == 314159
     end
     @test ispynull(PyNULL())
     @test !ispynull(PyObject(3))
