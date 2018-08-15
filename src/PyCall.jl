@@ -15,7 +15,7 @@ export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
-       eltype, get, delete!, empty!, length, isempty, iterate,
+       eltype, get, delete!, empty!, length, isempty,
        filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
