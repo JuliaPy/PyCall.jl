@@ -26,10 +26,10 @@ before_install:
     - test "x$TRAVIS_OS_NAME" = xosx -o "x$PYTHON" = xConda || (sudo apt-get -qq update && sudo apt-get install -y $PYTHON)
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.clone(pwd()); Pkg.build("PyCall")'
+    - julia -e 'using Pkg; Pkg.add(pwd()); Pkg.build("PyCall")'
     - julia -e 'import PyCall' # precompile
-    - julia -e 'Pkg.test("PyCall"; coverage=true)'
+    - julia -e 'using Pkg; Pkg.test("PyCall"; coverage=true)'
 after_success:
-    - julia -e 'cd(Pkg.dir("PyCall")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+    - julia -e 'using Pkg; cd(joinpath(dirname(pathof(PyCall)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 notifications:
     email: false
