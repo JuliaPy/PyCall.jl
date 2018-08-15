@@ -241,7 +241,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     let i = BigInt(12345678901234567890), o = PyObject(i) # BigInt
         @test o - i == 0
-        @test BigInt(o) == i
+        @test convert(BigInt, o) == i
         if pyversion >= v"3.2"
             @test PyAny(o) == i == convert(Integer, o)
             @test_throws InexactError Int64(o)
