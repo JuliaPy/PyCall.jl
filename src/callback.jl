@@ -15,8 +15,21 @@
 
 # convert Python args to Julia; overridden below for a FuncWrapper type
 # that allows the user to specify the argument types.
-julia_args(f, args) = convert(PyAny, args)
+julia_args(f, args) =
+    [_julia_arg(_getindex(args, i, PyObject)) for i in 1:length(args)]
 julia_kwarg(f, kw, arg) = convert(PyAny, arg)
+
+# For mutating functions such as fill! to mutate Python objects,
+# arguments have to be wrapped by an appropriate wrapper (e.g.,
+# PyArray) rather than copying to a Julia object.
+function _julia_arg(arg)
+    if haskey(PyCall.npy_api, :PyArray_Type) &&
+            pyisinstance(arg, PyCall.npy_api[:PyArray_Type])
+        return convert(PyArray, arg)
+    else
+        return convert(PyAny, arg)
+    end
+end
 
 function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
     args = PyObject(args_) # don't need pyincref because of finally clause below

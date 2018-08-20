@@ -151,6 +151,13 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test x == ["bar"]
     end
 
+    py"""
+    def apply(f, *args):
+        f(*args)
+        return args
+    """
+    @test py"apply"(fill!, zeros(3), 10)[1] == [10, 10, 10]
+
     @test roundtripeq(Dates.Date(2012,3,4))
     @test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
     @test roundtripeq(Dates.Millisecond(typemax(Int32)))
