@@ -29,7 +29,23 @@ function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args,
     end
     check_pyargsptr(nargs)
     pyargsptr = pyarg_tuples[nargs+1]
-    return _pycall!(ret, pyargsptr, o, args, nargs, kw) #::PyObject
+    # We temporarily set pyarg_tuples[nargs+1] to NULL to ensure that nested
+    # calls to pycall don't try to use the same tuple object (issue #533).
+    pyarg_tuples[nargs+1] = C_NULL
+    try
+        pysetargs!(pyargsptr, args, nargs)
+        return __pycall!(ret, pyargsptr, o, kw) #::PyObject
+    finally
+        if nargs > 0 && unsafe_load(pyargsptr).ob_refcnt > 1
+            # we are no longer the only reference to the tuple,
+            # so PyTuple_SetItem will fail (see check_pyargsptr)
+            pydecref_(pyargsptr)
+        else
+            pyunsetargs!(pyargsptr, nargs)   # garbage-collect args
+            pydecref_(pyarg_tuples[nargs+1]) # no-op if it's still NULL
+            pyarg_tuples[nargs+1] = pyargsptr # restore tuple cache
+        end
+    end
 end
 
 """
@@ -43,23 +59,14 @@ OTOH this py"def foo(*args): global z; z=args" doesn't trigger this.
 Fortunately, this check for ob_refcnt is fast - only a few cpu clock cycles.
 """
 function check_pyargsptr(nargs::Int)
-    if nargs > 0 && unsafe_load(pyarg_tuples[nargs+1]).ob_refcnt > 1
-        pydecref_(pyarg_tuples[nargs+1])
-        pyarg_tuples[nargs+1] =
-            @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    if nargs > 0
+        p = pyarg_tuples[nargs+1]
+        if p == C_NULL || unsafe_load(p).ob_refcnt > 1
+            pydecref_(p) # no-op for NULL p
+            pyarg_tuples[nargs+1] =
+                @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+        end
     end
-end
-
-"""
-Low-level version of `pycall!(ret, o, ...)` for when `kw` is already in python
-friendly format and you have the python tuple to hold the arguments (`pyargsptr`).
-Sets the tuple's values to the python version of your arguments, and calls the
-function. Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
-"""
-function _pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
-  args, nargs::Int=length(args), kw::Union{Ptr{Cvoid}, PyObject}=C_NULL)
-    pysetargs!(pyargsptr, args, nargs)
-    return __pycall!(ret, pyargsptr, o, kw) #::PyObject
 end
 
 """
@@ -76,6 +83,16 @@ function pysetargs!(pyargsptr::PyPtr, args, N::Int)
 end
 
 """
+Decref the `N`` elements of the Python tuple `pyargsptr` by setting the
+elements to NULL, to ensure that they are garbage-collected.
+"""
+function pyunsetargs!(pyargsptr::PyPtr, N::Int)
+    for i = 1:N
+        @pycheckz ccall((@pysym :PyTuple_SetItem), Cint, (PyPtr,Int,PyPtr), pyargsptr, i-1, C_NULL)
+    end
+end
+
+"""
 ```
 pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
 ```
@@ -88,7 +105,6 @@ function pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
     @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
                      (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
 end
-
 """
 Lowest level version of  `pycall!(ret, o, ...)`, assumes `pyargsptr` and `kw`
 have all their args set to Python values, so we can just call the function `o`.
