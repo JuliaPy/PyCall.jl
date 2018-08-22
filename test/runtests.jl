@@ -527,6 +527,9 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test o isa Vector{PyObject}
         @test o == [4,7]
     end
+
+    # issue #533
+    @test py"lambda x,y,z: (x,y,z)"(3:6,4:10,5:11) === (PyInt(3):PyInt(6), PyInt(4):PyInt(10), PyInt(5):PyInt(11))
 end
 
 ######################################################################
