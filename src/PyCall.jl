@@ -98,26 +98,23 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
-function pydecref_(o::PyPtr)
+function pydecref_(o::Union{PyPtr,PyObject})
     ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
     return o
 end
 
 function pydecref(o::PyObject)
-    pydecref_(o.o)
+    pydecref_(o)
     o.o = PyPtr_NULL
-    o
+    return o
 end
 
-function pyincref_(o::PyPtr)
+function pyincref_(o::Union{PyPtr,PyObject})
     ccall((@pysym :Py_IncRef), Cvoid, (PyPtr,), o)
     return o
 end
 
-function pyincref(o::PyObject)
-    pyincref_(o.o)
-    o
-end
+pyincref(o::PyObject) = pyincref_(o)
 
 # doing an incref *before* creating a PyObject may safer in the
 # case of borrowed references, to ensure that no exception or interrupt
