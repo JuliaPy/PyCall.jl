@@ -3,28 +3,28 @@ environment:
   - julia_version: 0.6
     PYTHON: "C:\\Python27\\python.exe"
   - julia_version: 0.6
-    PYTHON: "C:\\Python34\\python.exe"
+    PYTHON: "C:\\Python37\\python.exe"
   - julia_version: 0.6
     PYTHON: "Conda"
 
   - julia_version: 0.7
     PYTHON: "C:\\Python27\\python.exe"
   - julia_version: 0.7
-    PYTHON: "C:\\Python34\\python.exe"
+    PYTHON: "C:\\Python37\\python.exe"
   - julia_version: 0.7
     PYTHON: "Conda"
 
   - julia_version: 1
     PYTHON: "C:\\Python27\\python.exe"
   - julia_version: 1
-    PYTHON: "C:\\Python34\\python.exe"
+    PYTHON: "C:\\Python37\\python.exe"
   - julia_version: 1
     PYTHON: "Conda"
 
   - julia_version: nightly
     PYTHON: "C:\\Python27\\python.exe"
   - julia_version: nightly
-    PYTHON: "C:\\Python34\\python.exe"
+    PYTHON: "C:\\Python37\\python.exe"
   - julia_version: nightly
     PYTHON: "Conda"
 
