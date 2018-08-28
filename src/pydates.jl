@@ -17,11 +17,19 @@ struct PyDateTime_CAPI
     DeltaType::PyPtr
     TZInfoType::PyPtr
 
+    # singletons:
+    @static if pyversion >= v"3.7"
+        TimeZone_UTC::PyPtr
+    end
+
     # function pointers:
     Date_FromDate::Ptr{Cvoid}
     DateTime_FromDateAndTime::Ptr{Cvoid}
     Time_FromTime::Ptr{Cvoid}
     Delta_FromDelta::Ptr{Cvoid}
+    @static if pyversion >= v"3.7"
+        TimeZone_FromTimeZone::Ptr{Cvoid}
+    end
     DateTime_FromTimestamp::Ptr{Cvoid}
     Date_FromTimestamp::Ptr{Cvoid}
 end
