@@ -3,28 +3,28 @@ environment:
   - julia_version: 0.6
     python_version: "27"
   - julia_version: 0.6
-    python_version: "34"
+    python_version: "37"
   - julia_version: 0.6
     python_version: "Conda"
 
   - julia_version: 0.7
     python_version: "27"
   - julia_version: 0.7
-    python_version: "34"
+    python_version: "37"
   - julia_version: 0.7
     python_version: "Conda"
 
   - julia_version: 1
     python_version: "27"
   - julia_version: 1
-    python_version: "34"
+    python_version: "37"
   - julia_version: 1
     python_version: "Conda"
 
   - julia_version: nightly
     python_version: "27"
   - julia_version: nightly
-    python_version: "34"
+    python_version: "37"
   - julia_version: nightly
     python_version: "Conda"
 
