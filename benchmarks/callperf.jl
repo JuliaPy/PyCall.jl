@@ -1,4 +1,4 @@
-using PyCall, BenchmarkTools, DataStructures
+using PyCall, BenchmarkTools, DataStructures, Statistics
 using PyCall: _pycall!
 
 include("pywrapfn.jl")

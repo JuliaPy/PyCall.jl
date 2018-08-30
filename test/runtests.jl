@@ -241,10 +241,10 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     let i = BigInt(12345678901234567890), o = PyObject(i) # BigInt
         @test o - i == 0
-        @test BigInt(o) == i
+        @test convert(BigInt, o) == i
         if pyversion >= v"3.2"
             @test PyAny(o) == i == convert(Integer, o)
-            @test_throws InexactError Int64(o)
+            @test_throws InexactError convert(Int64, o)
         end
     end
 
@@ -315,7 +315,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # PyNULL and copy!
     let x = PyNULL(), y = copy!(x, PyObject(314159))
-        @test Int(x) == Int(y) == 314159
+        @test convert(Int, x) == convert(Int, y) == 314159
     end
     @test ispynull(PyNULL())
     @test !ispynull(PyObject(3))
@@ -527,6 +527,9 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test o isa Vector{PyObject}
         @test o == [4,7]
     end
+
+    # issue #533
+    @test py"lambda x,y,z: (x,y,z)"(3:6,4:10,5:11) === (PyInt(3):PyInt(6), PyInt(4):PyInt(10), PyInt(5):PyInt(11))
 end
 
 ######################################################################

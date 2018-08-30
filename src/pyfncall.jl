@@ -1,8 +1,3 @@
-
-# pyarg_tuples[i] is a pointer to a python tuple of length i-1
-# const pyarg_tuples = Vector{PyPtr}(32)
-const pyarg_tuples = PyPtr[]
-
 """
 Low-level version of `pycall!(ret, o, ...; kwargs...)`
 Sets `ret.o` to the result of the call, and returns `ret::PyObject`
@@ -21,72 +16,20 @@ Low-level version of `pycall!(ret, o, ...)` for when `kw` is already in python
 friendly format but you don't have the python tuple to hold the arguments
 (`pyargsptr`). Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
 """
-function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args,
-  nargs::Int=length(args), kw::Union{Ptr{Cvoid}, PyObject}=C_NULL)
-    # pyarg_tuples[i] is a pointer to a python tuple of length i-1
-    for n in length(pyarg_tuples):nargs
-        push!(pyarg_tuples, @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), n))
+function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, nargs::Int=length(args),
+                  kw::Union{Ptr{Cvoid}, PyObject}=C_NULL)
+    pyargsptr = @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    try
+        for i = 1:nargs
+            pyarg = PyObject(args[i])
+            pyincref(pyarg) # PyTuple_SetItem steals the reference
+            @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
+                                (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
+        end
+        return __pycall!(ret, pyargsptr, o, kw) #::PyObject
+    finally
+        pydecref_(pyargsptr)
     end
-    check_pyargsptr(nargs)
-    pyargsptr = pyarg_tuples[nargs+1]
-    return _pycall!(ret, pyargsptr, o, args, nargs, kw) #::PyObject
-end
-
-"""
-Handle the situation where a callee had previously called incref on the
-arguments tuple that was passed to it. We need to hold the only reference to the
-arguments tuple, since setting a tuple item is only allowed when there is just
-one reference to the tuple (tuples are supposed to be immutable in Python in all
-other cases). Note that this actually happens when creating new builtin
-exceptions, ref: https://github.com/python/cpython/blob/480ab05d5fee2b8fa161f799af33086a4e68c7dd/Objects/exceptions.c#L48
-OTOH this py"def foo(*args): global z; z=args" doesn't trigger this.
-Fortunately, this check for ob_refcnt is fast - only a few cpu clock cycles.
-"""
-function check_pyargsptr(nargs::Int)
-    if nargs > 0 && unsafe_load(pyarg_tuples[nargs+1]).ob_refcnt > 1
-        pydecref_(pyarg_tuples[nargs+1])
-        pyarg_tuples[nargs+1] =
-            @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
-    end
-end
-
-"""
-Low-level version of `pycall!(ret, o, ...)` for when `kw` is already in python
-friendly format and you have the python tuple to hold the arguments (`pyargsptr`).
-Sets the tuple's values to the python version of your arguments, and calls the
-function. Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
-"""
-function _pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
-  args, nargs::Int=length(args), kw::Union{Ptr{Cvoid}, PyObject}=C_NULL)
-    pysetargs!(pyargsptr, args, nargs)
-    return __pycall!(ret, pyargsptr, o, kw) #::PyObject
-end
-
-"""
-```
-pysetargs!(pyargsptr::PyPtr, args...)
-```
-Convert `args` to `PyObject`s, and set them as the elements of the Python tuple
-pointed to by `pyargsptr`
-"""
-function pysetargs!(pyargsptr::PyPtr, args, N::Int)
-    for i = 1:N
-        pysetarg!(pyargsptr, args[i], i)
-    end
-end
-
-"""
-```
-pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
-```
-Convert `arg` to a `PyObject`, and set it as the `i-1`th element of the Python
-tuple pointed to by `pyargsptr`
-"""
-function pysetarg!(pyargsptr::PyPtr, arg, i::Integer=1)
-    pyarg = PyObject(arg)
-    pyincref(pyarg) # PyTuple_SetItem steals the reference
-    @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
-                     (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
 end
 
 """
@@ -100,9 +43,8 @@ function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
     try
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
                         pyargsptr, kw)
-        pyincref_(retptr)
-        pydecref(ret)
-        ret.o = retptr
+        pydecref_(ret.o)
+        ret.o = pyincref_(retptr)
     finally
         sigatomic_end()
     end

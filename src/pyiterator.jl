@@ -3,7 +3,7 @@
 #########################################################################
 # Iterating over Python objects in Julia
 
-function start(po::PyObject)
+function _start(po::PyObject)
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), po))
@@ -14,18 +14,32 @@ function start(po::PyObject)
         sigatomic_end()
     end
 end
+@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
+    Base.start(po::PyObject) = _start(po)
 
-function next(po::PyObject, s)
-    sigatomic_begin()
-    try
-        nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-        return (convert(PyAny, s[1]), (nxt, s[2]))
-    finally
-        sigatomic_end()
+    function Base.next(po::PyObject, s)
+        sigatomic_begin()
+        try
+            nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+            return (convert(PyAny, s[1]), (nxt, s[2]))
+        finally
+            sigatomic_end()
+        end
+    end
+
+    Base.done(po::PyObject, s) = ispynull(s[1])
+else
+    function Base.iterate(po::PyObject, s=_start(po))
+        ispynull(s[1]) && return nothing
+        sigatomic_begin()
+        try
+            nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+            return (convert(PyAny, s[1]), (nxt, s[2]))
+        finally
+            sigatomic_end()
+        end
     end
 end
-
-done(po::PyObject, s) = ispynull(s[1])
 
 # issue #216
 function Base.collect(::Type{T}, o::PyObject) where T
@@ -43,19 +57,36 @@ Base.collect(o::PyObject) = collect(Any, o)
 const jlWrapIteratorType = PyTypeObject()
 
 # tp_iternext object of a jlwrap_iterator object, similar to PyIter_Next
-function pyjlwrap_iternext(self_::PyPtr)
-    try
-        iter, stateref = unsafe_pyjlwrap_to_objref(self_)
-        state = stateref[]
-        if !done(iter, state)
-            item, state′ = next(iter, state)
-            stateref[] = state′ # stores new state in the iterator object
-            return pystealref!(PyObject(item))
+@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
+    function pyjlwrap_iternext(self_::PyPtr)
+        try
+            iter, stateref = unsafe_pyjlwrap_to_objref(self_)
+            state = stateref[]
+            if !done(iter, state)
+                item, state′ = next(iter, state)
+                stateref[] = state′ # stores new state in the iterator object
+                return pystealref!(PyObject(item))
+            end
+        catch e
+            pyraise(e)
         end
-    catch e
-        pyraise(e)
+        return PyPtr_NULL
     end
-    return PyPtr_NULL
+else
+    function pyjlwrap_iternext(self_::PyPtr)
+        try
+            iter, iter_result_ref = unsafe_pyjlwrap_to_objref(self_)
+            iter_result = iter_result_ref[]
+            if iter_result !== nothing
+                item, state = iter_result
+                iter_result_ref[] = iterate(iter, state)
+                return pystealref!(PyObject(item))
+            end
+        catch e
+            pyraise(e)
+        end
+        return PyPtr_NULL
+    end
 end
 
 # the tp_iter slot of jlwrap object: like PyObject_GetIter, it
@@ -70,18 +101,36 @@ function pyjlwrap_getiter(self_::PyPtr)
     return PyPtr_NULL
 end
 
-# Given a Julia object o, return a jlwrap_iterator Python iterator object
-# that wraps the Julia iteration protocol with the Python iteration protocol.
-# Internally, the jlwrap_iterator object stores the tuple (o, Ref(start(o))),
-# where the Ref is used to store the iterator state (which updates during iteration).
-function jlwrap_iterator(o::Any)
-    if jlWrapIteratorType.tp_name == C_NULL # lazily initialize
-        pyjlwrap_type!(jlWrapIteratorType, "PyCall.jlwrap_iterator") do t
-            t.tp_iter = @cfunction(pyincref_, PyPtr, (PyPtr,)) # new reference to same object
-            t.tp_iternext = @cfunction(pyjlwrap_iternext, PyPtr, (PyPtr,))
+@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
+    # Given a Julia object o, return a jlwrap_iterator Python iterator object
+    # that wraps the Julia iteration protocol with the Python iteration protocol.
+    # Internally, the jlwrap_iterator object stores the tuple (o, Ref(start(o))),
+    # where the Ref is used to store the iterator state (which updates during iteration).
+    function jlwrap_iterator(o::Any)
+        if jlWrapIteratorType.tp_name == C_NULL # lazily initialize
+            pyjlwrap_type!(jlWrapIteratorType, "PyCall.jlwrap_iterator") do t
+                t.tp_iter = @cfunction(pyincref_, PyPtr, (PyPtr,)) # new reference to same object
+                t.tp_iternext = @cfunction(pyjlwrap_iternext, PyPtr, (PyPtr,))
+            end
         end
+        return pyjlwrap_new(jlWrapIteratorType, (o, Ref(start(o))))
     end
-    return pyjlwrap_new(jlWrapIteratorType, (o, Ref(start(o))))
+else
+    # Given a Julia object o, return a jlwrap_iterator Python iterator object
+    # that wraps the Julia iteration protocol with the Python iteration protocol.
+    # Internally, the jlwrap_iterator object stores the tuple (o, Ref(iterate(o))),
+    # where the Ref is used to store the (element, state)-iterator result tuple
+    # (which updates during iteration) and also the nothing termination indicator.
+    function jlwrap_iterator(o::Any)
+        if jlWrapIteratorType.tp_name == C_NULL # lazily initialize
+            pyjlwrap_type!(jlWrapIteratorType, "PyCall.jlwrap_iterator") do t
+                t.tp_iter = @cfunction(pyincref_, PyPtr, (PyPtr,)) # new reference to same object
+                t.tp_iternext = @cfunction(pyjlwrap_iternext, PyPtr, (PyPtr,))
+            end
+        end
+        iter_result = iterate(o)
+        return pyjlwrap_new(jlWrapIteratorType, (o, Ref{Union{Nothing,typeof(iter_result)}}(iterate(o))))
+    end
 end
 
 #########################################################################

@@ -41,7 +41,7 @@ else
     function convert(::Type{T}, po::PyObject) where {T<:Integer}
         overflow = Ref{Cint}()
         val = T(@pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow))
-        iszero(overflow[]) || throw(InexactError())
+        iszero(overflow[]) || throw(InexactError(:convert, T, po))
         return val
     end
     function convert(::Type{Integer}, po::PyObject)
@@ -536,29 +536,59 @@ struct PyDict_Iterator
     i::Int # current position in items list (0-based)
     len::Int # length of items list
 end
-start(d::PyDict{K,V,true}) where {K,V} = PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))
-done(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V} = itr.i >= itr.len
-function next(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V}
-    if 0 == ccall((@pysym :PyDict_Next), Cint,
-                  (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
-                  d, itr.pa, itr.ka, itr.va)
-        error("unexpected end of PyDict_Next")
-    end
-    ko = pyincref(itr.ka[]) # PyDict_Next returns
-    vo = pyincref(itr.va[]) #   borrowed ref, so incref
-    (Pair(convert(K,ko), convert(V,vo)),
-     PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.i+1, itr.len))
- end
+@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
+    Base.start(d::PyDict{K,V,true}) where {K,V} = PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))
+    Base.done(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V} = itr.i >= itr.len
+    function Base.next(d::PyDict{K,V,true}, itr::PyDict_Iterator) where {K,V}
+        if 0 == ccall((@pysym :PyDict_Next), Cint,
+                      (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
+                      d, itr.pa, itr.ka, itr.va)
+            error("unexpected end of PyDict_Next")
+        end
+        ko = pyincref(itr.ka[]) # PyDict_Next returns
+        vo = pyincref(itr.va[]) #   borrowed ref, so incref
+        (Pair(convert(K,ko), convert(V,vo)),
+         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.i+1, itr.len))
+     end
 
-# Iterator for generic mapping, using Python items iterator.
-# To strictly use the Julia iteration protocol, we should pass
-# d.o["items"] rather than d.o to done and next, but the PyObject
-# iterator functions only look at the state s, so we are okay.
-start(d::PyDict{K,V,false}) where {K,V} = start(pycall(d.o["items"], PyObject))
-done(d::PyDict{K,V,false}, s) where {K,V} = done(d.o, s)
-function next(d::PyDict{K,V,false}, s) where {K,V}
-    nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-    return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
+    # Iterator for generic mapping, using Python items iterator.
+    # To strictly use the Julia iteration protocol, we should pass
+    # d.o["items"] rather than d.o to done and next, but the PyObject
+    # iterator functions only look at the state s, so we are okay.
+    Base.start(d::PyDict{K,V,false}) where {K,V} = start(pycall(d.o["items"], PyObject))
+    Base.done(d::PyDict{K,V,false}, s) where {K,V} = done(d.o, s)
+    function Base.next(d::PyDict{K,V,false}, s) where {K,V}
+        nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+        return (convert(Pair{K,V}, s[1]), (nxt, s[2]))
+    end
+else
+    function Base.iterate(d::PyDict{K,V,true}, itr=PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))) where {K,V}
+        itr.i >= itr.len && return nothing
+        if 0 == ccall((@pysym :PyDict_Next), Cint,
+                      (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
+                      d, itr.pa, itr.ka, itr.va)
+            error("unexpected end of PyDict_Next")
+        end
+        ko = pyincref(itr.ka[]) # PyDict_Next returns
+        vo = pyincref(itr.va[]) #   borrowed ref, so incref
+        (Pair(convert(K,ko), convert(V,vo)),
+         PyDict_Iterator(itr.ka, itr.va, itr.pa, itr.i+1, itr.len))
+    end
+
+    # Iterator for generic mapping, using Python items iterator.
+    # Our approach is to wrap an iterator over d.o["items"]
+    # which necessitates including d.o["items"] in the state.
+    function _start(d::PyDict{K,V,false}) where {K,V}
+        d_items = pycall(d.o["items"], PyObject)
+        (d_items, iterate(d_items))
+    end
+    function Base.iterate(d::PyDict{K,V,false}, itr=_start(d)) where {K,V}
+        d_items, iter_result = itr
+        iter_result === nothing && return nothing
+        item, state = iter_result
+        iter_result = iterate(d_items, state)
+        (item[1] => item[2], (d_items, iter_result))
+    end
 end
 
 #########################################################################
