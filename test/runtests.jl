@@ -607,6 +607,22 @@ end
     """
     py"set"("obj")
     @test anonymous.obj.x != PyNULL()
+
+    # Test above for pyjlwrap_iternext too:
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            sys = pyimport("sys")
+            obj = (sys for _ in 1:1)
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = list(iter($include_string($anonymous, name)))
+    """
+    py"set"("obj")
+    @test anonymous.sys != PyNULL()
 end
 
 include("test_pyfncall.jl")

@@ -65,7 +65,7 @@ const jlWrapIteratorType = PyTypeObject()
             if !done(iter, state)
                 item, state′ = next(iter, state)
                 stateref[] = state′ # stores new state in the iterator object
-                return pystealref!(PyObject(item))
+                return pyreturn(item)
             end
         catch e
             pyraise(e)
@@ -80,7 +80,7 @@ else
             if iter_result !== nothing
                 item, state = iter_result
                 iter_result_ref[] = iterate(iter, state)
-                return pystealref!(PyObject(item))
+                return pyreturn(item)
             end
         catch e
             pyraise(e)
