@@ -264,7 +264,7 @@ The PyCall module provides a new type `PyVector` (a subclass of
 arbitrary Python list or sequence object.  (Unlike `PyArray`, the
 `PyVector` type is not limited to `NumPy` arrays, although using
 `PyArray` for the latter is generally more efficient.)  Just use
-`PyArray` as the return type of a `pycall` returning a list or
+`PyVector` as the return type of a `pycall` returning a list or
 sequence object (including tuples), or call `PyVector(o::PyObject)` on
 a sequence object `o`.
 
