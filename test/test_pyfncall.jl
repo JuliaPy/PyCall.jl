@@ -36,6 +36,7 @@ def mklist(*args, **kwargs):
 
     @testset "PyNULL" begin
         @test_throws ArgumentError py"lambda x: x"(PyNULL())
+        @test_throws ArgumentError py"lambda x: x"(x=PyNULL())
     end
 
 end

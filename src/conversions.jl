@@ -597,8 +597,16 @@ end
 function PyObject(d::AbstractDict)
     o = PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ()))
     for k in keys(d)
+        pykey = PyObject(k)
+        pyval = PyObject(d[k])
+        if ispynull(pykey)
+            throw(ArgumentError("Dictionary keyword contains a PyNULL"))
+        end
+        if ispynull(pyval)
+            throw(ArgumentError("The value for key $k is a PyNULL"))
+        end
         @pycheckz ccall((@pysym :PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
-                         o, PyObject(k), PyObject(d[k]))
+                         o, pykey, pyval)
     end
     return o
 end
