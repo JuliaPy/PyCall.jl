@@ -34,4 +34,8 @@ def mklist(*args, **kwargs):
         end
     end
 
+    @testset "PyNULL" begin
+        @test_throws ArgumentError py"lambda x: x"(PyNULL())
+    end
+
 end

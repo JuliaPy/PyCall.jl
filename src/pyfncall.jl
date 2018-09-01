@@ -22,6 +22,9 @@ function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, nargs::Int=leng
     try
         for i = 1:nargs
             pyarg = PyObject(args[i])
+            if ispynull(pyarg)
+                throw(ArgumentError("$i-th argument is a PyNULL"))
+            end
             pyincref(pyarg) # PyTuple_SetItem steals the reference
             @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
                                 (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
