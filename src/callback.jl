@@ -37,11 +37,7 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
             ret = Core._apply_latest(f_kw_closure)
         end
 
-        if ret isa PyObject
-            # Don't steal reference from existing Python object (#551)
-            return pyincref_(ret.o)
-        end
-        return pystealref!(PyObject(ret))
+        return pyreturn(ret)
     catch e
         pyraise(e)
     finally
