@@ -1,6 +1,6 @@
 import Compat.Libdl
 
-hassym(lib, sym) = Libdl.dlsym_e(lib, sym) != C_NULL
+hassym(lib, sym) = Libdl.dlsym_e(lib, sym) != nothing
 
 # call dlsym_e on a sequence of symbols and return the symbol that gives
 # the first non-null result
