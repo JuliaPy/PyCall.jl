@@ -589,6 +589,24 @@ end
     """
     py"set"("obj")
     @test anonymous.obj != PyNULL()
+
+    # Test above for pyjlwrap_getattr too:
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            struct S
+                x
+            end
+            obj = S(pyimport("sys"))
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = $include_string($anonymous, name).x
+    """
+    py"set"("obj")
+    @test anonymous.obj.x != PyNULL()
 end
 
 include("test_pyfncall.jl")

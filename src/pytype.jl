@@ -377,7 +377,7 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
         else
             fidx = Base.fieldindex(typeof(f), Symbol(attr), false)
             if fidx != 0
-                return pystealref!(PyObject(getfield(f, fidx)))
+                return pyreturn(getfield(f, fidx))
             else
                 return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
             end
