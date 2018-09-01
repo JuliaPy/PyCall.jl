@@ -573,4 +573,22 @@ end
     @test (@pywith IgnoreError(true) error(); true)
 end
 
+@testset "callback" begin
+    # Returning existing PyObject in Julia should not invalidate it.
+    # https://github.com/JuliaPy/PyCall.jl/pull/552
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            obj = pyimport("sys")  # get some PyObject
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = $include_string($anonymous, name)
+    """
+    py"set"("obj")
+    @test anonymous.obj != PyNULL()
+end
+
 include("test_pyfncall.jl")
