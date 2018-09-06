@@ -44,7 +44,7 @@ function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
                         pyargsptr, kw)
         pydecref_(ret.o)
-        ret.o = pyincref_(retptr)
+        ret.o = retptr
     finally
         sigatomic_end()
     end
