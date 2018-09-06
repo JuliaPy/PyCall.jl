@@ -78,8 +78,12 @@ function find_libpython(python::AbstractString)
     for lib in libs
         lib = splitext(lib)[1]
         try
-            return (Libdl.dlopen(lib, dlopen_flags),
-                    lib)
+            libpython = Libdl.dlopen(lib, dlopen_flags)
+            # Store the fullpath to libpython in deps.jl.  This makes
+            # it easier for users to investigate Python setup
+            # PyCall.jl trying to use.  It also helps PyJulia to
+            # compare libpython.
+            return (libpython, Libdl.dlpath(libpython))
         catch e
             push!(error_strings, string("dlopen($lib) ==> ", e))
         end
