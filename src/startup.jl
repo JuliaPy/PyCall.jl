@@ -80,6 +80,7 @@ else
     # If we're not in charge, assume the user is installing necessary python
     # libraries rather than messing with their configuration
     const conda = false
+    const pyprogramname = ""
 end
 
 const pyversion = vparse(split(Py_GetVersion(libpy_handle))[1])

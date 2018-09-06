@@ -622,6 +622,9 @@ function anaconda_conda()
     if conda || !occursin("conda", unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())))
         return ""
     end
+    if isempty(pyprogramname)
+        return ""
+    end
     aconda = joinpath(dirname(pyprogramname), "conda")
     return isfile(aconda) ? aconda : ""
 end
