@@ -59,7 +59,7 @@ function find_libpython(python::AbstractString)
         pipe = process = open(cmd)
     end
     libpy_name = read(pipe.out, String)
-    if process.exitcode != 0
+    if process.exitcode ∉ (0, 1)
         error("Failed to run: $cmd")
     end
 
