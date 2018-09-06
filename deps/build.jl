@@ -49,46 +49,26 @@ const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
 
 # return libpython name, libpython pointer
 function find_libpython(python::AbstractString)
-    # it is ridiculous that it is this hard to find the name of libpython
-    v = pyconfigvar(python,"VERSION","")
-    libs = [ dlprefix*"python"*v, dlprefix*"python" ]
-    lib = pyconfigvar(python, "LIBRARY")
-    lib != "None" && pushfirst!(libs, splitext(lib)[1])
-    lib = pyconfigvar(python, "LDLIBRARY")
-    lib != "None" && pushfirst!(pushfirst!(libs, basename(lib)), lib)
-    libs = unique(libs)
-
-    # it is ridiculous that it is this hard to find the path of libpython
-    libpaths = [pyconfigvar(python, "LIBDIR"),
-                (Compat.Sys.iswindows() ? dirname(pysys(python, "executable")) : joinpath(dirname(dirname(pysys(python, "executable"))), "lib"))]
-    if Compat.Sys.isapple()
-        push!(libpaths, pyconfigvar(python, "PYTHONFRAMEWORKPREFIX"))
+    cmd = `$python $(joinpath(@__DIR__, "find_libpython.py"))`
+    if "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
+        cmd = `$cmd --verbose`
+    end
+    if VERSION < v"0.7-"
+        pipe, process = open(cmd)
+    else
+        pipe = process = open(cmd)
+    end
+    libpy_name = read(pipe.out, String)
+    if process.exitcode != 0
+        error("Failed to run: $cmd")
     end
 
-    # `prefix` and `exec_prefix` are the path prefixes where python should look for python only and compiled libraries, respectively.
-    # These are also changed when run in a virtualenv.
-    exec_prefix = pysys(python, "exec_prefix")
-
-    push!(libpaths, exec_prefix)
-    push!(libpaths, joinpath(exec_prefix, "lib"))
-
-    error_strings = String[]
-
-    # TODO: other paths? python-config output? pyconfigvar("LDFLAGS")?
-
-    # find libpython (we hope):
-    for lib in libs
-        for libpath in libpaths
-            libpath_lib = joinpath(libpath, lib)
-            if isfile(libpath_lib*"."*Libdl.dlext)
-                try
-                    return (Libdl.dlopen(libpath_lib,
-                                         Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
-                            libpath_lib)
-                catch e
-                    push!(error_strings, string("dlopen($libpath_lib) ==> ", e))
-                end
-            end
+    dlopen_flags = Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL
+    if isfile(libpy_name)
+        try
+            return (Libdl.dlopen(libpy_name, dlopen_flags), libpy_name)
+        catch e
+            push!(error_strings, string("dlopen($libpath_lib) ==> ", e))
         end
     end
 
@@ -98,7 +78,7 @@ function find_libpython(python::AbstractString)
     for lib in libs
         lib = splitext(lib)[1]
         try
-            return (Libdl.dlopen(lib, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL),
+            return (Libdl.dlopen(lib, dlopen_flags),
                     lib)
         catch e
             push!(error_strings, string("dlopen($lib) ==> ", e))
