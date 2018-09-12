@@ -1,3 +1,4 @@
 deps/deps.jl
 deps/PYTHON
 deps/build.log
+*.pyc
