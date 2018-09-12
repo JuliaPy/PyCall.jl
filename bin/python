@@ -1,0 +1,28 @@
+#!/usr/bin/env julia
+
+description = """
+Python interpreter inside a Julia process.
+
+This command line interface mimics a basic subset of Python program so that
+Python program involving calls to Julia functions can be run without setting
+up PyJulia (which is currently hard for some platforms).
+
+Although this script has -i option and it can do a basic REPL, contrl-c may
+crash the whole process.  Consider using IPython >= 7 which can be launched by:
+
+    python -m IPython
+"""
+
+using PyCall
+
+# Initialize julia.Julia once so that subsequent calls of julia.Julia()
+# uses pre-configured DLL.
+pyimport("julia")[:Julia](init_julia=false)
+
+pushfirst!(PyVector(pyimport("sys")["path"]),
+           joinpath(dirname(dirname(pathof(PyCall))), "lib"))
+
+code = pyimport("pseudo_python_cli")[:main](ARGS, description)
+if code isa Integer
+    exit(code)
+end
