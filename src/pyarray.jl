@@ -8,6 +8,7 @@ struct PyArray_Info{T,N}
     st::NTuple{N,Int} # strides, in multiples of bytes!
     data::Ptr{T}
     readonly::Bool
+    pybuf::PyBuffer
 end
 
 function PyArray_Info(o::PyObject)
@@ -19,7 +20,7 @@ function PyArray_Info(o::PyObject)
     length(strd) == 0 && (sz = ())
     N = length(sz)
     isreadonly = pybuf.buf.readonly==1
-    return PyArray_Info{T,N}(native_byteorder, sz, strd, pybuf.buf.buf, isreadonly)
+    return PyArray_Info{T,N}(native_byteorder, sz, strd, pybuf.buf.buf, isreadonly, pybuf)
 end
 
 aligned(i::PyArray_Info{T,N}) where {T,N} = #  FIXME: also check pointer alignment?
@@ -114,7 +115,12 @@ ndims(a::PyArray{T,N}) where {T,N} = N
 
 similar(a::PyArray, T, dims::Dims) = Array{T}(undef, dims)
 
-function setdata!(a::PyArray{T,N}, o::PyObject, pybufinfo=PyBuffer()) where {T,N}
+"""
+Update the data ptr of the `a` to point to the buffer exposed by `o` through
+the Python buffer interface
+"""
+function setdata!(a::PyArray{T,N}, o::PyObject) where {T,N}
+    pybufinfo = a.info.pybuf
     PyBuffer!(pybufinfo, o, PyBUF_ND_CONTIGUOUS)
     dataptr = pybufinfo.buf.buf
     a.data = reinterpret(Ptr{T}, dataptr)
