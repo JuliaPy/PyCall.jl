@@ -134,6 +134,16 @@ function pystealref!(o::PyObject)
     return optr
 end
 
+"""
+    pyreturn(x) :: PyPtr
+
+Prepare `PyPtr` from `x` for passing it to Python.  If `x` is already
+a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
+wrapping/converted from `x` is created.
+"""
+pyreturn(x::Any) = pystealref!(PyObject(x))
+pyreturn(x::PyObject) = pyincref_(x.o)
+
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
     dest.o = src.o

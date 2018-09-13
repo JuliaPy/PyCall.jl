@@ -25,7 +25,7 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
 
         # we need to use invokelatest to get execution in newest world
         if kw_ == C_NULL
-            ret = PyObject(Base.invokelatest(f, jlargs...))
+            ret = Base.invokelatest(f, jlargs...)
         else
             kw = PyDict{Symbol,PyObject}(pyincref(kw_))
             kwargs = [ (k,julia_kwarg(f,k,v)) for (k,v) in kw ]
@@ -34,10 +34,10 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
             # use a closure over kwargs. see:
             #   https://github.com/JuliaLang/julia/pull/22646
             f_kw_closure() = f(jlargs...; kwargs...)
-            ret = PyObject(Core._apply_latest(f_kw_closure))
+            ret = Core._apply_latest(f_kw_closure)
         end
 
-        return pystealref!(ret)
+        return pyreturn(ret)
     catch e
         pyraise(e)
     finally

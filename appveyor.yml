@@ -1,32 +1,32 @@
 environment:
   matrix:
   - julia_version: 0.6
-    PYTHON: "C:\\Python27\\python.exe"
+    python_version: "27"
   - julia_version: 0.6
-    PYTHON: "C:\\Python34\\python.exe"
+    python_version: "37"
   - julia_version: 0.6
-    PYTHON: "Conda"
+    python_version: "Conda"
 
   - julia_version: 0.7
-    PYTHON: "C:\\Python27\\python.exe"
+    python_version: "27"
   - julia_version: 0.7
-    PYTHON: "C:\\Python34\\python.exe"
+    python_version: "37"
   - julia_version: 0.7
-    PYTHON: "Conda"
+    python_version: "Conda"
 
   - julia_version: 1
-    PYTHON: "C:\\Python27\\python.exe"
+    python_version: "27"
   - julia_version: 1
-    PYTHON: "C:\\Python34\\python.exe"
+    python_version: "37"
   - julia_version: 1
-    PYTHON: "Conda"
+    python_version: "Conda"
 
   - julia_version: nightly
-    PYTHON: "C:\\Python27\\python.exe"
+    python_version: "27"
   - julia_version: nightly
-    PYTHON: "C:\\Python34\\python.exe"
+    python_version: "37"
   - julia_version: nightly
-    PYTHON: "Conda"
+    python_version: "Conda"
 
 platform:
   - x86 # 32-bit
@@ -53,9 +53,20 @@ install:
   - ps: iex ((new-object net.webclient).DownloadString("https://raw.githubusercontent.com/JuliaCI/Appveyor.jl/version-1/bin/install.ps1"))
 
 build_script:
+  - ps: if ( -not ( $env:python_version -eq "Conda" )) {
+          if ($env:PLATFORM -eq "x64") {
+            $env:PYTHON = "C:\\Python" + $env:python_version + "-x64\\python.exe"
+          } else {
+            $env:PYTHON = "C:\\Python" + $env:python_version + "\\python.exe"
+          }
+        }
+    # For the path to Python executables, see:
+    # https://www.appveyor.com/docs/build-environment/#python
+  - echo "%PYTHON%"
   - echo "%JL_BUILD_SCRIPT%"
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"
 
 test_script:
+  - echo "%PYTHON%"
   - echo "%JL_TEST_SCRIPT%"
   - C:\julia\bin\julia -e "%JL_TEST_SCRIPT%"

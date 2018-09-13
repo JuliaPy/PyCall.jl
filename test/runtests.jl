@@ -573,5 +573,57 @@ end
     @test (@pywith IgnoreError(true) error(); true)
 end
 
+@testset "callback" begin
+    # Returning existing PyObject in Julia should not invalidate it.
+    # https://github.com/JuliaPy/PyCall.jl/pull/552
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            obj = pyimport("sys")  # get some PyObject
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = $include_string($anonymous, name)
+    """
+    py"set"("obj")
+    @test anonymous.obj != PyNULL()
+
+    # Test above for pyjlwrap_getattr too:
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            struct S
+                x
+            end
+            obj = S(pyimport("sys"))
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = $include_string($anonymous, name).x
+    """
+    py"set"("obj")
+    @test anonymous.obj.x != PyNULL()
+
+    # Test above for pyjlwrap_iternext too:
+    anonymous = Module()
+    Base.eval(
+        anonymous, quote
+            using PyCall
+            sys = pyimport("sys")
+            obj = (sys for _ in 1:1)
+        end)
+    py"""
+    ns = {}
+    def set(name):
+        ns[name] = list(iter($include_string($anonymous, name)))
+    """
+    py"set"("obj")
+    @test anonymous.sys != PyNULL()
+end
+
 include("test_pyfncall.jl")
 include("testpybuffer.jl")
