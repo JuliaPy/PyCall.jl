@@ -47,34 +47,43 @@ pysys(python::AbstractString, var::AbstractString) = pyvar(python, "sys", var)
 
 const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
 
-# return libpython name, libpython pointer
-function find_libpython(python::AbstractString)
-    cmd = `$python $(joinpath(@__DIR__, "find_libpython.py"))`
-    if "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
+# print out extra info to help with remote debugging
+const PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
+
+function exec_find_libpython(python::AbstractString, options)
+    cmd = `$python $(joinpath(@__DIR__, "find_libpython.py")) $options`
+    if PYCALL_DEBUG_BUILD
         cmd = `$cmd --verbose`
     end
-    if VERSION < v"0.7-"
-        pipe, process = open(cmd)
-    else
-        pipe = process = open(cmd)
-    end
-    libpy_name = read(pipe.out, String)
-    if process.exitcode ∉ (0, 1)
-        error("Failed to run: $cmd")
-    end
+    return readlines(cmd)
+end
 
+function show_dlopen_error(e)
+    if PYCALL_DEBUG_BUILD
+        println(stderr, "dlopen($libpath_lib) ==> ", e)
+        # Using STDERR since find_libpython.py prints debugging
+        # messages to STDERR too.
+    end
+end
+
+# return libpython name, libpython pointer
+function find_libpython(python::AbstractString)
     dlopen_flags = Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL
-    if isfile(libpy_name)
+
+    libpaths = exec_find_libpython(python, `--list-all`)
+    for lib in libpaths
         try
-            return (Libdl.dlopen(libpy_name, dlopen_flags), libpy_name)
+            return (Libdl.dlopen(lib, dlopen_flags), lib)
         catch e
-            push!(error_strings, string("dlopen($libpath_lib) ==> ", e))
+            show_dlopen_error(e)
         end
     end
 
+    # Try all candidate libpython names and let Libdl find the path.
     # We do this *last* because the libpython in the system
     # library path might be the wrong one if multiple python
     # versions are installed (we prefer the one in LIBDIR):
+    libs = exec_find_libpython(python, `--candidate-names`)
     for lib in libs
         lib = splitext(lib)[1]
         try
@@ -85,37 +94,18 @@ function find_libpython(python::AbstractString)
             # compare libpython.
             return (libpython, Libdl.dlpath(libpython))
         catch e
-            push!(error_strings, string("dlopen($lib) ==> ", e))
+            show_dlopen_error(e)
         end
-    end
-
-    if "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no") # print out extra info to help with remote debugging
-        println(stderr, "------------------------------------- exceptions -----------------------------------------")
-        for s in error_strings
-            print(s, "\n\n")
-        end
-        println(stderr, "---------------------------------- get_config_vars ---------------------------------------")
-        print(stderr, read(`python -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_vars())"`, String))
-        println(stderr, "--------------------------------- directory contents -------------------------------------")
-        for libpath in libpaths
-            if isdir(libpath)
-                print(libpath, ":\n")
-                for file in readdir(libpath)
-                    if occursin("pyth", file)
-                        println("    ", file)
-                    end
-                end
-            end
-        end
-        println(stderr, "------------------------------------------------------------------------------------------")
     end
 
     error("""
         Couldn't find libpython; check your PYTHON environment variable.
 
-        The python executable we tried was $python (= version $v);
-        the library names we tried were $libs
-        and the library paths we tried were $libpaths""")
+        The python executable we tried was $python (= version $v).
+        Re-building with
+            ENV["PYCALL_DEBUG_BUILD"] = "yes"
+        may provide extra information for why it failed.
+        """)
 end
 
 #########################################################################
