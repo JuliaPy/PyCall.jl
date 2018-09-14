@@ -297,10 +297,11 @@ def finding_libpython():
     for path in candidate_paths():
         logger.debug("Candidate: %s", path)
         normalized = normalize_path(path)
-        logger.debug("Normalized: %s", normalized)
         if normalized:
             logger.debug("Found: %s", normalized)
             yield normalized
+        else:
+            logger.debug("Not found.")
 
 
 def find_libpython():
@@ -328,7 +329,9 @@ def cli_find_libpython(cli_op, verbose):
     # error.
 
     if verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(
+            format="%(levelname)s %(message)s",
+            level=logging.DEBUG)
 
     if cli_op == "list-all":
         print_all(finding_libpython())
