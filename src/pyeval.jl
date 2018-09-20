@@ -5,7 +5,7 @@ const Py_eval_input = 258
 const _maindict = PyDict{String,PyObject,false}(PyNULL()) # cache of __main__ module dictionary
 function maindict()
     if ispynull(_maindict.o)
-        _maindict.o = pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__")))
+        _maindict.o = pyincref(@pycheckn @ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__")))
     end
     return _maindict
 end
@@ -15,17 +15,12 @@ end
 # and a current "file name" to use for stack traces
 function pyeval_(s::AbstractString, globals=maindict(), locals=maindict(), input_type=Py_eval_input, fname="PyCall")
     sb = String(s) # use temp var to prevent gc before we are done with o
-    sigatomic_begin()
-    try
-        o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                     (Cstring, Cstring, Cint),
-                                     sb, fname, input_type))
-        return PyObject(@pycheckn ccall((@pysym :PyEval_EvalCode),
-                                         PyPtr, (PyPtr, PyPtr, PyPtr),
-                                         o, globals, locals))
-    finally
-        sigatomic_end()
-    end
+    o = PyObject(@pycheckn @ccall((@pysym :Py_CompileString), PyPtr,
+                                  (Cstring, Cstring, Cint),
+                                  sb, fname, input_type))
+    return PyObject(@pycheckn @ccall((@pysym :PyEval_EvalCode),
+                                     PyPtr, (PyPtr, PyPtr, PyPtr),
+                                     o, globals, locals))
 end
 
 """

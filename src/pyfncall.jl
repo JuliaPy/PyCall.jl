@@ -18,12 +18,12 @@ friendly format but you don't have the python tuple to hold the arguments
 """
 function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, nargs::Int=length(args),
                   kw::Union{Ptr{Cvoid}, PyObject}=C_NULL)
-    pyargsptr = @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
+    pyargsptr = @pycheckn @ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
     try
         for i = 1:nargs
             pyarg = PyObject(args[i])
             pyincref(pyarg) # PyTuple_SetItem steals the reference
-            @pycheckz ccall((@pysym :PyTuple_SetItem), Cint,
+            @pycheckz @ccall((@pysym :PyTuple_SetItem), Cint,
                                 (PyPtr,Int,PyPtr), pyargsptr, i-1, pyarg)
         end
         return __pycall!(ret, pyargsptr, o, kw) #::PyObject
@@ -39,15 +39,10 @@ Sets `ret.o` to the result of the call, and returns `ret::PyObject`.
 """
 function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
   kw::Union{Ptr{Cvoid}, PyObject})
-    sigatomic_begin()
-    try
-        retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
-                        pyargsptr, kw)
-        pydecref_(ret.o)
-        ret.o = retptr
-    finally
-        sigatomic_end()
-    end
+    retptr = @pycheckn @ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
+                              pyargsptr, kw)
+    pydecref_(ret.o)
+    ret.o = retptr
     return ret #::PyObject
 end
 
