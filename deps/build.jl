@@ -55,7 +55,7 @@ function exec_find_libpython(python::AbstractString, options)
     if PYCALL_DEBUG_BUILD
         cmd = `$cmd --verbose`
     end
-    return readlines(cmd)
+    return readlines(pythonenv(cmd))
 end
 
 function show_dlopen_error(e)
