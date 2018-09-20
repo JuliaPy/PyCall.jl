@@ -10,13 +10,13 @@ for (op,py) in ((:+,:PyNumber_Add), (:-,:PyNumber_Subtract), (:*,:PyNumber_Multi
     qpy = QuoteNode(py)
     @eval begin
         $op(a::PyObject, b::PyObject) =
-            PyObject(@pycheckn @ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a, b))
+            PyObject(@pycheckn @pyccall($qpy, PyPtr, (PyPtr, PyPtr), a, b))
         $op(a::PyObject, b) = $op(a, PyObject(b))
         $op(a, b::PyObject) = $op(PyObject(a), b)
     end
 end
 
-^(a::PyObject, b::PyObject) = PyObject(@pycheckn @ccall((@pysym :PyNumber_Power), PyPtr, (PyPtr, PyPtr, PyPtr), a, b, pynothing[]))
+^(a::PyObject, b::PyObject) = PyObject(@pycheckn @pyccall(:PyNumber_Power, PyPtr, (PyPtr, PyPtr, PyPtr), a, b, pynothing[]))
 ^(a::PyObject, b) = a^PyObject(b)
 ^(a, b::PyObject) = PyObject(a)^b
 ^(a::PyObject, b::Integer) = a^PyObject(b)
@@ -30,7 +30,7 @@ for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:
     qpy = QuoteNode(py)
     @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
         a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
-        PyObject(@pycheckn @ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
+        PyObject(@pycheckn @pyccall($qpy, PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
     end
 end
 
@@ -39,7 +39,7 @@ import Base: abs,~
 for (op,py) in ((:+,:PyNumber_Positive), (:-,:PyNumber_Negative),
                 (:abs,:PyNumber_Absolute), (:~, :PyNumber_Invert))
     qpy = QuoteNode(py)
-    @eval $op(a::PyObject) = PyObject(@pycheckn @ccall((@pysym $qpy), PyPtr, (PyPtr,), a))
+    @eval $op(a::PyObject) = PyObject(@pycheckn @pyccall($qpy, PyPtr, (PyPtr,), a))
 end
 
 #########################################################################
@@ -64,10 +64,10 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
                        unsafe_pyjlwrap_to_objref(o2.o))
         else
             if $(op == :isless || op == :isequal)
-                return Bool(@pycheckz @ccall((@pysym :PyObject_RichCompareBool), Cint,
+                return Bool(@pycheckz @pyccall(:PyObject_RichCompareBool, Cint,
                                             (PyPtr, PyPtr, Cint), o1, o2, $py))
             else # other operations may return a PyObject
-                return PyAny(PyObject(@pycheckn @ccall((@pysym :PyObject_RichCompare), PyPtr,
+                return PyAny(PyObject(@pycheckn @pyccall(:PyObject_RichCompare, PyPtr,
                                                       (PyPtr, PyPtr, Cint), o1, o2, $py)))
             end
         end

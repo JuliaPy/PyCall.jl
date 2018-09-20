@@ -41,7 +41,7 @@ function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
-    @ccall(@pysym(:PyBuffer_Release), Cvoid, (Any,), o)
+    @pyccall(:PyBuffer_Release, Cvoid, (Any,), o)
     o
 end
 
@@ -88,7 +88,7 @@ end
 
 # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
 iscontiguous(b::PyBuffer) =
-    1 == @ccall((@pysym :PyBuffer_IsContiguous), Cint,
+    1 == @pyccall(:PyBuffer_IsContiguous, Cint,
                (Any, Cchar), b, 'A')
 
 #############################################################################
@@ -108,7 +108,7 @@ const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     b = PyBuffer()
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
-    @pycheckz @ccall((@pysym :PyObject_GetBuffer), Cint,
+    @pycheckz @pyccall(:PyObject_GetBuffer, Cint,
                      (PyPtr, Any, Cint), o, b, flags)
     return b
 end

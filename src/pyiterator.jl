@@ -4,8 +4,8 @@
 # Iterating over Python objects in Julia
 
 function _start(po::PyObject)
-    o = PyObject(@pycheckn @ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), po))
-    nxt = PyObject(@pycheck @ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), o))
+    o = PyObject(@pycheckn @pyccall(:PyObject_GetIter, PyPtr, (PyPtr,), po))
+    nxt = PyObject(@pycheck @pyccall(:PyIter_Next, PyPtr, (PyPtr,), o))
 
     return (nxt,o)
 end
@@ -13,7 +13,7 @@ end
     Base.start(po::PyObject) = _start(po)
 
     function Base.next(po::PyObject, s)
-        nxt = PyObject(@pycheck @ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+        nxt = PyObject(@pycheck @pyccall(:PyIter_Next, PyPtr, (PyPtr,), s[2]))
         return (convert(PyAny, s[1]), (nxt, s[2]))
     end
 
@@ -21,7 +21,7 @@ end
 else
     function Base.iterate(po::PyObject, s=_start(po))
         ispynull(s[1]) && return nothing
-        nxt = PyObject(@pycheck @ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
+        nxt = PyObject(@pycheck @pyccall(:PyIter_Next, PyPtr, (PyPtr,), s[2]))
         return (convert(PyAny, s[1]), (nxt, s[2]))
     end
 end
@@ -124,12 +124,12 @@ end
 
 @static if isdefined(Base.Broadcast, :broadcastable)
     function Base.Broadcast.broadcastable(o::PyObject)
-        iter = @ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), o)
+        iter = @pyccall(:PyObject_GetIter, PyPtr, (PyPtr,), o)
         if iter == C_NULL
             pyerr_clear()
             return Ref(o)
         else
-            @ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), iter)
+            @pyccall(:Py_DecRef, Cvoid, (PyPtr,), iter)
             return collect(o)
         end
     end

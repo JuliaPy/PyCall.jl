@@ -16,9 +16,9 @@ struct PyError <: Exception
         exc = Array{PyPtr}(undef, 3)
         pexc = convert(UInt, pointer(exc))
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-        @ccall((@pysym :PyErr_Fetch), Cvoid, (UInt,UInt,UInt),
+        @pyccall(:PyErr_Fetch, Cvoid, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
-        @ccall((@pysym :PyErr_NormalizeException), Cvoid, (UInt,UInt,UInt),
+        @pyccall(:PyErr_NormalizeException, Cvoid, (UInt,UInt,UInt),
               pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
         new(msg, PyObject(exc[1]), PyObject(exc[2]), PyObject(exc[3]))
     end
@@ -51,10 +51,10 @@ end
 # Conversion of Python exceptions into Julia exceptions
 
 # whether a Python exception has occurred
-pyerr_occurred() = @ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
+pyerr_occurred() = @pyccall(:PyErr_Occurred, PyPtr, ()) != C_NULL
 
 # call to discard Python exceptions
-pyerr_clear() = @ccall((@pysym :PyErr_Clear), Cvoid, ())
+pyerr_clear() = @pyccall(:PyErr_Clear, Cvoid, ())
 
 function pyerr_check(msg::AbstractString, val::Any)
     pyerr_occurred() && throw(PyError(msg))
@@ -126,12 +126,12 @@ end
 function pyraise(e)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
-    @ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
+    @pyccall(:PyErr_SetString, Cvoid, (PyPtr, Cstring),
           pyeT, string("Julia exception: ", e))
 end
 
 function pyraise(e::PyError)
-    @ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
+    @pyccall(:PyErr_Restore, Cvoid, (PyPtr, PyPtr, PyPtr),
           e.T, e.val, e.traceback)
     e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
 end

@@ -50,11 +50,11 @@ function npyinitialize()
         error("numpy.core.multiarray required for multidimensional Array conversions - ", e)
     end
     if pyversion.major < 3
-        PyArray_API = @pycheck @ccall((@pysym :PyCObject_AsVoidPtr),
+        PyArray_API = @pycheck @pyccall(:PyCObject_AsVoidPtr,
                                      Ptr{Ptr{Cvoid}}, (PyPtr,),
                                      npy_multiarray["_ARRAY_API"])
     else
-        PyArray_API = @pycheck @ccall((@pysym :PyCapsule_GetPointer),
+        PyArray_API = @pycheck @pyccall(:PyCapsule_GetPointer,
                                      Ptr{Ptr{Cvoid}}, (PyPtr,Ptr{Cvoid}),
                                      npy_multiarray["_ARRAY_API"], C_NULL)
     end
@@ -449,7 +449,7 @@ function convert(::Type{Array{T, 1}}, o::PyObject) where T<:NPY_TYPES
     try
         copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
-        len = @pycheckz @ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        len = @pycheckz @pyccall(:PySequence_Size, Int, (PyPtr,), o)
         A = Array{pyany_toany(T)}(undef, len)
         py2array(T, A, o, 1, 1)
     end

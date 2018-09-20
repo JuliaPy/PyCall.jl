@@ -65,7 +65,7 @@ const DateTime_FromDateAndTime = Ref{Ptr{Cvoid}}(0)
 const Delta_FromDelta = Ref{Ptr{Cvoid}}(0)
 function init_datetime()
     # emulate PyDateTime_IMPORT:
-    PyDateTimeAPI = unsafe_load(@pycheckn @ccall((@pysym :PyCapsule_Import),
+    PyDateTimeAPI = unsafe_load(@pycheckn @pyccall(:PyCapsule_Import,
                                      Ptr{PyDateTime_CAPI}, (Ptr{UInt8}, Cint),
                                      "datetime.datetime_CAPI", 0))
     DateType[] = PyDateTimeAPI.DateType

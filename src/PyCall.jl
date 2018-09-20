@@ -46,6 +46,10 @@ macro ccall(args...)
     end
 end
 
+macro pyccall(f, args...)
+    :(@ccall(@pysym($(esc(f))), $(esc.(args)...)))
+end
+
 #########################################################################
 
 # Mirror of C PyObject struct (for non-debugging Python builds).
@@ -109,7 +113,7 @@ it is equivalent to a `PyNULL()` object.
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
 function pydecref_(o::Union{PyPtr,PyObject})
-    @ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+    @pyccall(:Py_DecRef, Cvoid, (PyPtr,), o)
     return o
 end
 
@@ -120,7 +124,7 @@ function pydecref(o::PyObject)
 end
 
 function pyincref_(o::Union{PyPtr,PyObject})
-    @ccall((@pysym :Py_IncRef), Cvoid, (PyPtr,), o)
+    @pyccall(:Py_IncRef, Cvoid, (PyPtr,), o)
     return o
 end
 
@@ -160,10 +164,10 @@ function Base.copy!(dest::PyObject, src::PyObject)
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
-  !ispynull(t) && @ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
+  !ispynull(t) && @pyccall(:PyObject_IsInstance, Cint, (PyPtr,PyPtr), o, t.o) == 1
 
 pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
-  t != C_NULL && @ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+  t != C_NULL && @pyccall(:PyObject_IsInstance, Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyquery(q::Ptr{Cvoid}, o::PyObject) =
   @ccall(q, Cint, (PyPtr,), o) == 1
@@ -181,7 +185,7 @@ PyObject(o::PyObject) = o
 include("exception.jl")
 include("gui.jl")
 
-pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn @ccall(@pysym(:PyObject_Type), PyPtr, (PyPtr,), o))
+pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have no Python type")) : PyObject(@pycheckn @pyccall(:PyObject_Type, PyPtr, (PyPtr,), o))
 
 #########################################################################
 
@@ -211,7 +215,7 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 Return a string representation of `o` corresponding to `str(o)` in Python.
 """
 pystr(o::PyObject) = convert(AbstractString,
-                             PyObject(@pycheckn @ccall((@pysym :PyObject_Str), PyPtr,
+                             PyObject(@pycheckn @pyccall(:PyObject_Str, PyPtr,
                                                       (PyPtr,), o)))
 
 """
@@ -220,7 +224,7 @@ pystr(o::PyObject) = convert(AbstractString,
 Return a string representation of `o` corresponding to `repr(o)` in Python.
 """
 pyrepr(o::PyObject) = convert(AbstractString,
-                              PyObject(@pycheckn @ccall((@pysym :PyObject_Repr), PyPtr,
+                              PyObject(@pycheckn @pyccall(:PyObject_Repr, PyPtr,
                                                        (PyPtr,), o)))
 
 """
@@ -234,10 +238,10 @@ function pystring(o::PyObject)
     if ispynull(o)
         return "NULL"
     else
-        s = @ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
+        s = @pyccall(:PyObject_Repr, PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             pyerr_clear()
-            s = @ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
+            s = @pyccall(:PyObject_Str, PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
                 return string(o.o)
@@ -275,7 +279,7 @@ function hash(o::PyObject)
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
         hashsalt(unsafe_pyjlwrap_to_objref(o.o))
     else
-        h = @ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
+        h = @pyccall(:PyObject_Hash, Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
             return hashsalt(o.o)
@@ -293,7 +297,7 @@ function getindex(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = @ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+    p = @pyccall(:PyObject_GetAttrString, PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL
         pyerr_clear()
         throw(KeyError(s))
@@ -307,7 +311,7 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
-    if -1 == @ccall((@pysym :PyObject_SetAttrString), Cint,
+    if -1 == @pyccall(:PyObject_SetAttrString, Cint,
                    (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
@@ -319,7 +323,7 @@ function haskey(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
-    return 1 == @ccall((@pysym :PyObject_HasAttrString), Cint,
+    return 1 == @pyccall(:PyObject_HasAttrString, Cint,
                       (PyPtr, Cstring), o, s)
 end
 
@@ -418,7 +422,7 @@ end
 function _pyimport(name::AbstractString)
     cookie = ActivatePyActCtx()
     try
-        return PyObject(@ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
+        return PyObject(@pyccall(:PyImport_ImportModule, PyPtr, (Cstring,), name))
     finally
         DeactivatePyActCtx(cookie)
     end
@@ -719,7 +723,7 @@ include("pyfncall.jl")
 # for now we can define "get".
 
 function get(o::PyObject, returntype::TypeTuple, k, default)
-    r = @ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
+    r = @pyccall(:PyObject_GetItem, PyPtr, (PyPtr,PyPtr), o,PyObject(k))
     if r == C_NULL
         pyerr_clear()
         default
@@ -729,14 +733,14 @@ function get(o::PyObject, returntype::TypeTuple, k, default)
 end
 
 get(o::PyObject, returntype::TypeTuple, k) =
-    convert(returntype, PyObject(@pycheckn @ccall((@pysym :PyObject_GetItem),
+    convert(returntype, PyObject(@pycheckn @pyccall(:PyObject_GetItem,
                                  PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
 
 get(o::PyObject, k, default) = get(o, PyAny, k, default)
 get(o::PyObject, k) = get(o, PyAny, k)
 
 function delete!(o::PyObject, k)
-    e = @ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))
+    e = @pyccall(:PyObject_DelItem, Cint, (PyPtr, PyPtr), o, PyObject(k))
     if e == -1
         pyerr_clear() # delete! ignores errors in Julia
     end
@@ -744,7 +748,7 @@ function delete!(o::PyObject, k)
 end
 
 function set!(o::PyObject, k, v)
-    @pycheckz @ccall((@pysym :PyObject_SetItem), Cint, (PyPtr, PyPtr, PyPtr),
+    @pycheckz @pyccall(:PyObject_SetItem, Cint, (PyPtr, PyPtr, PyPtr),
                      o, PyObject(k), PyObject(v))
     v
 end
@@ -761,24 +765,24 @@ function ind2py(i::Integer)
     return i-1
 end
 
-_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn @ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
+_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn @pyccall(:PySequence_GetItem, PyPtr, (PyPtr, Int), o, ind2py(i))))
 getindex(o::PyObject, i::Integer) = _getindex(o, i, PyAny)
 function setindex!(o::PyObject, v, i::Integer)
-    @pycheckz @ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
+    @pycheckz @pyccall(:PySequence_SetItem, Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
     v
 end
 getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2)))
 setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py(i2)), v)
 getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
 setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
-length(o::PyObject) = @pycheckz @ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+length(o::PyObject) = @pycheckz @pyccall(:PySequence_Size, Int, (PyPtr,), o)
 size(o::PyObject) = (length(o),)
 firstindex(o::PyObject) = 1
 lastindex(o::PyObject) = length(o)
 
 function splice!(a::PyObject, i::Integer)
     v = a[i]
-    @pycheckz @ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+    @pycheckz @pyccall(:PySequence_DelItem, Cint, (PyPtr, Int), a, i-1)
     v
 end
 
@@ -787,20 +791,20 @@ popfirst!(a::PyObject) = splice!(a, 1)
 
 function empty!(a::PyObject)
     for i in length(a):-1:1
-        @pycheckz @ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
+        @pycheckz @pyccall(:PySequence_DelItem, Cint, (PyPtr, Int), a, i-1)
     end
     a
 end
 
 # The following operations only work for the list type and subtypes thereof:
 function push!(a::PyObject, item)
-    @pycheckz @ccall((@pysym :PyList_Append), Cint, (PyPtr, PyPtr),
+    @pycheckz @pyccall(:PyList_Append, Cint, (PyPtr, PyPtr),
                      a, PyObject(item))
     a
 end
 
 function insert!(a::PyObject, i::Integer, item)
-    @pycheckz @ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
+    @pycheckz @pyccall(:PyList_Insert, Cint, (PyPtr, Int, PyPtr),
                      a, ind2py(i), PyObject(item))
     a
 end
@@ -826,7 +830,7 @@ function append!(a::PyObject, items)
 end
 
 append!(a::PyObject, items::PyObject) =
-    PyObject(@pycheckn @ccall((@pysym :PySequence_InPlaceConcat),
+    PyObject(@pycheckn @pyccall(:PySequence_InPlaceConcat,
                              PyPtr, (PyPtr, PyPtr), a, items))
 
 #########################################################################
