@@ -283,9 +283,7 @@ function getindex(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = disable_sigint() do
-        ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
-    end
+    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL
         pyerr_clear()
         throw(KeyError(s))
@@ -299,11 +297,8 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
-    e = disable_sigint() do
-        ccall((@pysym :PyObject_SetAttrString), Cint,
-              (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
-    end
-    if -1 == e
+    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
+                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
         pyerr_clear()
         throw(KeyError(s))
     end
@@ -314,11 +309,8 @@ function haskey(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("haskey of NULL PyObject"))
     end
-
-    return 1 == disable_sigint() do
-        ccall((@pysym :PyObject_HasAttrString), Cint,
-              (PyPtr, Cstring), o, s)
-    end
+    return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
+                      (PyPtr, Cstring), o, s)
 end
 
 #########################################################################
