@@ -61,6 +61,71 @@ function pyjlwrap_init()
 end
 
 #########################################################################
+# Virtual environment support
+
+_clength(x::Cstring) = ccall(:strlen, Csize_t, (Cstring,), x) + 1
+_clength(x) = length(x)
+
+function __leak(::Type{T}, x) where T
+    n = _clength(x)
+    ptr = ccall(:malloc, Ptr{T}, (Csize_t,), n * sizeof(T))
+    unsafe_copyto!(ptr, pointer(x), n)
+    return ptr
+end
+
+"""
+    _leak(T::Type, x::AbstractString) :: Ptr
+    _leak(x::Array) :: Ptr
+
+Leak `x` from Julia's GCer.  This is meant to be used only for
+`Py_SetPythonHome` and `Py_SetProgramName` where the Python
+documentation demands that the passed argument must points to "static
+storage whose contents will not change for the duration of the
+program's execution" (although it seems that in newer CPython versions
+the contents are copied internally).
+"""
+_leak(x::Union{Cstring, Array}) = __leak(eltype(x), x)
+_leak(T::Type, x::AbstractString) =
+    _leak(Base.unsafe_convert(T, Base.cconvert(T, x)))
+_leak(::Type{Cwstring}, x::AbstractString) =
+    _leak(Base.cconvert(Cwstring, x))
+
+function pythonhome_of(pyprogramname::AbstractString)
+    if Sys.iswindows()
+        script = """
+        import sys
+        sys.stdout.write(sys.exec_prefix)
+        """
+        # See where PYTHONHOME is mentioned in ../deps/build.jl
+    else
+        script = """
+        import sys
+        sys.stdout.write(sys.prefix)
+        sys.stdout.write(":")
+        sys.stdout.write(sys.exec_prefix)
+        """
+        # https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHOME
+    end
+    cmd = `$pyprogramname -c $script`
+
+    # For Windows:
+    env = copy(ENV)
+    env["PYTHONIOENCODING"] = "UTF-8"
+    cmd = setenv(cmd, env)
+
+    return read(cmd, String)
+end
+
+function find_libpython(python::AbstractString)
+    script = joinpath(@__DIR__, "..", "deps", "find_libpython.py")
+    try
+        return read(`$python $script`, String)
+    catch
+        return nothing
+    end
+end
+
+#########################################################################
 
 function __init__()
     # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
@@ -76,7 +141,48 @@ function __init__()
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
-    if !already_inited
+    if already_inited
+        # Importing from PyJulia takes this path.
+    elseif isfile(get(ENV, "PYCALL_JL_RUNTIME_PYTHON", ""))
+        venv_python = ENV["PYCALL_JL_RUNTIME_PYTHON"]
+
+        # Check libpython compatibility.
+        venv_libpython = find_libpython(venv_python)
+        if venv_libpython === nothing
+            error("""
+            `libpython` for $venv_python cannot be found.
+            PyCall.jl cannot initialize Python safely.
+            """)
+        elseif venv_libpython != libpython
+            error("""
+            Incompatible `libpython` detected.
+            `libpython` for $venv_python is:
+                $venv_libpython
+            `libpython` for $pyprogramname is:
+                $libpython
+            PyCall.jl only supports loading Python environment using
+            the same `libpython`.
+            """)
+        end
+
+        if haskey(ENV, "PYCALL_JL_RUNTIME_PYTHONHOME")
+            venv_home = ENV["PYCALL_JL_RUNTIME_PYTHONHOME"]
+        else
+            venv_home = pythonhome_of(venv_python)
+        end
+        if pyversion.major < 3
+            ccall((@pysym :Py_SetPythonHome), Cvoid, (Cstring,),
+                  _leak(Cstring, venv_home))
+            ccall((@pysym :Py_SetProgramName), Cvoid, (Cstring,),
+                  _leak(Cstring, venv_python))
+        else
+            ccall((@pysym :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},),
+                  _leak(Cwstring, venv_home))
+            ccall((@pysym :Py_SetProgramName), Cvoid, (Ptr{Cwchar_t},),
+                  _leak(Cwstring, venv_python))
+        end
+        ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
+    else
         Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion)
         if !isempty(pyprogramname)
             if pyversion.major < 3
