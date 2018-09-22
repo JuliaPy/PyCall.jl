@@ -321,6 +321,18 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test !ispynull(PyObject(3))
     @test ispynull(pydecref(PyObject(3)))
 
+    ex = try
+        pyimport("s p a m")
+    catch ex
+        ex
+    end
+    @test ex isa PyCall.PyError
+    @test occursin("could not be found by pyimport", ex.msg)
+    # Make sure we are testing ModuleNotFoundError here:
+    if PyCall.pyversion >= v"3.6"
+        @test pyisinstance(ex.val, pybuiltin("ModuleNotFoundError"))
+    end
+
     @test !ispynull(pyimport_conda("inspect", "not a conda package"))
     import Conda
     if PyCall.conda

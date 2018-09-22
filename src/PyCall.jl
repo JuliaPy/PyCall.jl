@@ -436,7 +436,7 @@ function pyimport(name::AbstractString)
     if ispynull(o)
         if pyerr_occurred()
             e = PyError("PyImport_ImportModule")
-            if e.T.o == @pyglobalobjptr(:PyExc_ImportError)
+            if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
 The Python package $name could not be found by pyimport. Usually this means
