@@ -57,15 +57,13 @@ def linked_libpython():
     """
     Find the linked libpython using dladdr (in *nix).
 
-    Calling this in Windows always return `None` at the moment.
-
     Returns
     -------
     path : str or None
         A path to linked libpython.  Return `None` if statically linked.
     """
     if is_windows:
-        return None
+        return _linked_libpython_windows()
     return _linked_libpython_unix()
 
 
@@ -93,6 +91,26 @@ def _linked_libpython_unix():
     if path == os.path.realpath(sys.executable):
         return None
     return path
+
+
+def _linked_libpython_windows():
+    """
+    Based on: https://stackoverflow.com/a/16659821
+    """
+    from ctypes.wintypes import HANDLE, LPWSTR, DWORD
+
+    GetModuleFileName = ctypes.windll.kernel32.GetModuleFileNameW
+    GetModuleFileName.argtypes = [HANDLE, LPWSTR, DWORD]
+    GetModuleFileName.restype = DWORD
+
+    MAX_PATH = 260
+    try:
+        buf = ctypes.create_unicode_buffer(MAX_PATH)
+        GetModuleFileName(ctypes.pythonapi._handle, buf, MAX_PATH)
+        return buf.value
+    except (ValueError, OSError):
+        return None
+
 
 
 def library_name(name, suffix=SHLIB_SUFFIX, is_windows=is_windows):
