@@ -29,13 +29,17 @@ import Base.Iterators: filter
 include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
 include("startup.jl")
 
-# Python C API is not interrupt-safe.  In principle, we should
-# use sigatomic for every ccall to the Python library, but this
-# should really be fixed in Julia (#2622).  However, we will
-# use the `disable_sigint` function to protect *all* invocations
-# of Python API.  This is required since `pyjlwrap_call` uses
-# `reenable_sigint` which has to be called within `disable_sigint`
-# context.
+# Python C API is not interrupt-safe.  This is why we use the
+# `disable_sigint` function to protect *all* invocations of Python
+# API.  This is required since arbitrary Python function can be called
+# in virtually any context.  For example, a decref may call __dell__
+# which is carelessly defined to invoke a disk operation (say to flush
+# buffer).  Furthermore, 100% coverage is required since the
+# `pyjlwrap_call` callback to Julia uses `reenable_sigint` which has
+# to be called within `disable_sigint` context.  In principle, this
+# should really be fixed in Julia.  However, although
+# JuliaLang/julia#2622 is closed, ccall still does not automatically
+# disable SIGINT.
 macro ccall(args...)
     quote
         disable_sigint() do
