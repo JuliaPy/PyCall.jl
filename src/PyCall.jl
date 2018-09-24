@@ -20,8 +20,6 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        append!, insert!, prepend!, unsafe_convert
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
 
-import Base: sigatomic_begin, sigatomic_end
-
 import Conda
 import MacroTools   # because of issue #270
 import Base.Iterators: filter
