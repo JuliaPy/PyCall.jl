@@ -10,7 +10,7 @@
 # IO objects should raise IOError for unsupported operations or failed IO
 function ioraise(e)
     if isa(e, MethodError) || isa(e, ErrorException)
-        ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
+        @pyccall(:PyErr_SetString, Cvoid, (PyPtr, Cstring),
               (pyexc::Dict)[PyIOError],
               string("Julia exception: ", e))
     else

@@ -30,7 +30,7 @@ does not contain valid Unicode), or from the default conversion of a
 """
 function pybytes(b::Union{String,DenseVector{UInt8}})
     b isa String || stride(b,1) == 1 || throw(ArgumentError("pybytes requires stride-1 byte arrays"))
-    PyObject(@pycheckn ccall(@pysym(PyString_FromStringAndSize),
+    PyObject(@pycheckn @pyccall(PyString_FromStringAndSize,
                              PyPtr, (Ptr{UInt8}, Int),
                              b, sizeof(b)))
 end

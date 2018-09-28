@@ -312,8 +312,8 @@ function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, ba
         t.tp_new = @pyglobal :PyType_GenericNew
     end
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Any,), t)
-    ccall((@pysym :Py_IncRef), Cvoid, (Any,), t)
+    @pycheckz @pyccall(:PyType_Ready, Cint, (Any,), t)
+    @pyccall(:Py_IncRef, Cvoid, (Any,), t)
     return t
 end
 
@@ -373,13 +373,13 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
             return pystealref!(PyObject(nothing))
         elseif startswith(attr, "__")
             # TODO: handle __code__/func_code (issue #268)
-            return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
+            return @pyccall(:PyObject_GenericGetAttr, PyPtr, (PyPtr,PyPtr), self_, attr__)
         else
             fidx = Base.fieldindex(typeof(f), Symbol(attr), false)
             if fidx != 0
                 return pyreturn(getfield(f, fidx))
             else
-                return ccall(@pysym(:PyObject_GenericGetAttr), PyPtr, (PyPtr,PyPtr), self_, attr__)
+                return @pyccall(:PyObject_GenericGetAttr, PyPtr, (PyPtr,PyPtr), self_, attr__)
             end
         end
     catch e
@@ -404,7 +404,7 @@ function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
     PyTypeObject!(to, name, sz) do t::PyTypeObject
         # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
         t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), jlWrapType)
-        ccall((@pysym :Py_IncRef), Cvoid, (Any,), jlWrapType)
+        @pyccall(:Py_IncRef, Cvoid, (Any,), jlWrapType)
         init(t)
     end
 end
@@ -418,7 +418,7 @@ pyjlwrap_type(init::Function, name::AbstractString) =
 #  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-    o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
+    o = PyObject(@pycheckn @pyccall(:_PyObject_New,
                                  PyPtr, (Any,), pyT))
     p = convert(Ptr{Ptr{Cvoid}}, o.o)
     if isimmutable(value)
@@ -443,7 +443,7 @@ function pyjlwrap_new(x::Any)
 end
 
 # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Any), o, jlWrapType) == 1
+is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && @pyccall(:PyObject_IsInstance, Cint, (PyPtr, Any), o, jlWrapType) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,

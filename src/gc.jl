@@ -15,7 +15,7 @@ const pycall_gc = Dict{PyPtr,Any}()
 
 function weakref_callback(callback::PyPtr, wo::PyPtr)
     delete!(pycall_gc, wo)
-    ccall((@pysym :Py_DecRef), Cvoid, (PyPtr,), wo)
+    @pyccall(:Py_DecRef, Cvoid, (PyPtr,), wo)
     return pyincref_(pynothing[])
 end
 
@@ -34,11 +34,11 @@ function pyembed(po::PyObject, jo::Any)
         cf = @cfunction(weakref_callback, PyPtr, (PyPtr,PyPtr))
         weakref_callback_meth[] = PyMethodDef("weakref_callback", cf, METH_O)
         copy!(weakref_callback_obj,
-              PyObject(@pycheckn ccall((@pysym :PyCFunction_NewEx), PyPtr,
+              PyObject(@pycheckn @pyccall(:PyCFunction_NewEx, PyPtr,
                                        (Ref{PyMethodDef}, Ptr{Cvoid}, Ptr{Cvoid}),
                                        weakref_callback_meth, C_NULL, C_NULL)))
     end
-    wo = @pycheckn ccall((@pysym :PyWeakref_NewRef), PyPtr, (PyPtr,PyPtr),
+    wo = @pycheckn @pyccall(:PyWeakref_NewRef, PyPtr, (PyPtr,PyPtr),
                          po, weakref_callback_obj)
     pycall_gc[wo] = jo
     return po

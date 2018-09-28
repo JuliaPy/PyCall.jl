@@ -65,7 +65,7 @@ const DateTime_FromDateAndTime = Ref{Ptr{Cvoid}}(0)
 const Delta_FromDelta = Ref{Ptr{Cvoid}}(0)
 function init_datetime()
     # emulate PyDateTime_IMPORT:
-    PyDateTimeAPI = unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
+    PyDateTimeAPI = unsafe_load(@pycheckn @pyccall(:PyCapsule_Import,
                                      Ptr{PyDateTime_CAPI}, (Ptr{UInt8}, Cint),
                                      "datetime.datetime_CAPI", 0))
     DateType[] = PyDateTimeAPI.DateType
@@ -77,13 +77,13 @@ function init_datetime()
 end
 
 PyObject(d::Dates.Date) =
-    PyObject(@pycheckn ccall(Date_FromDate[], PyPtr,
+    PyObject(@pycheckn @ccall(Date_FromDate[], PyPtr,
                              (Cint, Cint, Cint, PyPtr),
                              Dates.year(d), Dates.month(d), Dates.day(d),
                              DateType[]))
 
 PyObject(d::Dates.DateTime) =
-    PyObject(@pycheckn ccall(DateTime_FromDateAndTime[], PyPtr,
+    PyObject(@pycheckn @ccall(DateTime_FromDateAndTime[], PyPtr,
                              (Cint, Cint, Cint, Cint, Cint, Cint, Cint,
                               PyPtr, PyPtr),
                              Dates.year(d), Dates.month(d), Dates.day(d),
@@ -92,7 +92,7 @@ PyObject(d::Dates.DateTime) =
                              pynothing[], DateTimeType[]))
 
 PyDelta_FromDSU(days, seconds, useconds) =
-    PyObject(@pycheckn ccall(Delta_FromDelta[], PyPtr,
+    PyObject(@pycheckn @ccall(Delta_FromDelta[], PyPtr,
                              (Cint, Cint, Cint, Cint, PyPtr),
                              days, seconds, useconds,
                              1, DeltaType[]))
