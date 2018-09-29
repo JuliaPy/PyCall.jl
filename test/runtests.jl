@@ -637,4 +637,22 @@ end
     @test anonymous.sys != PyNULL()
 end
 
+struct Unprintable end
+Base.show(::IO, ::Unprintable) = error("show(::IO, ::Unprintable) called")
+
+py"""
+def try_repr(x):
+    try:
+        return repr(x)
+    except Exception as err:
+        return err
+"""
+
+@testset "throwing show" begin
+    unp = Unprintable()
+    @test_throws Exception show(unp)
+    @test py"try_repr"("printable") isa String
+    @test pyisinstance(py"try_repr"(unp), pybuiltin("Exception"))
+end
+
 include("test_pyfncall.jl")
