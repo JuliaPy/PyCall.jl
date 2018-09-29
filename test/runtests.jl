@@ -639,6 +639,7 @@ end
 
 struct Unprintable end
 Base.show(::IO, ::Unprintable) = error("show(::IO, ::Unprintable) called")
+Base.show(::IO, ::Type{Unprintable}) = error("show(::IO, ::Type{Unprintable}) called")
 
 py"""
 def try_repr(x):
@@ -648,11 +649,21 @@ def try_repr(x):
         return err
 """
 
+py"""
+def try_call(f):
+    try:
+        return f()
+    except Exception as err:
+        return err
+"""
+
 @testset "throwing show" begin
     unp = Unprintable()
     @test_throws Exception show(unp)
     @test py"try_repr"("printable") isa String
     @test pyisinstance(py"try_repr"(unp), pybuiltin("Exception"))
+    @test pyisinstance(py"try_call"(() -> throw(Unprintable())),
+                       pybuiltin("Exception"))
 end
 
 include("test_pyfncall.jl")
