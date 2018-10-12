@@ -193,7 +193,7 @@ try # make sure deps.jl file is removed on error
 
     # Get PYTHONHOME, either from the environment or from Python
     # itself (if it is not in the environment or if we are using Conda)
-    PYTHONHOME = if !haskey(ENV, "HOME") || use_conda
+    PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
         # PYTHONHOME tells python where to look for both pure python
         # and binary modules.  When it is set, it replaces both
         # `prefix` and `exec_prefix` and we thus need to set it to
