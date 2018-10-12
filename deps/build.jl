@@ -141,9 +141,12 @@ function whichfirst(args...)
     return ""
 end
 
+const prefsfile = VERSION < v"0.7" ? "PYTHON" : joinpath(first(DEPOT_PATH), "prefs", "PyCall")
+mkpath(dirname(prefsfile))
+
 try # make sure deps.jl file is removed on error
     python = try
-        let py = get(ENV, "PYTHON", isfile("PYTHON") ? readchomp("PYTHON") :
+        let py = get(ENV, "PYTHON", isfile(prefsfile) ? readchomp(prefsfile) :
                      (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ?
                      whichfirst("python3", "python") : "Conda"),
             vers = isempty(py) || py == "Conda" ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
@@ -190,7 +193,7 @@ try # make sure deps.jl file is removed on error
 
     # Get PYTHONHOME, either from the environment or from Python
     # itself (if it is not in the environment or if we are using Conda)
-    PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
+    PYTHONHOME = if !haskey(ENV, "HOME") || use_conda
         # PYTHONHOME tells python where to look for both pure python
         # and binary modules.  When it is set, it replaces both
         # `prefix` and `exec_prefix` and we thus need to set it to
@@ -227,7 +230,7 @@ try # make sure deps.jl file is removed on error
     """)
 
     # Make subsequent builds (e.g. Pkg.update) use the same Python by default:
-    writeifchanged("PYTHON", use_conda ? "Conda" : isfile(programname) ? programname : python)
+    writeifchanged(prefsfile, use_conda ? "Conda" : isfile(programname) ? programname : python)
 
     #########################################################################
 
