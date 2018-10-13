@@ -192,12 +192,24 @@ function wx_eventloop(sec::Real=50e-3)
 end
 
 # Tk: (Tkinter/tkinter module)
+# based on https://github.com/ipython/ipython/blob/7.0.1/IPython/terminal/pt_inputhooks/tk.py
 function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
+    if pyversion < v"3"
+        _tkinter = Tk[:tkinter]
+    else
+        _tkinter = pyimport("_tkinter")
+    end
+    flag = _tkinter[:ALL_EVENTS] | _tkinter[:DONT_WAIT]
+    root = Tk["_default_root"]
     install_doevent(sec) do async
-        root = Tk["_default_root"]
+        new_root = Tk["_default_root"]
+        if new_root.o != pynothing[]
+            root = new_root
+        end
         if root.o != pynothing[]
-            pycall(root["update"], PyObject)
+            while pycall(root["dooneevent"], Bool, flag)
+            end
         end
     end
 end
