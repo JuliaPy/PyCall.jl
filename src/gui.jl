@@ -195,13 +195,9 @@ end
 # based on https://github.com/ipython/ipython/blob/7.0.1/IPython/terminal/pt_inputhooks/tk.py
 function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
-    if pyversion < v"3"
-        _tkinter = Tk[:tkinter]
-    else
-        _tkinter = pyimport("_tkinter")
-    end
+    _tkinter = pyimport("_tkinter")
     flag = _tkinter[:ALL_EVENTS] | _tkinter[:DONT_WAIT]
-    root = Tk["_default_root"]
+    root = PyObject(nothing)
     install_doevent(sec) do async
         new_root = Tk["_default_root"]
         if new_root.o != pynothing[]
