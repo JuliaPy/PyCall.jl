@@ -1,6 +1,10 @@
 using PyCall, Compat
 using Compat.Test, Compat.Dates, Compat.Serialization
 
+using Compat: Pkg
+display(Pkg.installed())
+println()
+
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
 
