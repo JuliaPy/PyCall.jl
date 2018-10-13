@@ -101,7 +101,7 @@ function find_libpython(python::AbstractString)
     error("""
         Couldn't find libpython; check your PYTHON environment variable.
 
-        The python executable we tried was $python (= version $v).
+        The python executable we tried was $python.
         Re-building with
             ENV["PYCALL_DEBUG_BUILD"] = "yes"
         may provide extra information for why it failed.
