@@ -666,4 +666,18 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
+@testset "pyiterate" begin
+    i1 = PyObject([1])
+    i2 = PyObject([2])
+    l = PyObject([i1,i2])
+    @test collect(l) == [[1],[2]]
+    r1, s1 = PyCall.pyiterate(l)
+    r2, s2 = PyCall.pyiterate(l, s1)
+    @test PyCall.pyiterate(l, s2) === nothing
+    @test r1 isa PyObject
+    @test r2 isa PyObject
+    @test r1 == i1
+    @test r2 == i2
+end
+
 include("test_pyfncall.jl")
