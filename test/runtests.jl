@@ -521,6 +521,9 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
           py"[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]" ==
           [1,4,9,16]
 
+    # 594
+    @test collect(zip(py"iter([1, 2, 3])", 1:3)) == [(1, 1), (2, 2), (3, 3)]
+
     let o = PyObject("foo")
         @test pystr(o) == "foo"
         @test pyrepr(o) == "'foo'"

@@ -3,6 +3,7 @@
 #########################################################################
 # Iterating over Python objects in Julia
 
+Base.IteratorSize(::Type{PyObject}) = Base.SizeUnknown()
 function _start(po::PyObject)
     sigatomic_begin()
     try
@@ -63,6 +64,8 @@ else
     Base.eltype(::Type{PyIterator{T}}) where T = T
     Base.eltype(::Type{PyIterator{PyAny}}) = Any
     Base.length(piter::PyIterator) = length(piter.o)
+
+    Base.IteratorSize(::Type{<: PyIterator}) = Base.SizeUnknown()
 
     _start(piter::PyIterator) = _start(piter.o)
     
