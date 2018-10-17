@@ -51,16 +51,19 @@ const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
 const PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
 
 function exec_find_libpython(python::AbstractString, options)
-    cmd = `$python $(joinpath(@__DIR__, "find_libpython.py")) $options`
+    # Do not inline `@__DIR__` into the backticks to expand correctly.
+    # See: https://github.com/JuliaLang/julia/issues/26323
+    script = joinpath(@__DIR__, "find_libpython.py")
+    cmd = `$python $script $options`
     if PYCALL_DEBUG_BUILD
         cmd = `$cmd --verbose`
     end
     return readlines(pythonenv(cmd))
 end
 
-function show_dlopen_error(e)
+function show_dlopen_error(lib, e)
     if PYCALL_DEBUG_BUILD
-        println(stderr, "dlopen($libpath_lib) ==> ", e)
+        println(stderr, "dlopen($lib) ==> ", e)
         # Using STDERR since find_libpython.py prints debugging
         # messages to STDERR too.
     end
@@ -75,7 +78,7 @@ function find_libpython(python::AbstractString)
         try
             return (Libdl.dlopen(lib, dlopen_flags), lib)
         catch e
-            show_dlopen_error(e)
+            show_dlopen_error(lib, e)
         end
     end
 
@@ -94,7 +97,7 @@ function find_libpython(python::AbstractString)
             # compare libpython.
             return (libpython, Libdl.dlpath(libpython))
         catch e
-            show_dlopen_error(e)
+            show_dlopen_error(lib, e)
         end
     end
 
