@@ -29,24 +29,56 @@ end
 
     Base.done(po::PyObject, s) = ispynull(s[1])
 else
-    function pyiterate(po::PyObject, s=_start(po))
+    """
+        PyIterator{T}(pyobject)
+
+    Wrap `pyobject::PyObject` into an iterator, that produces items of type `T`. To be more precise `convert(T, item)` is applied in each iteration. This can be useful to avoid automatic conversion of items into corresponding julia types.
+    ```jldoctest
+    julia> using PyCall
+
+    julia> l = PyObject([PyObject(1), PyObject(2)])
+    PyObject [1, 2]
+    
+    julia> piter = PyCall.PyIterator{PyAny}(l)
+    PyCall.PyIterator{PyAny}(PyObject [1, 2])
+    
+    julia> collect(piter)
+    2-element Array{Any,1}:
+     1
+     2
+    
+    julia> piter = PyCall.PyIterator{PyObject}(l)
+    PyCall.PyIterator{PyObject}(PyObject [1, 2])
+    
+    julia> collect(piter)
+    2-element Array{PyObject,1}:
+     PyObject 1
+     PyObject 2
+     ```
+    """
+    struct PyIterator{T}
+        o::PyObject
+    end
+    
+    Base.eltype(::Type{PyIterator{T}}) where T = T
+    Base.eltype(::Type{PyIterator{PyAny}}) = Any
+    Base.length(piter::PyIterator) = length(piter.o)
+
+    _start(piter::PyIterator) = _start(piter.o)
+    
+    function Base.iterate(piter::PyIterator{T}, s=_start(piter)) where {T}
         ispynull(s[1]) && return nothing
         sigatomic_begin()
         try
             nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-            return (s[1], (nxt, s[2]))
+            return (convert(T,s[1]), (nxt, s[2]))
         finally
             sigatomic_end()
         end
     end
     function Base.iterate(po::PyObject, s=_start(po))
-        raw = pyiterate(po, s)
-        if raw == nothing
-            raw
-        else
-            pyitem, state = raw
-            convert(PyAny, pyitem), state
-        end
+        piter = PyIterator{PyAny}(po)
+        iterate(piter, s)
     end
 end
 

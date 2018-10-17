@@ -666,18 +666,28 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
-@testset "pyiterate" begin
+@testset "PyIterator" begin
+    arr = [1,2]
+    o = PyObject(arr)
+    c_pyany = collect(PyCall.PyIterator{PyAny}(o))
+    @test c_pyany == arr
+    @test c_pyany[1] === arr[1]
+    @test c_pyany[2] === arr[2]
+
+    c_f64 = collect(PyCall.PyIterator{Float64}(o))
+    @test c_f64 == arr
+    @test eltype(c_f64) == Float64
+
     i1 = PyObject([1])
     i2 = PyObject([2])
     l = PyObject([i1,i2])
-    @test collect(l) == [[1],[2]]
-    r1, s1 = PyCall.pyiterate(l)
-    r2, s2 = PyCall.pyiterate(l, s1)
-    @test PyCall.pyiterate(l, s2) === nothing
-    @test r1 isa PyObject
-    @test r2 isa PyObject
-    @test r1 == i1
-    @test r2 == i2
+
+    piter = PyCall.PyIterator{Any}(l)
+    @test length(piter) == 2
+    @test length(collect(piter)) == 2
+    r1, r2 = collect(piter)
+    @test r1.o === i1.o
+    @test r2.o  === i2.o
 end
 
 include("test_pyfncall.jl")
