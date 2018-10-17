@@ -767,3 +767,4 @@ end
 include("test_pyfncall.jl")
 include("testpybuffer.jl")
 include("test_venv.jl")
+include("test_build.jl")
