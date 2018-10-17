@@ -51,7 +51,10 @@ const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
 const PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
 
 function exec_find_libpython(python::AbstractString, options)
-    cmd = `$python $(joinpath(@__DIR__, "find_libpython.py")) $options`
+    # Do not inline `@__DIR__` into the backticks to expand correctly.
+    # See: https://github.com/JuliaLang/julia/issues/26323
+    script = joinpath(@__DIR__, "find_libpython.py")
+    cmd = `$python $script $options`
     if PYCALL_DEBUG_BUILD
         cmd = `$cmd --verbose`
     end
