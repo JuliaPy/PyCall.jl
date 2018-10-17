@@ -61,7 +61,7 @@ else
         o::PyObject
     end
 
-    PyIterator(o) = PyIterator{PyObject}(o)
+    PyIterator(o::PyObject) = PyIterator{PyObject}(o)
     
     Base.eltype(::Type{PyIterator{T}}) where T = T
     Base.eltype(::Type{PyIterator{PyAny}}) = Any
