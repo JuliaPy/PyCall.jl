@@ -48,7 +48,7 @@ else
      1
      2
     
-    julia> piter = PyCall.PyIterator{PyObject}(l)
+    julia> piter = PyCall.PyIterator(l)
     PyCall.PyIterator{PyObject}(PyObject [1, 2])
     
     julia> collect(piter)
@@ -60,6 +60,8 @@ else
     struct PyIterator{T}
         o::PyObject
     end
+
+    PyIterator(o) = PyIterator{PyObject}(o)
     
     Base.eltype(::Type{PyIterator{T}}) where T = T
     Base.eltype(::Type{PyIterator{PyAny}}) = Any

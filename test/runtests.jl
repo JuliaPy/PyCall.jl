@@ -521,9 +521,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
           py"[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]" ==
           [1,4,9,16]
 
-    # 594
-    @test collect(zip(py"iter([1, 2, 3])", 1:3)) == [(1, 1), (2, 2), (3, 3)]
-
     let o = PyObject("foo")
         @test pystr(o) == "foo"
         @test pyrepr(o) == "'foo'"
@@ -688,13 +685,17 @@ else
         i2 = PyObject([2])
         l = PyObject([i1,i2])
 
-        piter = PyCall.PyIterator{Any}(l)
+        piter = PyCall.PyIterator(l)
         @test length(piter) == 2
         @test length(collect(piter)) == 2
         r1, r2 = collect(piter)
         @test r1.o === i1.o
         @test r2.o  === i2.o
     end
+
+    # 594
+    @test collect(zip(py"iter([1, 2, 3])", 1:3)) == [(1, 1), (2, 2), (3, 3)]
+
 end
 
 include("test_pyfncall.jl")
