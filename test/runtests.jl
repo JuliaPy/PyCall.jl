@@ -674,8 +674,8 @@ else
         o = PyObject(arr)
         c_pyany = collect(PyCall.PyIterator{PyAny}(o))
         @test c_pyany == arr
-        @test c_pyany[1] === arr[1]
-        @test c_pyany[2] === arr[2]
+        @test c_pyany[1] isa Integer
+        @test c_pyany[2] isa Integer
 
         c_f64 = collect(PyCall.PyIterator{Float64}(o))
         @test c_f64 == arr
