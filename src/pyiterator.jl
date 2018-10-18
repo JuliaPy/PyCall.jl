@@ -39,23 +39,23 @@ else
 
     julia> l = PyObject([PyObject(1), PyObject(2)])
     PyObject [1, 2]
-    
+
     julia> piter = PyCall.PyIterator{PyAny}(l)
-    PyCall.PyIterator{PyAny}(PyObject [1, 2])
-    
+    PyCall.PyIterator{PyAny,Base.HasLength()}(PyObject [1, 2])
+
     julia> collect(piter)
     2-element Array{Any,1}:
      1
      2
-    
+
     julia> piter = PyCall.PyIterator(l)
-    PyCall.PyIterator{PyObject}(PyObject [1, 2])
-    
+    PyCall.PyIterator{PyObject,Base.HasLength()}(PyObject [1, 2])
+
     julia> collect(piter)
     2-element Array{PyObject,1}:
      PyObject 1
      PyObject 2
-     ```
+    ```
     """
     struct PyIterator{T,S}
         o::PyObject
