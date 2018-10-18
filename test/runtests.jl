@@ -691,10 +691,18 @@ else
         r1, r2 = collect(piter)
         @test r1.o === i1.o
         @test r2.o  === i2.o
-    end
 
-    # 594
-    @test collect(zip(py"iter([1, 2, 3])", 1:3)) == [(1, 1), (2, 2), (3, 3)]
+        @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
+        @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
+
+        # 594
+        @test collect(zip(py"iter([1, 2, 3])", 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+        @test collect(zip(PyCall.PyIterator{Int}(py"iter([1, 2, 3])"), 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+        @test collect(zip(PyCall.PyIterator(py"[1, 2, 3]"o), 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+    end
 
 end
 

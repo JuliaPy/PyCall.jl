@@ -57,17 +57,31 @@ else
      PyObject 2
      ```
     """
-    struct PyIterator{T}
+    struct PyIterator{T,S}
         o::PyObject
     end
 
-    PyIterator(o::PyObject) = PyIterator{PyObject}(o)
+    function _compute_IteratorSize(o::PyObject)
+        S = try
+            length(o)
+            Base.HasLength()
+        catch err
+            Base.SizeUnknown()
+        end
+    end
+    function PyIterator(o::PyObject) 
+        PyIterator{PyObject}(o)
+    end
+    function (::Type{PyIterator{T}})(o::PyObject) where {T}
+        S = _compute_IteratorSize(o)
+        PyIterator{T,S}(o)
+    end
     
-    Base.eltype(::Type{PyIterator{T}}) where T = T
-    Base.eltype(::Type{PyIterator{PyAny}}) = Any
+    Base.eltype(::Type{<:PyIterator{T}}) where T = T
+    Base.eltype(::Type{<:PyIterator{PyAny}}) = Any
     Base.length(piter::PyIterator) = length(piter.o)
 
-    Base.IteratorSize(::Type{<: PyIterator}) = Base.SizeUnknown()
+    Base.IteratorSize(::Type{<: PyIterator{T,S}}) where {T,S} = S
 
     _start(piter::PyIterator) = _start(piter.o)
     
