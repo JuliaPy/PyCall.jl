@@ -438,7 +438,7 @@ function pyimport(name::AbstractString)
     if ispynull(o)
         if pyerr_occurred()
             e = PyError("PyImport_ImportModule")
-            if e.T.o == @pyglobalobjptr(:PyExc_ImportError)
+            if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
 The Python package $name could not be found by pyimport. Usually this means
@@ -658,23 +658,14 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
             pyimport(modulename)
         else
             aconda = anaconda_conda()
-            if !isempty(aconda)
-                try
-                    Compat.@info "Installing $modulename via Anaconda's $aconda..."
-                    isempty(channel) || run(`$aconda config --add channels $channel --force`)
-                    run(`$aconda install -y $condapkg`)
-                catch e2
-                    error("""
-                    Detected Anaconda Python, but \"$aconda install -y $condapkg\"  failed.
+            if isempty(aconda)
+                # Not in conda environment; show the error from `pyimport`.
+                rethrow()
+            end
 
-                    You should either install $condapkg manually or fix your Anaconda installation so that $aconda works.   Alternatively, you can reconfigure PyCall to use its own Miniconda installation via the Conda.jl package, by running:
-                        ENV["PYTHON"]=""; Pkg.build("PyCall")
-                    after re-launching Julia.
-
-                    The exception was: $e2
-                    """)
-                end
-                return pyimport(modulename)
+            options = ""
+            if !isempty(channel)
+                options = " --channel $channel"
             end
 
             error("""
@@ -684,6 +675,12 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
                     ENV["PYTHON"]=""
                     Pkg.build("PyCall")
                 before trying again.
+
+                Note that Conda.jl can use custom conda environment. Read more about `CONDA_JL_HOME` configuration in Conda.jl documentation:
+                    https://github.com/JuliaPy/Conda.jl
+
+                To install $condapkg using $aconda, you can run the following command from your system shell:
+                    $aconda install$options $condapkg
 
                 The pyimport exception was: $e
                 """)

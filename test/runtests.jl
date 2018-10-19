@@ -321,6 +321,18 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test !ispynull(PyObject(3))
     @test ispynull(pydecref(PyObject(3)))
 
+    ex = try
+        pyimport("s p a m")
+    catch ex
+        ex
+    end
+    @test ex isa PyCall.PyError
+    @test occursin("could not be found by pyimport", ex.msg)
+    # Make sure we are testing ModuleNotFoundError here:
+    if PyCall.pyversion >= v"3.6"
+        @test pyisinstance(ex.val, pybuiltin("ModuleNotFoundError"))
+    end
+
     @test !ispynull(pyimport_conda("inspect", "not a conda package"))
     import Conda
     if PyCall.conda
@@ -623,6 +635,35 @@ end
     """
     py"set"("obj")
     @test anonymous.sys != PyNULL()
+end
+
+struct Unprintable end
+Base.show(::IO, ::Unprintable) = error("show(::IO, ::Unprintable) called")
+Base.show(::IO, ::Type{Unprintable}) = error("show(::IO, ::Type{Unprintable}) called")
+
+py"""
+def try_repr(x):
+    try:
+        return repr(x)
+    except Exception as err:
+        return err
+"""
+
+py"""
+def try_call(f):
+    try:
+        return f()
+    except Exception as err:
+        return err
+"""
+
+@testset "throwing show" begin
+    unp = Unprintable()
+    @test_throws Exception show(unp)
+    @test py"try_repr"("printable") isa String
+    @test pyisinstance(py"try_repr"(unp), pybuiltin("Exception"))
+    @test pyisinstance(py"try_call"(() -> throw(Unprintable())),
+                       pybuiltin("Exception"))
 end
 
 include("test_pyfncall.jl")

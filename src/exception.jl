@@ -123,11 +123,51 @@ function pyexc_initialize()
     pyexc[PyIOError] = @pyglobalobjptr :PyExc_IOError
 end
 
+"""
+    showerror_string(e) :: String
+
+Convert output of `showerror` to a `String`.  Since this function may
+be called via Python C-API, it tries to not throw at all cost.
+"""
+function showerror_string(e::T) where {T}
+    try
+        io = IOBuffer()
+        showerror(io, e)
+        return String(take!(io))
+    catch
+        try
+            return """
+                   $e
+                   ERROR: showerror(::IO, ::$T) failed!"""
+        catch
+            try
+                return """
+                       $T
+                       ERROR: showerror(::IO, ::$T) failed!
+                       ERROR: string(::$T) failed!"""
+            catch
+                name = try
+                    io = IOBuffer()
+                    Base.show_datatype(io, T)
+                    String(take!(io))
+                catch
+                    "_UNKNOWN_TYPE_"
+                end
+                return """
+                       Unprintable error.
+                       ERROR: showerror(::IO, ::$name) failed!
+                       ERROR: string(::$name) failed!
+                       ERROR: string($name) failed!"""
+            end
+        end
+    end
+end
+
 function pyraise(e)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
     ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
-          pyeT, string("Julia exception: ", e))
+          pyeT, string("Julia exception: ", showerror_string(e)))
 end
 
 function pyraise(e::PyError)
