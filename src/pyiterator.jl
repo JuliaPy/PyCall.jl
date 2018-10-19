@@ -66,6 +66,9 @@ else
             length(o)
             Base.HasLength()
         catch err
+            if !(err isa PyError && pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError))
+                rethrow()
+            end
             Base.SizeUnknown()
         end
     end
