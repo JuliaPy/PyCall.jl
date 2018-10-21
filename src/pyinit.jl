@@ -110,13 +110,28 @@ function pythonhome_of(pyprogramname::AbstractString)
 end
 
 """
-    python_cmd(args::Cmd = ``) :: Cmd
+    python_cmd(args::Cmd = ``; venv) :: Cmd
 
 Create an appropriate `Cmd` for running Python program with command
 line arguments `args`.
+
+# Keyword Arguments
+- `venv::String`: The path of a virtualenv to be used instead of the
+  default environment with which PyCall isconfigured.
 """
-function python_cmd(args::Cmd = ``)
-    cmd = `$pyprogramname $args`
+function python_cmd(args::Cmd = ``; venv::Union{Nothing, String} = nothing)
+    if venv == nothing
+        py = pyprogramname
+    else
+        # See:
+        # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
+        if Compat.Sys.iswindows()
+            py = joinpath(venv, "Scripts", "python.exe")
+        else
+            py = joinpath(venv, "bin", "python")
+        end
+    end
+    cmd = `$py $args`
 
     # For Windows:
     env = copy(ENV)

@@ -36,9 +36,13 @@ end
         mktempdir() do path
             # Create a new virtualenv
             run(PyCall.python_cmd(`-m venv $path`))
-            newpython = joinpath(path, "bin", "python")
-            if Compat.Sys.iswindows()
-                newpython *= ".exe"
+            newpython = PyCall.python_cmd(venv=path).exec[1]
+            if !isfile(newpython)
+                @info """
+                Python executable $newpython does not exists.
+                This directory contains only the following files:
+                $(join(readdir(dirname(newpython)), '\n'))
+                """
             end
             @test isfile(newpython)
 
