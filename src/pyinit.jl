@@ -91,7 +91,7 @@ _leak(::Type{Cwstring}, x::AbstractString) =
     _leak(Base.cconvert(Cwstring, x))
 
 function pythonhome_of(pyprogramname::AbstractString)
-    if Sys.iswindows()
+    if Compat.Sys.iswindows()
         script = """
         import sys
         sys.stdout.write(sys.exec_prefix)
