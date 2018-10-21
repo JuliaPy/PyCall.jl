@@ -667,3 +667,4 @@ def try_call(f):
 end
 
 include("test_pyfncall.jl")
+include("test_venv.jl")

@@ -106,14 +106,22 @@ function pythonhome_of(pyprogramname::AbstractString)
         """
         # https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHOME
     end
-    cmd = `$pyprogramname -c $script`
+    return read(python_cmd(`-c $script`), String)
+end
+
+"""
+    python_cmd(args::Cmd = ``) :: Cmd
+
+Create an appropriate `Cmd` for running Python program with command
+line arguments `args`.
+"""
+function python_cmd(args::Cmd = ``)
+    cmd = `$pyprogramname $args`
 
     # For Windows:
     env = copy(ENV)
     env["PYTHONIOENCODING"] = "UTF-8"
-    cmd = setenv(cmd, env)
-
-    return read(cmd, String)
+    return setenv(cmd, env)
 end
 
 function find_libpython(python::AbstractString)
