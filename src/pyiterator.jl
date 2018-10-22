@@ -99,7 +99,10 @@ else
         end
     end
     function Base.iterate(po::PyObject, s=_start(po))
-        piter = PyIterator{PyAny}(po)
+        # avoid the constructor that calls length
+        # since that might be an expensive operation
+        # even if length is cheap, this adds 10% performance
+        piter = PyIterator{PyAny, Base.IteratorSize}(po)
         iterate(piter, s)
     end
 end
