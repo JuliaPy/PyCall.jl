@@ -69,7 +69,7 @@ else
             if !(err isa PyError && pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError))
                 rethrow()
             end
-            Base.SizeUnknown()
+            Base.SizeUnknown
         end
     end
     function PyIterator(o::PyObject) 
