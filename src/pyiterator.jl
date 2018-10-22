@@ -64,7 +64,7 @@ else
     function _compute_IteratorSize(o::PyObject)
         S = try
             length(o)
-            Base.HasLength()
+            Base.HasLength
         catch err
             if !(err isa PyError && pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError))
                 rethrow()
