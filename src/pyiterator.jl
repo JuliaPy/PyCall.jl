@@ -84,7 +84,7 @@ else
     Base.eltype(::Type{<:PyIterator{PyAny}}) = Any
     Base.length(piter::PyIterator) = length(piter.o)
 
-    Base.IteratorSize(::Type{<: PyIterator{T,S}}) where {T,S} = S
+    Base.IteratorSize(::Type{<: PyIterator{T,S}}) where {T,S} = S()
 
     _start(piter::PyIterator) = _start(piter.o)
     
