@@ -109,29 +109,34 @@ end
 
 
 @testset "venv activation" begin
-    if Compat.Sys.isunix() && !startswith(PyCall.pyprogramname, "/usr/bin")
-        @warn """
-        Note that "venv activation" test does not work when PyCall is built
-        with a Python executable created by `virtualenv` command.  You are
-        using possibly non-system Python executable:
-            $(PyCall.pyprogramname)
-
-        Following commands may solve the failure (if any):
-            julia> ENV["PYTHON"] = "/usr/bin/python3"
-            pkg> build PyCall
-            pkg> test PyCall
-        """
-        # Let's just warn it.  Not sure how to reliably detect it...
+    # In case PyCall is built with a Python executable created by
+    # `virtualenv`, let's try to find the original Python executable.
+    # Otherwise, `venv` does not work with this Python executable:
+    # https://bugs.python.org/issue30811
+    sys = PyCall.pyimport("sys")
+    if haskey(sys, :real_prefix)
+        # sys.real_prefix is set by virtualenv and does not exist in
+        # standard Python:
+        # https://github.com/pypa/virtualenv/blob/16.0.0/virtualenv_embedded/site.py#L554
+        candidates = [
+            PyCall.venv_python(sys[:real_prefix], "$(pyversion.major).$(pyversion.minor)"),
+            PyCall.venv_python(sys[:real_prefix], "$(pyversion.major)"),
+            PyCall.venv_python(sys[:real_prefix]),
+            PyCall.pyprogramname,  # must exists
+        ]
+        python = candidates[findfirst(isfile, candidates)]
+    else
+        python = PyCall.pyprogramname
     end
 
     if PyCall.conda
         @info "Skip venv test with conda."
-    elseif !success(PyCall.python_cmd(`-c "import venv"`))
+    elseif !success(PyCall.python_cmd(`-c "import venv"`, python=python))
         @info "Skip venv test since venv package is missing."
     else
         mktempdir() do path
             # Create a new virtual environment
-            run(PyCall.python_cmd(`-m venv $path`))
+            run(PyCall.python_cmd(`-m venv $path`, python=python))
             test_venv_has_python(path)
             test_venv_activation(path)
         end

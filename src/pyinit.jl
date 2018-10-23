@@ -92,13 +92,13 @@ _leak(::Type{Cwstring}, x::AbstractString) =
 
 venv_python(::Nothing) = pyprogramname
 
-function venv_python(venv::AbstractString)
+function venv_python(venv::AbstractString, suffix::AbstractString = "")
     # See:
     # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
     if Compat.Sys.iswindows()
-        return joinpath(venv, "Scripts", "python.exe")
+        return joinpath(venv, "Scripts", "python$suffix.exe")
     else
-        return joinpath(venv, "bin", "python")
+        return joinpath(venv, "bin", "python$suffix")
     end
 end
 
