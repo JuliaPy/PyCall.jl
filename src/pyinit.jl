@@ -94,23 +94,69 @@ function pythonhome_of(pyprogramname::AbstractString)
     if Compat.Sys.iswindows()
         script = """
         import sys
-        sys.stdout.write(sys.exec_prefix)
+        if hasattr(sys, "base_exec_prefix"):
+            sys.stdout.write(sys.base_exec_prefix)
+        else:
+            sys.stdout.write(sys.exec_prefix)
         """
         # See where PYTHONHOME is mentioned in ../deps/build.jl
     else
         script = """
         import sys
-        sys.stdout.write(sys.prefix)
-        sys.stdout.write(":")
-        sys.stdout.write(sys.exec_prefix)
+        if hasattr(sys, "base_exec_prefix"):
+            sys.stdout.write(sys.base_prefix)
+            sys.stdout.write(":")
+            sys.stdout.write(sys.base_exec_prefix)
+        else:
+            sys.stdout.write(sys.prefix)
+            sys.stdout.write(":")
+            sys.stdout.write(sys.exec_prefix)
         """
         # https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHOME
     end
-    return read(python_cmd(`-c $script`), String)
+    return read(python_cmd(`-c $script`; python = pyprogramname), String)
+end
+# To support `venv` standard library (as well as `virtualenv`), we
+# need to use `sys.base_prefix` and `sys.base_exec_prefix` here.
+# Otherwise, initializing Python in `__init__` below fails with
+# unrecoverable error:
+#
+#   Fatal Python error: initfsencoding: unable to load the file system codec
+#   ModuleNotFoundError: No module named 'encodings'
+#
+# This is because `venv` does not symlink standard libraries like
+# `virtualenv`.  For example, `lib/python3.X/encodings` does not
+# exist.  Rather, `venv` relies on the behavior of Python runtime:
+#
+#   If a file named "pyvenv.cfg" exists one directory above
+#   sys.executable, sys.prefix and sys.exec_prefix are set to that
+#   directory and it is also checked for site-packages
+#   --- https://docs.python.org/3/library/venv.html
+#
+# Thus, we need point `PYTHONHOME` to `sys.base_prefix` and
+# `sys.base_exec_prefix`.  If the virtual environment is created by
+# `virtualenv`, those `sys.base_*` paths point to the virtual
+# environment.  Thus, above code supports both use cases.
+#
+# See also:
+# * https://docs.python.org/3/library/venv.html
+# * https://docs.python.org/3/library/site.html
+# * https://docs.python.org/3/library/sys.html#sys.base_exec_prefix
+
+venv_python(::Nothing) = pyprogramname
+
+function venv_python(venv::AbstractString)
+    # See:
+    # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
+    if Compat.Sys.iswindows()
+        return joinpath(venv, "Scripts", "python.exe")
+    else
+        return joinpath(venv, "bin", "python")
+    end
 end
 
 """
-    python_cmd(args::Cmd = ``; venv) :: Cmd
+    python_cmd(args::Cmd = ``; venv, python) :: Cmd
 
 Create an appropriate `Cmd` for running Python program with command
 line arguments `args`.
@@ -118,20 +164,13 @@ line arguments `args`.
 # Keyword Arguments
 - `venv::String`: The path of a virtualenv to be used instead of the
   default environment with which PyCall isconfigured.
+- `python::String`: The path to the Python executable.  `venv` is ignored
+  when this argument is specified.
 """
-function python_cmd(args::Cmd = ``; venv::Union{Nothing, String} = nothing)
-    if venv == nothing
-        py = pyprogramname
-    else
-        # See:
-        # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
-        if Compat.Sys.iswindows()
-            py = joinpath(venv, "Scripts", "python.exe")
-        else
-            py = joinpath(venv, "bin", "python")
-        end
-    end
-    cmd = `$py $args`
+function python_cmd(args::Cmd = ``;
+                    venv::Union{Nothing, AbstractString} = nothing,
+                    python::AbstractString = venv_python(venv))
+    cmd = `$python $args`
 
     # For Windows:
     env = copy(ENV)
@@ -141,8 +180,9 @@ end
 
 function find_libpython(python::AbstractString)
     script = joinpath(@__DIR__, "..", "deps", "find_libpython.py")
+    cmd = python_cmd(`$script`; python = python)
     try
-        return read(`$python $script`, String)
+        return read(cmd, String)
     catch
         return nothing
     end

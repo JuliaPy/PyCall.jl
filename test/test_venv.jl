@@ -1,5 +1,5 @@
 using PyCall, Compat, Compat.Test
-using Compat: @info
+using Compat: @info, @warn
 
 
 @testset "fuzz PyCall._leak" begin
@@ -28,13 +28,28 @@ end
 
 
 @testset "venv activation" begin
+    if Compat.Sys.isunix() && !startswith(PyCall.pyprogramname, "/usr/bin")
+        @warn """
+        Note that "venv activation" test does not work when PyCall is built
+        with a Python executable created by `virtualenv` command.  You are
+        using possibly non-system Python executable:
+            $(PyCall.pyprogramname)
+
+        Following commands may solve the failure (if any):
+            julia> ENV["PYTHON"] = "/usr/bin/python3"
+            pkg> build PyCall
+            pkg> test PyCall
+        """
+        # Let's just warn it.  Not sure how to reliably detect it...
+    end
+
     if PyCall.conda
         @info "Skip venv test with conda."
     elseif !success(PyCall.python_cmd(`-c "import venv"`))
         @info "Skip venv test since venv package is missing."
     else
         mktempdir() do path
-            # Create a new virtualenv
+            # Create a new virtual environment
             run(PyCall.python_cmd(`-m venv $path`))
             newpython = PyCall.python_cmd(venv=path).exec[1]
             if !isfile(newpython)
@@ -55,22 +70,31 @@ end
             code = """
             $setup_code
             using PyCall
-            print(PyCall.pyimport("sys")[:executable])
+            println(PyCall.pyimport("sys")[:executable])
+            println(PyCall.pyimport("sys")[:exec_prefix])
+            println(PyCall.pyimport("pip")[:__file__])
             """
+            # Note that `pip` is just some arbitrary non-standard
+            # library.  Using standard library like `os` does not work
+            # because those files are not created.
             env = copy(ENV)
             env["PYCALL_JL_RUNTIME_PYTHON"] = newpython
-            jlcmd = setenv(`$(Base.julia_cmd()) -e $code`, env)
+            jlcmd = setenv(`$(Base.julia_cmd()) --startup-file=no -e $code`, env)
             if Compat.Sys.iswindows()
                 # Marking the test broken in Windows.  It seems that
                 # venv copies .dll on Windows and libpython check in
                 # PyCall.__init__ detects that.
                 @test_broken begin
                     output = read(jlcmd, String)
-                    newpython == output
+                    sys_executable, exec_prefix, mod_file = split(output, "\n")
+                    newpython == sys_executable
                 end
             else
                 output = read(jlcmd, String)
-                @test newpython == output
+                sys_executable, exec_prefix, mod_file = split(output, "\n")
+                @test newpython == sys_executable
+                @test startswith(exec_prefix, path)
+                @test startswith(mod_file, path)
             end
         end
     end
