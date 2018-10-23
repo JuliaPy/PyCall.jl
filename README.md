@@ -155,8 +155,8 @@ accessed with `o[:attribute]` rather than `o.attribute`, so that `o.method(...)`
 Python is replaced by `o[:method](...)` in Julia.  Also, you use
 `get(o, key)` rather than `o[key]`.  (However, you can access integer
 indices via `o[i]` as in Python, albeit with 1-based Julian indices rather
-than 0-based Python indices.)  (This is because Julia does not
-permit overloading the `.` operator yet.)  See also the section on
+than 0-based Python indices.)  (This will be changed to `o.method` once Julia
+0.6 support is dropped, now that Julia supports `.` overloading.)  See also the section on
 `PyObject` below, as well as the `pywrap` function to create anonymous
 modules that simulate `.` access (this is what `@pyimport` does).  For
 example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
