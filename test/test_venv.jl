@@ -82,11 +82,14 @@ end
 
 
 @testset "virtualenv activation" begin
+    pyname = "python$(pyversion.major).$(pyversion.minor)"
     if Compat.Sys.which("virtualenv") === nothing
         @info "No virtualenv command. Skipping the test..."
+    elseif Compat.Sys.which(pyname) === nothing
+        @info "No $pyname command. Skipping the test..."
     else
         mktempdir() do path
-            run(`virtualenv $path`)
+            run(`virtualenv --python=$pyname $path`)
             test_venv_has_python(path)
 
             newpython = PyCall.python_cmd(venv=path).exec[1]
