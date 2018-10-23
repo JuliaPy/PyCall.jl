@@ -45,9 +45,6 @@ matrix:
 # https://github.com/pytest-dev/pytest/blob/799b72cf6f35c4c4c73797303d3f78c12a795f77/.travis.yml#L38-L52
 # https://github.com/pytest-dev/pytest/pull/3893
 
-before_install:
-    - test "x$TRAVIS_OS_NAME" = xosx -o "x$PYTHON" = xConda || (sudo apt-get -qq update && sudo apt-get install -y $PYTHON)
-
 after_success:
     - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 notifications:
