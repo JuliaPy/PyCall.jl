@@ -1,7 +1,6 @@
 language: julia
 os:
     - linux
-    - osx
 julia:
     - 0.6
     - 0.7
@@ -19,9 +18,33 @@ env:
     - PYTHON=python3 # python 3.5
     - PYTHON=Conda # not actually a python version, here to test Conda.jl's python
 matrix:
-  exclude:
-    - os: osx
-      env: PYTHON=python3 # I'm not sure how to install Python 3 on Travis OSX
+  include:
+    - &test-macos-py2
+      language: julia
+      os: osx
+      env: PYTHON=python
+      julia: 0.6
+    - &test-macos-py3
+      <<: *test-macos-py2
+      before_install:
+        - brew update
+        - brew upgrade python || echo "Ignoring errors..."
+        - brew unlink python
+        - brew link python
+      env: PYTHON=python3
+    - &test-macos-conda
+      <<: *test-macos-py2
+      env: PYTHON=Conda
+    - {<<: *test-macos-py2,   julia: 0.7}
+    - {<<: *test-macos-py3,   julia: 0.7}
+    - {<<: *test-macos-conda, julia: 0.7}
+    - {<<: *test-macos-py2,   julia: nightly}
+    - {<<: *test-macos-py3,   julia: nightly}
+    - {<<: *test-macos-conda, julia: nightly}
+# See:
+# https://github.com/pytest-dev/pytest/blob/799b72cf6f35c4c4c73797303d3f78c12a795f77/.travis.yml#L38-L52
+# https://github.com/pytest-dev/pytest/pull/3893
+
 before_install:
     - test "x$TRAVIS_OS_NAME" = xosx -o "x$PYTHON" = xConda || (sudo apt-get -qq update && sudo apt-get install -y $PYTHON)
 
