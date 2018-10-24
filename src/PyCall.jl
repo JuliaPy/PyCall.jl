@@ -36,6 +36,12 @@ import Base.Iterators: filter
 include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
 include("startup.jl")
 
+"""
+Python executable used by PyCall in the current process.
+"""
+current_python() = _current_python[]
+const _current_python = Ref(pyprogramname)
+
 #########################################################################
 
 # Mirror of C PyObject struct (for non-debugging Python builds).
@@ -461,7 +467,7 @@ you want to use, run Pkg.build("PyCall"), and re-launch Julia.
                     msg = msg * """
 PyCall is currently configured to use the Python version at:
 
-$python
+$(current_python())
 
 and you should use whatever mechanism you usually use (apt-get, pip, conda,
 etcetera) to install the Python package containing the $name module.

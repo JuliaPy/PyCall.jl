@@ -149,19 +149,19 @@ function __init__()
     if already_inited
         # Importing from PyJulia takes this path.
     elseif isfile(get(ENV, "PYCALL_JL_RUNTIME_PYTHON", ""))
-        venv_python = ENV["PYCALL_JL_RUNTIME_PYTHON"]
+        _current_python[] = ENV["PYCALL_JL_RUNTIME_PYTHON"]
 
         # Check libpython compatibility.
-        venv_libpython = find_libpython(venv_python)
+        venv_libpython = find_libpython(current_python())
         if venv_libpython === nothing
             error("""
-            `libpython` for $venv_python cannot be found.
+            `libpython` for $(current_python()) cannot be found.
             PyCall.jl cannot initialize Python safely.
             """)
         elseif venv_libpython != libpython
             error("""
             Incompatible `libpython` detected.
-            `libpython` for $venv_python is:
+            `libpython` for $(current_python()) is:
                 $venv_libpython
             `libpython` for $pyprogramname is:
                 $libpython
@@ -173,18 +173,18 @@ function __init__()
         if haskey(ENV, "PYCALL_JL_RUNTIME_PYTHONHOME")
             venv_home = ENV["PYCALL_JL_RUNTIME_PYTHONHOME"]
         else
-            venv_home = pythonhome_of(venv_python)
+            venv_home = pythonhome_of(current_python())
         end
         if pyversion.major < 3
             ccall((@pysym :Py_SetPythonHome), Cvoid, (Cstring,),
                   _leak(Cstring, venv_home))
             ccall((@pysym :Py_SetProgramName), Cvoid, (Cstring,),
-                  _leak(Cstring, venv_python))
+                  _leak(Cstring, current_python()))
         else
             ccall((@pysym :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},),
                   _leak(Cwstring, venv_home))
             ccall((@pysym :Py_SetProgramName), Cvoid, (Ptr{Cwchar_t},),
-                  _leak(Cwstring, venv_python))
+                  _leak(Cwstring, current_python()))
         end
         ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
     else
