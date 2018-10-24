@@ -113,7 +113,7 @@ end
 size(a::PyArray) = a.dims
 ndims(a::PyArray{T,N}) where {T,N} = N
 
-similar(a::PyArray, T, dims::Dims) = Array{T}(undef, dims)
+similar(a::PyArray, ::Type{T}, dims::Dims) where {T} = Array{T}(undef, dims)
 
 """
 Update the data ptr of the `a` to point to the buffer exposed by `o` through

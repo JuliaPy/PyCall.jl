@@ -100,5 +100,15 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             setdata!(pyarr, ao2)
             @test all(pyarr[1:10] .== 11.0:20.0)
         end
+
+        @testset "similar on PyArray PyVec getindex" begin
+            jlarr1 = [1:10;]
+            jlarr2 = hcat([1:10;], [1:10;])
+            pyarr1 = pycall(np["array"], PyArray, jlarr1)
+            pyarr2 = pycall(np["array"], PyArray, jlarr2)
+            @test all(pyarr1[1:10]    .== jlarr1[1:10])
+            @test all(pyarr2[1:10, 2] .== jlarr2[1:10, 2])
+            @test all(pyarr2[1:10, 1:2] .== jlarr2)
+        end
     end
 end
