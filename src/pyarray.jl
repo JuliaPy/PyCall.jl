@@ -296,11 +296,16 @@ array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_CONTIGUOUS))
 ```
 NoCopyArray(o::PyObject)
 ```
-Convert a Python array-like object, to a Julia `Array` without making a copy of
-the data. If the data is stored in row-major format (the default in
-Python/NumPy), then the returned array `nca` will be a `PermutedDimsArray` such
-that the arrays are indexed the same way in Julia and Python. i.e.
-`nca[idxs...] == o[idxs...]`
+Convert a Python array-like object, to a Julia `Array` or `PermutedDimsArray`
+without making a copy of the data.
+
+If the data is stored in row-major format
+(the default in Python/NumPy), then the returned array `nca` will be a
+`PermutedDimsArray` such that the arrays are indexed the same way in Julia and
+Python. i.e. `nca[idxs...] == o[idxs...]`
+
+If the data is stored in column-major format then a regular Julia `Array` will
+be returned.
 
 Warning: This function is only lightly tested, and should be considered
 experimental - it may cause segmentation faults on conversion or subsequent

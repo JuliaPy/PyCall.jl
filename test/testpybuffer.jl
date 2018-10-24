@@ -91,5 +91,14 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test isbuftype(arrpyo(1.0:10.0, "d")) == true
             @test isbuftype(PyObject([1:10...])) == true
         end
+
+        # TODO maybe move these to a test_pyarray.jl
+        @testset "setdata!" begin
+            ao1 = arrpyo(1.0:10.0, "d")
+            pyarr = convert(PyArray, ao1)
+            ao2 = arrpyo(11.0:20.0, "d")
+            setdata!(pyarr, ao2)
+            @test all(pyarr[1:10] .== 11.0:20.0)
+        end
     end
 end
