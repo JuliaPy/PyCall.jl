@@ -1,5 +1,6 @@
 using Compat.Test, PyCall, Compat
-using PyCall: f_contiguous, PyBUF_ND_CONTIGUOUS, array_format, npy_initialized
+using PyCall: f_contiguous, PyBUF_ND_CONTIGUOUS, array_format, npy_initialized,
+NoCopyArray, isbuftype, setdata!
 
 pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
 pyutf8(s::String) = pyutf8(PyObject(s))
