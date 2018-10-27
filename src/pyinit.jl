@@ -63,32 +63,28 @@ end
 #########################################################################
 # Virtual environment support
 
-_clength(x::Cstring) = ccall(:strlen, Csize_t, (Cstring,), x) + 1
-_clength(x) = length(x)
+# Static buffer to make sure the string passed to libpython persists
+# for the lifetime of the program, as CPython API requires:
+const __venv_programname = Vector{UInt8}(undef, 1024)
+const __venv_pythonhome = Vector{UInt8}(undef, 1024)
 
-function __leak(::Type{T}, x) where T
-    n = _clength(x)
-    ptr = ccall(:malloc, Ptr{T}, (Csize_t,), n * sizeof(T))
-    unsafe_copyto!(ptr, pointer(x), n)
-    return ptr
+"""
+    _preserveas!(dest::Vector{UInt8}, (Cstring|Cwstring), x::String) :: Ptr
+
+Copy `x` as `Cstring` or `Cwstring` to `dest`.
+"""
+function _preserveas!(dest::Vector{UInt8}, ::Type{Cstring}, x::AbstractString)
+    s = transcode(UInt8, String(x))
+    copyto!(dest, s)
+    dest[length(s) + 1] = 0
+    return pointer(dest)
 end
 
-"""
-    _leak(T::Type, x::AbstractString) :: Ptr
-    _leak(x::Array) :: Ptr
-
-Leak `x` from Julia's GCer.  This is meant to be used only for
-`Py_SetPythonHome` and `Py_SetProgramName` where the Python
-documentation demands that the passed argument must points to "static
-storage whose contents will not change for the duration of the
-program's execution" (although it seems that in newer CPython versions
-the contents are copied internally).
-"""
-_leak(x::Union{Cstring, Array}) = __leak(eltype(x), x)
-_leak(T::Type, x::AbstractString) =
-    _leak(Base.unsafe_convert(T, Base.cconvert(T, x)))
-_leak(::Type{Cwstring}, x::AbstractString) =
-    _leak(Base.cconvert(Cwstring, x))
+function _preserveas!(dest::Vector{UInt8}, ::Type{Cwstring}, x::AbstractString)
+    s = Base.cconvert(Cwstring, x)
+    copyto!(reinterpret(Int32, dest), s)
+    return pointer(dest)
+end
 
 venv_python(::Nothing) = pyprogramname
 
@@ -177,14 +173,14 @@ function __init__()
         end
         if pyversion.major < 3
             ccall((@pysym :Py_SetPythonHome), Cvoid, (Cstring,),
-                  _leak(Cstring, venv_home))
+                  _preserveas!(__venv_pythonhome, Cstring, venv_home))
             ccall((@pysym :Py_SetProgramName), Cvoid, (Cstring,),
-                  _leak(Cstring, current_python()))
+                  _preserveas!(__venv_programname, Cstring, current_python()))
         else
             ccall((@pysym :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},),
-                  _leak(Cwstring, venv_home))
+                  _preserveas!(__venv_pythonhome, Cwstring, venv_home))
             ccall((@pysym :Py_SetProgramName), Cvoid, (Ptr{Cwchar_t},),
-                  _leak(Cwstring, current_python()))
+                  _preserveas!(__venv_programname, Cwstring, current_python()))
         end
         ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
     else

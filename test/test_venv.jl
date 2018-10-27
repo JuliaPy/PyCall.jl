@@ -2,31 +2,6 @@ using PyCall, Compat, Compat.Test
 using Compat: @info, @warn
 
 
-@testset "fuzz PyCall._leak" begin
-    N = 10000
-
-    @testset "_leak(Cstring, ...)" begin
-        for i in 1:N
-            x = String(rand('A':'z', rand(1:1000)))
-            y = Base.unsafe_string(PyCall._leak(Cstring, x))
-            @test x == y
-        end
-    end
-
-    @testset "_leak(Cwstring, ...)" begin
-        for i in 1:N
-            x = String(rand('A':'z', rand(1:1000)))
-            a = Base.cconvert(Cwstring, x)
-            ptr = PyCall._leak(a)
-            z = unsafe_wrap(Array, ptr, size(a))
-            @test z[end] == 0
-            y = transcode(String, z)[1:end-1]
-            @test x == y
-        end
-    end
-end
-
-
 function test_venv_has_python(path)
     newpython = PyCall.python_cmd(venv=path).exec[1]
     if !isfile(newpython)
