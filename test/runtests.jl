@@ -258,13 +258,15 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
-    # hasproperty, getproperty, and propertynames
-    @test PyCall.hasproperty(np, "random")
-    @test PyCall.hasproperty(np.random, :rand)
-    @test getproperty(np, "linalg") == np.linalg
-    @test getproperty(np.linalg, :eig) == np.linalg.eig
-    @test :rand in propertynames(np.random)
-    @test_throws KeyError np.whatever
+    @static if VERSION >= v"0.7-"
+        # hasproperty, getproperty, and propertynames
+        @test PyCall.hasproperty(np, "random")
+        @test PyCall.hasproperty(np.random, :rand)
+        @test getproperty(np, "linalg") == np.linalg
+        @test getproperty(np.linalg, :eig) == np.linalg.eig
+        @test :rand in propertynames(np.random)
+        @test_throws KeyError np.whatever
+    end
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
