@@ -64,7 +64,11 @@ end
         @info "No $pyname command. Skipping the test..."
     else
         mktempdir() do tmppath
-            path = joinpath(tmppath, "ϵνιℓ")
+            if PyCall.pyversion.major == 2
+                path = joinpath(tmppath, "kind")
+            else
+                path = joinpath(tmppath, "ϵνιℓ")
+            end
             run(`virtualenv --python=$pyname $path`)
             test_venv_has_python(path)
 
@@ -111,7 +115,11 @@ end
         @info "Skip venv test since venv package is missing."
     else
         mktempdir() do tmppath
-            path = joinpath(tmppath, "ϵνιℓ")
+            if PyCall.pyversion.major == 2
+                path = joinpath(tmppath, "kind")
+            else
+                path = joinpath(tmppath, "ϵνιℓ")
+            end
             # Create a new virtual environment
             run(PyCall.python_cmd(`-m venv $path`, python=python))
             test_venv_has_python(path)
