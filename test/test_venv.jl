@@ -63,7 +63,8 @@ end
     elseif Compat.Sys.which(pyname) === nothing
         @info "No $pyname command. Skipping the test..."
     else
-        mktempdir() do path
+        mktempdir() do tmppath
+            path = joinpath(tmppath, "ϵνιℓ")
             run(`virtualenv --python=$pyname $path`)
             test_venv_has_python(path)
 
@@ -109,7 +110,8 @@ end
     elseif !success(PyCall.python_cmd(`-c "import venv"`, python=python))
         @info "Skip venv test since venv package is missing."
     else
-        mktempdir() do path
+        mktempdir() do tmppath
+            path = joinpath(tmppath, "ϵνιℓ")
             # Create a new virtual environment
             run(PyCall.python_cmd(`-m venv $path`, python=python))
             test_venv_has_python(path)
