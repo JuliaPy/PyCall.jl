@@ -18,6 +18,11 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        eltype, get, delete!, empty!, length, isempty,
        filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert
+
+@static if VERSION >= v"0.7-"
+    import Base: getproperty, setproperty!, propertynames
+end
+
 import Compat: pushfirst!, popfirst!, firstindex, lastindex
 
 # Python C API is not interrupt-safe.  In principle, we should
@@ -291,7 +296,7 @@ end
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function Base.getproperty(o::PyObject, s::AbstractString)
+function getproperty(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
@@ -303,12 +308,12 @@ function Base.getproperty(o::PyObject, s::AbstractString)
     return PyObject(p)
 end
 
-Base.getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
+getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
-Base.propertynames(o::PyObject) = map(x->Symbol(first(x)), 
+propertynames(o::PyObject) = map(x->Symbol(first(x)), 
                                 pycall(inspect["getmembers"], PyObject, o))
 
-function Base.setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
+function setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
