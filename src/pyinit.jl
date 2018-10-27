@@ -148,7 +148,7 @@ function __init__()
         # (e.g. Matplotlib: see PyPlot#79)
         if isinteractive()
             let sys = pyimport("sys")
-                if !haskey(sys, "ps1")
+                if !hasproperty(sys, "ps1")
                     sys["ps1"] = ">>> "
                 end
             end

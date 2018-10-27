@@ -65,7 +65,7 @@ end
 
 ##########################################################################
 
-pyio_jl(self::PyObject) = unsafe_pyjlwrap_to_objref(self["io"].o)::IO
+pyio_jl(self::PyObject) = unsafe_pyjlwrap_to_objref(PyPtr(self["io"]))::IO
 
 const PyIO = PyNULL()
 

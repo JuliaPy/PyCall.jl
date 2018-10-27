@@ -41,7 +41,7 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
     catch e
         pyraise(e)
     finally
-        args.o = PyPtr_NULL # don't decref
+        setfield!(args, :o, PyPtr_NULL) # don't decref
     end
     return PyPtr_NULL
 end

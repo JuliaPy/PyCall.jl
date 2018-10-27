@@ -43,8 +43,8 @@ function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
     try
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
                         pyargsptr, kw)
-        pydecref_(ret.o)
-        ret.o = retptr
+        pydecref_(PyPtr(ret))
+        setfield!(ret, :o, retptr)
     finally
         sigatomic_end()
     end

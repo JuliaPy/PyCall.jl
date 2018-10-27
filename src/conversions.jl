@@ -244,7 +244,7 @@ PyVector(o::PyObject) = PyVector{PyAny}(o)
 PyObject(a::PyVector) = a.o
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
 convert(::Type{PyVector{T}}, o::PyObject) where {T} = PyVector{T}(o)
-unsafe_convert(::Type{PyPtr}, a::PyVector) = a.o.o
+unsafe_convert(::Type{PyPtr}, a::PyVector) = PyPtr(a.o)
 PyVector(a::PyVector) = a
 PyVector(a::AbstractVector{T}) where {T} = PyVector{T}(array2py(a))
 
@@ -456,7 +456,7 @@ PyDict(d::AbstractDict{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
 PyDict(d::AbstractDict{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
-unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
+unsafe_convert(::Type{PyPtr}, d::PyDict) = PyPtr(d.o)
 
 haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
 keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
@@ -747,7 +747,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? Abst
 # we never automatically convert to Function.
 pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = o.o == pynothing[] ? Nothing : Union{}
+pynothing_query(o::PyObject) = o ≛ pynothing[] ? Nothing : Union{}
 
 # We refrain from converting all objects that support the mapping protocol (PyMapping_Check)
 # to avoid converting types like Pandas `DataFrame` that are only lossily
@@ -768,7 +768,7 @@ function pysequence_query(o::PyObject)
         return AbstractRange
     elseif ispybytearray(o)
         return Vector{UInt8}
-    elseif !haskey(o, "__array_interface__")
+    elseif !hasproperty(o, "__array_interface__")
         # only handle PyList for now
         return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
     else
@@ -844,7 +844,7 @@ function convert(::Type{PyAny}, o::PyObject)
     try
         T = pytype_query(o)
         if T == PyObject && is_pyjlwrap(o)
-            return unsafe_pyjlwrap_to_objref(o.o)
+            return unsafe_pyjlwrap_to_objref(o)
         end
         convert(T, o)
     catch

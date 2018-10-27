@@ -258,6 +258,14 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
+    # hasproperty, getproperty, and propertynames
+    @test PyCall.hasproperty(np, "random")
+    @test PyCall.hasproperty(np.random, :rand)
+    @test getproperty(np, "linalg") == np.linalg
+    @test getproperty(np.linalg, :eig) == np.linalg.eig
+    @test :rand in propertynames(np.random)
+    @test_throws KeyError np.whatever
+
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
         @test ndims(b) == 1
@@ -267,7 +275,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     let o = PyObject(1+2im)
-        @test haskey(o, :real)
+        @test PyCall.hasproperty(o, :real) # replace by Base.hasproperty in the future
         @test :real in keys(o)
         @test o[:real] == 1
     end
@@ -437,7 +445,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     let o = PyObject(Any[1,2]), c = o
         broadcast!(+, o, o, Any[3,4]) # o .+= x doesn't work yet in 0.7
         @test collect(o) == [1,2,3,4]
-        @test o.o == c.o # updated in-place
+        @test PyPtr(o) == PyPtr(c) # updated in-place
     end
 
     # more flexible bool conversions, matching Python "truth value testing"

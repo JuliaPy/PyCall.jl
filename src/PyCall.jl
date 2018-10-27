@@ -74,6 +74,18 @@ mutable struct PyObject
     end
 end
 
+PyPtr(o::PyObject) = getfield(o, :o)
+
+"""
+    ≛(x, y)
+
+`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`. 
+"""
+≛(o::PyObject, p::PyPtr) = PyPtr(o) == p
+≛(p::PyPtr, o::PyObject) = o ≛ p
+≛(o1::PyObject, o2::PyObject) = PyPtr(o1) == PyPtr(o2)
+≛(p1::PyPtr, p2::PyPtr) = p1 == p2
+
 """
     PyNULL()
 
@@ -96,7 +108,7 @@ PyNULL() = PyObject(PyPtr_NULL)
 Test where `o` contains a `NULL` pointer to a Python object, i.e. whether
 it is equivalent to a `PyNULL()` object.
 """
-ispynull(o::PyObject) = o.o == PyPtr_NULL
+ispynull(o::PyObject) = o ≛ PyPtr_NULL
 
 function pydecref_(o::Union{PyPtr,PyObject})
     ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
@@ -105,7 +117,7 @@ end
 
 function pydecref(o::PyObject)
     pydecref_(o)
-    o.o = PyPtr_NULL
+    setfield!(o, :o, PyPtr_NULL)
     return o
 end
 
@@ -128,8 +140,8 @@ will be performed when `o` is garbage collected.  (This means that
 you can no longer use `o`.)  Used for passing objects to Python.
 """
 function pystealref!(o::PyObject)
-    optr = o.o
-    o.o = PyPtr_NULL # don't decref when o is gc'ed
+    optr = PyPtr(o)
+    setfield!(o, :o, PyPtr_NULL) # don't decref when o is gc'ed
     return optr
 end
 
@@ -141,16 +153,16 @@ a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
 wrapping/converted from `x` is created.
 """
 pyreturn(x::Any) = pystealref!(PyObject(x))
-pyreturn(x::PyObject) = pyincref_(x.o)
+pyreturn(x::PyObject) = pyincref_(PyPtr(x))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
-    dest.o = src.o
+    setfield!(dest, :o, PyPtr(src))
     return pyincref(dest)
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
-  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
+  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
@@ -159,7 +171,7 @@ pyquery(q::Ptr{Cvoid}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
 
 # conversion to pass PyObject as ccall arguments:
-unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
+unsafe_convert(::Type{PyPtr}, po::PyObject) = PyPtr(po)
 
 # use constructor for generic conversions to PyObject
 convert(::Type{PyObject}, o) = PyObject(o)
@@ -230,7 +242,7 @@ function pystring(o::PyObject)
             s = ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
-                return string(o.o)
+                return string(PyPtr(o))
             end
         end
         return convert(AbstractString, PyObject(s))
@@ -242,9 +254,9 @@ function show(io::IO, o::PyObject)
 end
 
 function Base.Docs.doc(o::PyObject)
-    if haskey(o, "__doc__")
+    if hasproperty(o, "__doc__")
         d = o["__doc__"]
-        if d.o != pynothing[]
+        if !(PyPtr(d) ≛ pynothing[])
             return Base.Docs.Text(convert(AbstractString, d))
         end
     end
@@ -263,23 +275,23 @@ function hash(o::PyObject)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(o.o))
+        hashsalt(unsafe_pyjlwrap_to_objref(PyPtr(o)))
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
-            return hashsalt(o.o)
+            return hashsalt(PyPtr(o))
         end
         hashsalt(h)
     end
 end
 
 #########################################################################
-# For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python,
+# For o::PyObject, make o["foo"], o[:foo], and o.foo equivalent to o.foo in Python,
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function getindex(o::PyObject, s::AbstractString)
+function Base.getproperty(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
@@ -291,8 +303,29 @@ function getindex(o::PyObject, s::AbstractString)
     return PyObject(p)
 end
 
-getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
+Base.getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
+Base.propertynames(o::PyObject) = map(x->Symbol(first(x)), 
+                                pycall(inspect["getmembers"], PyObject, o))
+
+function Base.setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
+    if ispynull(o)
+        throw(ArgumentError("assign of NULL PyObject"))
+    end
+    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
+                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+        pyerr_clear()
+        throw(KeyError(s))
+    end
+    o
+end
+
+getindex(o::PyObject, s::Union{Symbol, AbstractString}) = getproperty(o, s)
+
+
+# If I make this
+# setindex!(o::PyObject, v, s::Union{Symbol,AbstractString}) = setproperty!(o, s, v)
+# the tests (Pkg.test("PyCall")) won't go through. Don't know why.....
 function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
@@ -305,9 +338,11 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     o
 end
 
-function haskey(o::PyObject, s::Union{Symbol,AbstractString})
+haskey(o::PyObject, s::Union{Symbol,AbstractString}) = hasproperty(o, s)
+
+function hasproperty(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
-        throw(ArgumentError("haskey of NULL PyObject"))
+        throw(ArgumentError("hasproperty of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
                       (PyPtr, Cstring), o, s)
@@ -795,7 +830,7 @@ end
 pushfirst!(a::PyObject, item) = insert!(a, 1, item)
 
 function prepend!(a::PyObject, items)
-    if isa(items,PyObject) && items.o == a.o
+    if isa(items,PyObject) && PyPtr(items) == PyPtr(a)
         # avoid infinite loop in prepending a to itself
         return prepend!(a, collect(items))
     end
@@ -837,16 +872,16 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
     showable = VERSION < v"0.7.0-DEV.4047" ? :mimewritable : :showable
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
-            if !ispynull(o) && haskey(o, $method)
+            if !ispynull(o) && hasproperty(o, $method)
                 r = pycall(o[$method], PyObject)
-                r.o != pynothing[] && return write(io, convert($T, r))
+                PyPtr(r) != pynothing[] && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
         end
         Base.$showable(::$mime, o::PyObject) =
-            !ispynull(o) && haskey(o, $method) && let meth = o[$method]
-                meth.o != pynothing[] &&
-                pycall(meth, PyObject).o != pynothing[]
+            !ispynull(o) && hasproperty(o, $method) && let meth = o[$method]
+                PyPtr(meth) != pynothing[] &&
+                PyPtr(pycall(meth, PyObject)) != pynothing[]
             end
     end
 end

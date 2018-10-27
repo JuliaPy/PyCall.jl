@@ -172,6 +172,5 @@ end
 
 function pyraise(e::PyError)
     ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
-          e.T, e.val, e.traceback)
-    e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
+          pyincref(e.T), pyincref(e.val), pyincref(e.traceback))
 end

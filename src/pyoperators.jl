@@ -29,7 +29,7 @@ for (op,py) in ((:+,:PyNumber_InPlaceAdd), (:-,:PyNumber_InPlaceSubtract), (:*,:
                 (:<<,:PyNumber_InPlaceLshift), (:>>,:PyNumber_InPlaceRshift), (:⊻,:PyNumber_InPlaceXor))
     qpy = QuoteNode(py)
     @eval function Base.broadcast!(::typeof($op), a::PyObject, a′::PyObject, b)
-        a.o == a′.o || throw(MethodError(broadcast!, ($op, a, a', b)))
+        a ≛ a′ || throw(MethodError(broadcast!, ($op, a, a', b)))
         PyObject(@pycheckn ccall((@pysym $qpy), PyPtr, (PyPtr, PyPtr), a,PyObject(b)))
     end
 end
@@ -58,10 +58,10 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
                 (:>, Py_GT), (:>=, Py_GE), (:isequal, Py_EQ), (:isless, Py_LT))
     @eval function $op(o1::PyObject, o2::PyObject)
         if ispynull(o1) || ispynull(o2)
-            return $(py==Py_EQ || py==Py_NE || op==:isless ? :($op(o1.o, o2.o)) : false)
+            return $(py==Py_EQ || py==Py_NE || op==:isless ? :($op(PyPtr(o1), PyPtr(o2))) : false)
         elseif is_pyjlwrap(o1) && is_pyjlwrap(o2)
-            return $op(unsafe_pyjlwrap_to_objref(o1.o),
-                       unsafe_pyjlwrap_to_objref(o2.o))
+            return $op(unsafe_pyjlwrap_to_objref(PyPtr(o1)),
+                       unsafe_pyjlwrap_to_objref(PyPtr(o2)))
         else
             if $(op == :isless || op == :isequal)
                 return Bool(@pycheckz ccall((@pysym :PyObject_RichCompareBool), Cint,
@@ -80,5 +80,5 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
     end
 end
 # default to false since hash(x) != hash(PyObject(x)) in general
-isequal(o1::PyObject, o2::Any) = !ispynull(o1) && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(o1.o), o2) : false
+isequal(o1::PyObject, o2::Any) = !ispynull(o1) && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(PyPtr(o1)), o2) : false
 isequal(o1::Any, o2::PyObject) = isequal(o2, o1)
