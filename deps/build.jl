@@ -92,11 +92,6 @@ include("depsutils.jl")
 
 #########################################################################
 
-# A couple of key strings need to be stored as constants so that
-# they persist throughout the life of the program.  In Python 3,
-# they need to be wchar_t* data.
-wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
-
 # we write configuration files only if they change, both
 # to prevent unnecessary recompilation and to minimize
 # problems in the unlikely event of read-only directories.
@@ -190,10 +185,8 @@ try # make sure deps.jl file is removed on error
     const python = "$(escape_string(python))"
     const libpython = "$(escape_string(libpy_name))"
     const pyprogramname = "$(escape_string(programname))"
-    const wpyprogramname = $(wstringconst(programname))
     const pyversion_build = $(repr(pyversion))
     const PYTHONHOME = "$(escape_string(PYTHONHOME))"
-    const wPYTHONHOME = $(wstringconst(PYTHONHOME))
 
     "True if we are using the Python distribution in the Conda package."
     const conda = $use_conda

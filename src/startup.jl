@@ -46,7 +46,7 @@ if !symbols_present
     # Only to be used at top-level - pointer will be invalid after reload
     libpy_handle = Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
     # need SetPythonHome to avoid warning, #299
-    Py_SetPythonHome(libpy_handle, PYTHONHOME, wPYTHONHOME, pyversion_build)
+    Py_SetPythonHome(libpy_handle, pyversion_build, PYTHONHOME)
 else
     @static if Compat.Sys.iswindows()
         pathbuf = Vector{UInt16}(undef, 1024)

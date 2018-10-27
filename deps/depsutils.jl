@@ -13,21 +13,58 @@ function findsym(lib, syms...)
     error("no symbol found from: ", syms)
 end
 
+# Static buffer to make sure the string passed to libpython persists
+# for the lifetime of the program, as CPython API requires:
+const __buf_programname = Vector{UInt8}(undef, 1024)
+const __buf_pythonhome = Vector{UInt8}(undef, 1024)
+
 # Need to set PythonHome before calling GetVersion to avoid warning (#299).
 # Unfortunately, this poses something of a chicken-and-egg problem because
 # we need to know the Python version to set PythonHome via the API.  Note
 # that the string (or array) passed to Py_SetPythonHome needs to be a
 # constant that lasts for the lifetime of the program, which is why we
-# can't use Cwstring here (since that creates a temporary copy).
-function Py_SetPythonHome(libpy, PYTHONHOME, wPYTHONHOME, pyversion)
-    if !isempty(PYTHONHOME)
-        if pyversion.major < 3
-            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Cstring,), PYTHONHOME)
-        else
-            ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},), wPYTHONHOME)
-        end
+# prepare static buffer __buf_pythonhome, copy the string to it, and then
+# pass the pointer to the buffer to the CPython API.
+function Py_SetPythonHome(libpy, pyversion, PYTHONHOME::AbstractString)
+    isempty(PYTHONHOME) && return
+    if pyversion.major < 3
+        ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Cstring,),
+              _preserveas!(__buf_pythonhome, Cstring, PYTHONHOME))
+    else
+        ccall(Libdl.dlsym(libpy, :Py_SetPythonHome), Cvoid, (Ptr{Cwchar_t},),
+              _preserveas!(__buf_pythonhome, Cwstring, PYTHONHOME))
     end
 end
+
+function Py_SetProgramName(libpy, pyversion, programname::AbstractString)
+    isempty(programname) && return
+    if pyversion.major < 3
+        ccall(Libdl.dlsym(libpy, :Py_SetProgramName), Cvoid, (Cstring,),
+              _preserveas!(__buf_programname, Cstring, programname))
+    else
+        ccall(Libdl.dlsym(libpy, :Py_SetProgramName), Cvoid, (Ptr{Cwchar_t},),
+              _preserveas!(__buf_programname, Cwstring, programname))
+    end
+end
+
+"""
+    _preserveas!(dest::Vector{UInt8}, (Cstring|Cwstring), x::String) :: Ptr
+
+Copy `x` as `Cstring` or `Cwstring` to `dest`.
+"""
+function _preserveas!(dest::Vector{UInt8}, ::Type{Cstring}, x::AbstractString)
+    s = transcode(UInt8, String(x))
+    copyto!(dest, s)
+    dest[length(s) + 1] = 0
+    return pointer(dest)
+end
+
+function _preserveas!(dest::Vector{UInt8}, ::Type{Cwstring}, x::AbstractString)
+    s = Base.cconvert(Cwstring, x)
+    copyto!(reinterpret(Int32, dest), s)
+    return pointer(dest)
+end
+
 
 # need to be able to get the version before Python is initialized
 Py_GetVersion(libpy) = unsafe_string(ccall(Libdl.dlsym(libpy, :Py_GetVersion), Ptr{UInt8}, ()))
