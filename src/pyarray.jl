@@ -142,6 +142,10 @@ function copy(a::PyArray{T,N}) where {T,N}
 end
 
 # TODO: need to do bounds-checking of these indices!
+# TODO: need to GC root these `a`s to guard against the PyArray getting gc'd,
+# e.g. if it's a temporary in a function:
+# `two_rands() = pycall(np.rand, PyArray, 10)[1:2]`
+
 
 getindex(a::PyArray{T,0}) where {T} = unsafe_load(a.data)
 getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_load(a.data, 1 + (i-1)*a.st[1])
