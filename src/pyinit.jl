@@ -154,4 +154,40 @@ function __init__()
             end
         end
     end
+
+    # Configure finalization steps.
+    #
+    # * In julia/PyCall, `julia` needs to call `Py_Finalize` to
+    #   finalize Python runtime to invoke Python functions registered
+    #   in Python's exit hook.  This is done by Julia's `atexit` exit
+    #   hook.
+    #
+    # * In PyJulia, `python` needs to call `jl_atexit_hook` in its
+    #   exit hook instead.
+    #
+    # In both cases, it is important to not invoke GC of the finalized
+    # runtime.  This is ensured by:
+    @pycheckz ccall((@pysym :Py_AtExit), Cint, (Ptr{Cvoid},),
+                    @cfunction($_set_finalized, Cvoid, ()))
+    if !already_inited
+        # Once `_set_finalized` is successfully registered to
+        # `Py_AtExit`, it is safe to call `Py_Finalize` during
+        # finalization of this Julia process.
+        atexit(Py_Finalize)
+    end
+end
+
+const _finalized = Ref(false)
+# This flag is set via `Py_AtExit` to avoid calling `pydecref_` after
+# Python is finalized.
+
+function _set_finalized()
+    # This function MUST NOT invoke any Python APIs.
+    # https://docs.python.org/3/c-api/sys.html#c.Py_AtExit
+    _finalized[] = true
+    return nothing
+end
+
+function Py_Finalize()
+    ccall(@pysym(:Py_Finalize), Cvoid, ())
 end
