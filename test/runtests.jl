@@ -667,8 +667,13 @@ def try_call(f):
 end
 
 @testset "atexit" begin
+    if VERSION < v"0.7-"
+        setup = ""
+    else
+        setup = Base.load_path_setup_code()
+    end
     script = """
-    $(Base.load_path_setup_code())
+    $setup
 
     using PyCall
 
