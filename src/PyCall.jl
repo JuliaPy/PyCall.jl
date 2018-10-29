@@ -98,11 +98,12 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o.o == PyPtr_NULL
 
-function pydecref_(o::Union{PyPtr,PyObject}) :: Nothing
+function pydecref_(o::Union{PyPtr,PyObject})
     if _finalized[]
-        return
+        return o
     end
     ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+    return o
 end
 
 function pydecref(o::PyObject)
