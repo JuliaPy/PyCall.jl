@@ -23,7 +23,7 @@ Arguments
 Return value: the created class (`::PyTypeObject`)
 """
 function def_py_class(type_name::AbstractString, methods::Vector;
-                      base_classes=[], getsets::Vector=[])
+                      base_classes=[], getsets::Vector=[], class_vars=[])
     # Only create new-style classes
     base_classes = union(base_classes, [pybuiltin("object")])
     methods = Dict(py_name => jlfun2pyfun(jl_fun::Function)
@@ -32,7 +32,7 @@ function def_py_class(type_name::AbstractString, methods::Vector;
                                                 jlfun2pyfun(setter))
                           for (py_name::Symbol, getter, setter) in getsets)
     return pybuiltin("type")(type_name, tuple(base_classes...),
-                             merge(methods, getter_setters))
+                             merge(methods, getter_setters, Dict(class_vars)))
 end
 
 ######################################################################
@@ -58,6 +58,11 @@ function parse_pydef_toplevel(expr)
     return class_name::Symbol, base_classes, lines
 end
 
+# From MacroTools
+function isfunction(expr)
+    @capture(MacroTools.longdef1(expr), function (fcall_ | fcall_) body_ end)
+end
+
 function parse_pydef(expr)
     class_name, base_classes, lines = parse_pydef_toplevel(expr)
     # Now we parse every method definition / getter / setter
@@ -66,8 +71,12 @@ function parse_pydef(expr)
     getter_dict = Dict{Any, Symbol}() # python_var => jl_getter_name
     setter_dict = Dict{Any, Symbol}()
     method_syms = Dict{Any, Symbol}() # see below
+    class_vars = Dict{Symbol, Any}()
     for line in lines
-        if !isa(line, LineNumberNode) && line.head != :line # need to skip those
+        if line isa LineNumberNode || line isa Symbol || line.head == :line
+            continue
+        end
+        if isfunction(line)
             def_dict = splitdef(line)
             py_f = def_dict[:name]
             # The dictionary of the new Julia-side definition. 
@@ -101,11 +110,21 @@ function parse_pydef(expr)
                 error("Malformed line: $line")
             end
             push!(function_defs, combinedef(jl_def_dict))
+        elseif line.head == :(=) # Non function assignment
+            class_vars[line.args[1]] = line.args[2]
         end
     end
     @assert(isempty(setdiff(keys(setter_dict), keys(getter_dict))),
             "All .set attributes must have a .get")
-    class_name, base_classes, methods, getter_dict, setter_dict, function_defs
+    return (
+        class_name,
+        base_classes,
+        methods,
+        getter_dict,
+        setter_dict,
+        function_defs,
+        class_vars
+    )
 end
 
 """
@@ -159,7 +178,13 @@ metaclass as a `PyObject` instead of binding it to the class name.
 It's side-effect-free, except for the definition of the class methods.
 """
 macro pydef_object(class_expr)
-    class_name, base_classes, methods_, getter_dict, setter_dict, function_defs=
+    class_name,
+    base_classes,
+    methods_,
+    getter_dict,
+    setter_dict,
+    function_defs,
+    class_vars =
         parse_pydef(class_expr)
     methods = [:($(Expr(:quote, py_name::Symbol)), $(esc(jl_fun::Symbol)))
                for (py_name, jl_fun) in methods_]
@@ -167,12 +192,16 @@ macro pydef_object(class_expr)
                  $(esc(getter)),
                  $(esc(get(setter_dict, attribute, nothing))))
                for (attribute, getter) in getter_dict]
+    class_var_pairs = [
+        :($(Expr(:quote, py_name)), $(esc(val_expr)))
+        for (py_name, val_expr) in class_vars
+    ]
     :(begin
         $(map(esc, function_defs)...)
         # This line doesn't have any side-effect, it just returns the Python
         # (meta-)class, as a PyObject
         def_py_class($(string(class_name)), [$(methods...)];
                      base_classes=[$(map(esc, base_classes)...)],
-                     getsets=[$(getsets...)])
+                     getsets=[$(getsets...)], class_vars = [$(class_var_pairs...)])
     end)
 end
