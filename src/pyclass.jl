@@ -73,9 +73,9 @@ function parse_pydef(expr)
     method_syms = Dict{Any, Symbol}() # see below
     class_vars = Dict{Symbol, Any}()
     for line in lines
-        if line isa LineNumberNode || line isa Symbol || line.head == :line
-            continue
-        end
+        line isa LineNumberNode && continue
+        line isa Expr || error("Malformed line: $line")
+        line.head == :line && continue
         if isfunction(line)
             def_dict = splitdef(line)
             py_f = def_dict[:name]
@@ -112,6 +112,8 @@ function parse_pydef(expr)
             push!(function_defs, combinedef(jl_def_dict))
         elseif line.head == :(=) # Non function assignment
             class_vars[line.args[1]] = line.args[2]
+        else
+            error("Malformed line: $line")
         end
     end
     @assert(isempty(setdiff(keys(setter_dict), keys(getter_dict))),
