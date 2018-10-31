@@ -272,17 +272,13 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     A = py"A"
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
-    @test_throws KeyError A.X
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
         @test A.B.C == 1
+        @test_throws KeyError A.X
     end
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
-
-    pylogging = pyimport("logging")
-    @test hasproperty(pylogging.Logger, "info")
-    @test getproperty(pylogging, :Logger) == pylogging.Logger
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
