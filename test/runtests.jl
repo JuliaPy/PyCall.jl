@@ -277,7 +277,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @static if VERSION >= v"0.7-"
         @test A.B.C == 1
     end
-    setproperty!(A.B, "C", 2)
+    setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
 
     pylogging = pyimport("logging")
