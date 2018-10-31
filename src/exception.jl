@@ -132,7 +132,7 @@ be called via Python C-API, it tries to not throw at all cost.
 function showerror_string(e::T) where {T}
     try
         io = IOBuffer()
-        showerror(io, e)
+        showerror(io, e, catch_backtrace())
         return String(take!(io))
     catch
         try
