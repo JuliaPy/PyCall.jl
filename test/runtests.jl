@@ -1,6 +1,11 @@
 using PyCall, Compat
 using Compat.Test, Compat.Dates, Compat.Serialization
 
+using PyCall: hasproperty
+@static if VERSION < v"0.7-"
+    using PyCall: getproperty, setproperty!, propertynames
+end
+
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
 
@@ -258,15 +263,26 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
+    # hasproperty, getproperty, and propertynames
+    py"""
+    class A:
+        class B:
+            C = 1
+    """
+    A = py"A"
+    @test hasproperty(A, "B")
+    @test getproperty(A, "B") == py"A.B"
+    @test_throws KeyError A.X
+    @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
-        # hasproperty, getproperty, and propertynames
-        @test PyCall.hasproperty(np, "random")
-        @test PyCall.hasproperty(np.random, :rand)
-        @test getproperty(np, "linalg") == np.linalg
-        @test getproperty(np.linalg, :eig) == np.linalg.eig
-        @test :rand in propertynames(np.random)
-        @test_throws KeyError np.whatever
+        @test A.B.C == 1
     end
+    setproperty!(A.B, "C", 2)
+    @test py"A.B.C" == 2
+
+    pylogging = pyimport("logging")
+    @test hasproperty(pylogging.Logger, "info")
+    @test getproperty(pylogging, :Logger) == pylogging.Logger
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
