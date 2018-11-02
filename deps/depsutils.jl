@@ -61,7 +61,7 @@ end
 
 function _preserveas!(dest::Vector{UInt8}, ::Type{Cwstring}, x::AbstractString)
     s = Base.cconvert(Cwstring, x)
-    copyto!(reinterpret(Int32, dest), s)
+    copyto!(dest, reinterpret(UInt8, s))
     return pointer(dest)
 end
 
