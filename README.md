@@ -461,6 +461,16 @@ Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter):
     app = SampleApp()
     app[:mainloop]()
 
+Class variables are also supported:
+
+    using PyCall
+    @pydef mutable struct ObjectCounter
+        obj_count = 0 # Class variable
+        function __init__(::PyObject)
+            ObjectCounter[:obj_count] += 1
+        end
+    end
+
 ### GUI Event Loops
 
 For Python packages that have a graphical user interface (GUI),

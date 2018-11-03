@@ -573,6 +573,14 @@ end
     end
 end
 
+# @pydef with class variable
+@pydef mutable struct ObjectCounter
+    obj_count = 1 - 1
+    function __init__(::PyObject)
+        ObjectCounter[:obj_count] += 1
+    end
+end
+
 @testset "pydef" begin
     d = Doubler(5)
     @test d[:x] == 5
@@ -583,6 +591,10 @@ end
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
+
+    @test ObjectCounter[:obj_count] == 0
+    a = ObjectCounter()
+    @test ObjectCounter[:obj_count] == 1
 end
 
 @testset "callback" begin
