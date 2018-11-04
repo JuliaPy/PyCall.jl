@@ -102,9 +102,7 @@ else
         # avoid the constructor that calls length
         # since that might be an expensive operation
         # even if length is cheap, this adds 10% performance
-
-        DummyNeverUsed = Base.SizeUnknown
-        piter = PyIterator{PyAny, DummyNeverUsed}(po)
+        piter = PyIterator{PyAny, Base.SizeUnknown}(po)
         iterate(piter, s)
     end
 end
