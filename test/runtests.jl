@@ -687,4 +687,23 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
+@testset "atexit" begin
+    if VERSION < v"0.7-"
+        setup = ""
+    else
+        setup = Base.load_path_setup_code()
+    end
+    script = """
+    $setup
+
+    using PyCall
+
+    pyimport("atexit")[:register]() do
+        println("atexit called")
+    end
+    """
+    out = read(`$(Base.julia_cmd()) -e $script`, String)
+    @test occursin("atexit called", out)
+end
+
 include("test_pyfncall.jl")
