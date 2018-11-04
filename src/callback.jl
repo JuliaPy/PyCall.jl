@@ -39,7 +39,7 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
 
         return pyreturn(ret)
     catch e
-        pyraise(e)
+        pyraise(e, catch_backtrace())
     finally
         args.o = PyPtr_NULL # don't decref
     end
