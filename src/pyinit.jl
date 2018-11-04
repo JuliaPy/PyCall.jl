@@ -121,41 +121,40 @@ function __init__()
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
-    if already_inited
-        # Importing from PyJulia takes this path.
-    elseif isfile(get(ENV, "PYCALL_JL_RUNTIME_PYTHON", ""))
-        _current_python[] = ENV["PYCALL_JL_RUNTIME_PYTHON"]
+    if !already_inited
+        pyhome = PYTHONHOME
 
-        # Check libpython compatibility.
-        venv_libpython = find_libpython(current_python())
-        if venv_libpython === nothing
-            error("""
-            `libpython` for $(current_python()) cannot be found.
-            PyCall.jl cannot initialize Python safely.
-            """)
-        elseif venv_libpython != libpython
-            error("""
-            Incompatible `libpython` detected.
-            `libpython` for $(current_python()) is:
-                $venv_libpython
-            `libpython` for $pyprogramname is:
-                $libpython
-            PyCall.jl only supports loading Python environment using
-            the same `libpython`.
-            """)
+        if isfile(get(ENV, "PYCALL_JL_RUNTIME_PYTHON", ""))
+            _current_python[] = ENV["PYCALL_JL_RUNTIME_PYTHON"]
+
+            # Check libpython compatibility.
+            venv_libpython = find_libpython(current_python())
+            if venv_libpython === nothing
+                error("""
+                `libpython` for $(current_python()) cannot be found.
+                PyCall.jl cannot initialize Python safely.
+                """)
+            elseif venv_libpython != libpython
+                error("""
+                Incompatible `libpython` detected.
+                `libpython` for $(current_python()) is:
+                    $venv_libpython
+                `libpython` for $pyprogramname is:
+                    $libpython
+                PyCall.jl only supports loading Python environment using
+                the same `libpython`.
+                """)
+            end
+
+            if haskey(ENV, "PYCALL_JL_RUNTIME_PYTHONHOME")
+                pyhome = ENV["PYCALL_JL_RUNTIME_PYTHONHOME"]
+            else
+                pyhome = pythonhome_of(current_python())
+            end
         end
 
-        if haskey(ENV, "PYCALL_JL_RUNTIME_PYTHONHOME")
-            venv_home = ENV["PYCALL_JL_RUNTIME_PYTHONHOME"]
-        else
-            venv_home = pythonhome_of(current_python())
-        end
-        Py_SetPythonHome(libpy_handle, pyversion, venv_home)
+        Py_SetPythonHome(libpy_handle, pyversion, pyhome)
         Py_SetProgramName(libpy_handle, pyversion, current_python())
-        ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
-    else
-        Py_SetPythonHome(libpy_handle, pyversion, PYTHONHOME)
-        Py_SetProgramName(libpy_handle, pyversion, pyprogramname)
         ccall((@pysym :Py_InitializeEx), Cvoid, (Cint,), 0)
     end
 
