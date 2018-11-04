@@ -66,13 +66,15 @@ end
 venv_python(::Nothing) = pyprogramname
 
 function venv_python(venv::AbstractString, suffix::AbstractString = "")
-    # See:
-    # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
+    # `suffix` is used to insert version number (e.g., "3.7") in tests
+    # (see ../test/test_venv.jl)
     if Compat.Sys.iswindows()
         return joinpath(venv, "Scripts", "python$suffix.exe")
     else
         return joinpath(venv, "bin", "python$suffix")
     end
+    # "Scripts" is used only in Windows and "bin" elsewhere:
+    # https://github.com/python/cpython/blob/3.7/Lib/venv/__init__.py#L116
 end
 
 """

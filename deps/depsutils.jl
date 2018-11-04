@@ -50,7 +50,9 @@ end
 """
     _preserveas!(dest::Vector{UInt8}, (Cstring|Cwstring), x::String) :: Ptr
 
-Copy `x` as `Cstring` or `Cwstring` to `dest`.
+Copy `x` as `Cstring` or `Cwstring` to `dest` and return a pointer to
+`dest`.  Thus, this pointer is safe to use as long as `dest` is
+protected from GC.
 """
 function _preserveas!(dest::Vector{UInt8}, ::Type{Cstring}, x::AbstractString)
     s = transcode(UInt8, String(x))
