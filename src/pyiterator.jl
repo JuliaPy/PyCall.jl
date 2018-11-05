@@ -134,7 +134,7 @@ const jlWrapIteratorType = PyTypeObject()
                 return pyreturn(item)
             end
         catch e
-            pyraise(e, catch_backtrace())
+            @pyraise e
         end
         return PyPtr_NULL
     end
@@ -149,7 +149,7 @@ else
                 return pyreturn(item)
             end
         catch e
-            pyraise(e, catch_backtrace())
+            @pyraise e
         end
         return PyPtr_NULL
     end
@@ -162,7 +162,7 @@ function pyjlwrap_getiter(self_::PyPtr)
         self = unsafe_pyjlwrap_to_objref(self_)
         return pystealref!(jlwrap_iterator(self))
     catch e
-        pyraise(e, catch_backtrace())
+        @pyraise e
     end
     return PyPtr_NULL
 end

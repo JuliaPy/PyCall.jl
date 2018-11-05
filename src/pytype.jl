@@ -348,7 +348,7 @@ function pyjlwrap_repr(o::PyPtr)
         return pyreturn(o != C_NULL ? string("<PyCall.jlwrap ",unsafe_pyjlwrap_to_objref(o),">")
                         : "<PyCall.jlwrap NULL>")
     catch e
-        pyraise(e, catch_backtrace())
+        @pyraise e
         return PyPtr_NULL
     end
 end
@@ -395,7 +395,7 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
             end
         end
     catch e
-        pyraise(e, catch_backtrace())
+        @pyraise e
     finally
         attr_.o = PyPtr_NULL # don't decref
     end

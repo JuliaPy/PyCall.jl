@@ -181,3 +181,13 @@ function pyraise(e::PyError, ::Vector = [])
           e.T, e.val, e.traceback)
     e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
 end
+
+"""
+    @pyraise e
+
+Throw the exception `e` to Python, attaching a backtrace.  This macro should only be
+used in a `catch` block so that `catch_backtrace()` is valid.
+"""
+macro pyraise(e)
+    :(pyraise($(esc(e)), catch_backtrace()))
+end
