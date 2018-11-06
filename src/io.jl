@@ -8,13 +8,13 @@
 # IOBase methods:
 
 # IO objects should raise IOError for unsupported operations or failed IO
-function ioraise(e)
+function ioraise(e, bt = nothing)
     if isa(e, MethodError) || isa(e, ErrorException)
         ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
               (pyexc::Dict)[PyIOError],
-              string("Julia exception: ", e))
+              showerror_string(e, bt))
     else
-        pyraise(e)
+        pyraise(e, bt)
     end
 end
 
@@ -22,7 +22,7 @@ macro with_ioraise(expr)
     :(try
         $(esc(expr))
       catch e
-        ioraise(e)
+        ioraise(e, catch_backtrace())
       end)
 end
 

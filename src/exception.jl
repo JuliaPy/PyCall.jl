@@ -123,16 +123,21 @@ function pyexc_initialize()
     pyexc[PyIOError] = @pyglobalobjptr :PyExc_IOError
 end
 
+_showerror_string(io::IO, e, ::Nothing) = showerror(io, e)
+_showerror_string(io::IO, e, bt) = showerror(io, e, bt)
+
+# bt argument defaults to nothing, to delay dispatching on the presence of a
+# backtrace until after the try-catch block
 """
     showerror_string(e) :: String
 
 Convert output of `showerror` to a `String`.  Since this function may
 be called via Python C-API, it tries to not throw at all cost.
 """
-function showerror_string(e::T) where {T}
+function showerror_string(e::T, bt = nothing) where {T}
     try
         io = IOBuffer()
-        showerror(io, e)
+        _showerror_string(io, e, bt)
         return String(take!(io))
     catch
         try
@@ -163,15 +168,26 @@ function showerror_string(e::T) where {T}
     end
 end
 
-function pyraise(e)
+function pyraise(e, bt = nothing)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
     ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
-          pyeT, string("Julia exception: ", showerror_string(e)))
+          pyeT, string("Julia exception: ", showerror_string(e, bt)))
 end
 
-function pyraise(e::PyError)
+# Second argument allows for backtraces passed to `pyraise` to be ignored.
+function pyraise(e::PyError, ::Vector = [])
     ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
           e.T, e.val, e.traceback)
     e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
+end
+
+"""
+    @pyraise e
+
+Throw the exception `e` to Python, attaching a backtrace.  This macro should only be
+used in a `catch` block so that `catch_backtrace()` is valid.
+"""
+macro pyraise(e)
+    :(pyraise($(esc(e)), catch_backtrace()))
 end
