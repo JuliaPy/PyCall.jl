@@ -360,6 +360,11 @@ def cli_find_libpython(cli_op, verbose):
         print_all(candidate_names())
     elif cli_op == "candidate-paths":
         print_all(p for p in candidate_paths() if p and os.path.isabs(p))
+    elif cli_op == "dynamic":
+        path = normalize_path(linked_libpython())
+        if path is None:
+            return 1
+        print(path, end="")
     else:
         path = find_libpython()
         if path is None:
@@ -388,6 +393,10 @@ def main(args=None):
         "--candidate-paths",
         action="store_const", dest="cli_op", const="candidate-paths",
         help="Print list of candidate paths of libpython.")
+    group.add_argument(
+        "--dynamic",
+        action="store_const", dest="cli_op", const="dynamic",
+        help="Print the path to dynamically linked libpython.")
 
     ns = parser.parse_args(args)
     parser.exit(cli_find_libpython(**vars(ns)))

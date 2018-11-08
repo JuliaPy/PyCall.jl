@@ -88,7 +88,7 @@ function __init__()
 
     # issue #189
     libpy_handle = libpython === nothing ? C_NULL :
-        Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+        Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_GLOBAL)
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
