@@ -112,7 +112,6 @@ def _linked_libpython_windows():
         return None
 
 
-
 def library_name(name, suffix=SHLIB_SUFFIX, is_windows=is_windows):
     """
     Convert a file basename `name` to a library name (no "lib" and ".so" etc.)
@@ -197,7 +196,6 @@ def candidate_names(suffix=SHLIB_SUFFIX):
         yield dlprefix + stem + suffix
 
 
-
 @uniquified
 def candidate_paths(suffix=SHLIB_SUFFIX):
     """
@@ -263,8 +261,13 @@ def normalize_path(path, suffix=SHLIB_SUFFIX, is_apple=is_apple):
 
     Parameters
     ----------
-    path : str ot None
+    path : str or None
         A candidate path to a shared library.
+
+    Returns
+    -------
+    path : str or None
+        Normalized existing path or `None`.
     """
     if not path:
         return None
