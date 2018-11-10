@@ -125,15 +125,15 @@ if libpython == nothing
     end
 else
     macro pysym(func)
-        :(($(esc(func)), libpython))
+        :(Libdl.dlsym(libpy_handle, $(esc(func))))
     end
     macro pyglobal(name)
-        :(cglobal(($(esc(name)), libpython)))
+        :(convert(Ptr{Cvoid}, Libdl.dlsym(libpy_handle, $(esc(name)))))
     end
     macro pyglobalobj(name)
-        :(cglobal(($(esc(name)), libpython), PyObject_struct))
+        :(convert(Ptr{PyObject_struct}, Libdl.dlsym(libpy_handle, $(esc(name)))))
     end
     macro pyglobalobjptr(name)
-        :(unsafe_load(cglobal(($(esc(name)), libpython), Ptr{PyObject_struct})))
+        :(unsafe_load(convert(Ptr{Ptr{PyObject_struct}}, Libdl.dlsym(libpy_handle, $(esc(name))))))
     end
 end
