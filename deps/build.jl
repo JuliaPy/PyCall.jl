@@ -71,7 +71,7 @@ end
 
 # return libpython name, libpython pointer, is_pie
 function find_libpython(python::AbstractString)
-    dlopen_flags = Libdl.RTLD_LAZY|Libdl.RTLD_GLOBAL
+    dlopen_flags = Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL
 
     python = something(Compat.Sys.which(python))
 
