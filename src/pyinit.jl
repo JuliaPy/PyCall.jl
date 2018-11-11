@@ -89,6 +89,17 @@ function __init__()
     # issue #189
     libpy_handle = libpython === nothing ? C_NULL :
         Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+    if is_pie
+        unsafe_store!(
+            cglobal((@pysym :stdin), Ptr{Cvoid}),
+            unsafe_load(cglobal(:stdin, Ptr{Cvoid})))
+        unsafe_store!(
+            cglobal((@pysym :stdout), Ptr{Cvoid}),
+            unsafe_load(cglobal(:stdout, Ptr{Cvoid})))
+        unsafe_store!(
+            cglobal((@pysym :stderr), Ptr{Cvoid}),
+            unsafe_load(cglobal(:stderr, Ptr{Cvoid})))
+    end
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 
