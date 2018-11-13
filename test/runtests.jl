@@ -272,11 +272,11 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test o[:real] == 1
     end
 
-    # []-based sequence access
-    let a1=[5,8,6], a2=rand(3,4), a3=rand(3,4,5), o1=PyObject(a1), o2=PyObject(a2), o3=PyObject(a3)
+    @testset "[]-based sequence access" begin
+        a1=[5,8,6]; a2=rand(3,4); a3=rand(3,4,5); o1=PyObject(a1); o2=PyObject(a2); o3=PyObject(a3)
         @test [o1[i] for i in eachindex(a1)] == a1
         @test [o1[end-(i-1)] for i in eachindex(a1)] == reverse(a1)
-        @test o2[1] == collect(a2[1,:])
+        @test all(o2[1] == collect(a2[1,:]))
         @test length(o1) == length(o2) == length(o3) == 3
         o1[end-1] = 7
         @test o1[2] == 7
@@ -286,7 +286,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         if PyCall.npy_initialized
             @test [o2[i,j] for i=1:3, j=1:4] == a2
             @test [o3[i,j,k] for i=1:3, j=1:4, k=1:5] == a3
-            @test o3[2,3] == collect(a3[2,3,:])
+            @test all(o3[2,3] == collect(a3[2,3,:]))
             o2[2,3] = 8
             @test o2[2,3] == 8
             o3[2,3,4] = 9
@@ -391,6 +391,15 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         #  weak references to type objects)
         @test convert(Dict{Int,PyObject}, weakdict(Dict(3=>weakdict))) == Dict(3=>weakdict)
         @test get(weakdict(Dict(3=>weakdict)),3) == weakdict
+    end
+
+    # Weak ref support for pyjlwrap types
+    let weakref = pyimport("weakref")
+        bar = TestConstruct(1)
+        o = PyObject(bar)
+        @test PyCall.is_pyjlwrap(o)
+        r = weakref[:ref](o)
+        @test weakref[:getweakrefcount](o) == 1
     end
 
     # Expose python docs to Julia doc system
@@ -573,6 +582,14 @@ end
     end
 end
 
+# @pydef with class variable
+@pydef mutable struct ObjectCounter
+    obj_count = 1 - 1
+    function __init__(::PyObject)
+        ObjectCounter[:obj_count] += 1
+    end
+end
+
 @testset "pydef" begin
     d = Doubler(5)
     @test d[:x] == 5
@@ -583,6 +600,10 @@ end
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
+
+    @test ObjectCounter[:obj_count] == 0
+    a = ObjectCounter()
+    @test ObjectCounter[:obj_count] == 1
 end
 
 @testset "callback" begin
@@ -666,5 +687,64 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
+@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
+    # PyIterator not defined in this julia version
+else
+    @testset "PyIterator" begin
+        arr = [1,2]
+        o = PyObject(arr)
+        c_pyany = collect(PyCall.PyIterator{PyAny}(o))
+        @test c_pyany == arr
+        @test c_pyany[1] isa Integer
+        @test c_pyany[2] isa Integer
+
+        c_f64 = collect(PyCall.PyIterator{Float64}(o))
+        @test c_f64 == arr
+        @test eltype(c_f64) == Float64
+
+        i1 = PyObject([1])
+        i2 = PyObject([2])
+        l = PyObject([i1,i2])
+
+        piter = PyCall.PyIterator(l)
+        @test length(piter) == 2
+        @test length(collect(piter)) == 2
+        r1, r2 = collect(piter)
+        @test r1.o === i1.o
+        @test r2.o  === i2.o
+
+        @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
+        @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
+
+        # 594
+        @test collect(zip(py"iter([1, 2, 3])", 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+        @test collect(zip(PyCall.PyIterator{Int}(py"iter([1, 2, 3])"), 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+        @test collect(zip(PyCall.PyIterator(py"[1, 2, 3]"o), 1:3)) ==
+        [(1, 1), (2, 2), (3, 3)]
+    end
+end
+  
+@testset "atexit" begin
+    if VERSION < v"0.7-"
+        setup = ""
+    else
+        setup = Base.load_path_setup_code()
+    end
+    script = """
+    $setup
+
+    using PyCall
+
+    pyimport("atexit")[:register]() do
+        println("atexit called")
+    end
+    """
+    out = read(`$(Base.julia_cmd()) -e $script`, String)
+    @test occursin("atexit called", out)
+end
+
 include("test_pyfncall.jl")
+include("testpybuffer.jl")
 include("test_venv.jl")
