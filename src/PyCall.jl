@@ -5,7 +5,8 @@ module PyCall
 using Compat, VersionParsing
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
-       PyPtr, pyincref, pydecref, pyversion, PyArray, PyArray_Info,
+       PyPtr, pyincref, pydecref, pyversion,
+       PyArray, PyArray_Info, PyBuffer,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
@@ -177,6 +178,7 @@ pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have n
 
 const TypeTuple = Union{Type,NTuple{N, Type}} where {N}
 include("pybuffer.jl")
+include("pyarray.jl")
 include("conversions.jl")
 include("pytype.jl")
 include("pyiterator.jl")
