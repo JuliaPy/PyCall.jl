@@ -42,7 +42,7 @@ end
 Release the reference to buffer `o`
 N.b. As per https://docs.python.org/3/c-api/buffer.html#c.PyBuffer_Release,
 It is an error to call this function on a PyBuffer that was not obtained via
-the python c-api function `PyObject_GetBuffer(), unless o.obj is a PyPtr(C_NULL)`
+the python c-api function `PyObject_GetBuffer()`, unless o.obj is a PyPtr(C_NULL)
 """
 function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
