@@ -48,7 +48,7 @@ function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
-    ccall(@pysym(:PyBuffer_Release), Cvoid, (Any,), o)
+    _finalized[] || ccall(@pysym(:PyBuffer_Release), Cvoid, (Any,), o)
     o
 end
 
