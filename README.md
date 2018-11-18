@@ -23,7 +23,7 @@ Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
 install the files.  Julia 0.5 or later is required.
 
 The latest development version of PyCall is available from
-<https://github.com/stevengj/PyCall.jl>.  If you want to switch to
+<https://github.com/JuliaPy/PyCall.jl>.  If you want to switch to
 this after installing the package, run `Pkg.checkout("PyCall"); Pkg.build("PyCall")`.
 
 By default on Mac and Windows systems, `Pkg.add("PyCall")`
@@ -39,7 +39,7 @@ the `python3` program (if any, otherwise `python`) in your PATH.
 
 The advantage of a Conda-based configuration is particularly
 compelling if you are installing PyCall in order to use packages like
-[PyPlot.jl](https://github.com/stevengj/PyPlot.jl) or
+[PyPlot.jl](https://github.com/JuliaPy/PyPlot.jl) or
 [SymPy.jl](https://github.com/JuliaPy/SymPy.jl), as these can then
 automatically install their Python dependencies.  (To exploit this in
 your own packages, use the `pyimport_conda` function described below.)
@@ -83,10 +83,10 @@ different virtualenv, then you should switch virtualenvs and run
 `rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
 
 **Note:** Usually, the necessary libraries are installed along with
-Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122)
+Python, but [pyenv on MacOS](https://github.com/JuliaPy/PyCall.jl/issues/122)
 requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
 pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
-currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
+currently [not supported](https://github.com/JuliaPy/PyCall.jl/issues/42).
 As a general rule, we tend to recommend the [Anaconda Python
 distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
 Windows, or using the Julia Conda package, in order to minimize headaches.
@@ -129,7 +129,7 @@ options, and this functionality is accessed from Julia by:
 
 However, for better integration with Julia graphics backends and to
 avoid the need for the `show` function, we recommend using matplotlib
-via the Julia [PyPlot module](https://github.com/stevengj/PyPlot.jl).
+via the Julia [PyPlot module](https://github.com/JuliaPy/PyPlot.jl).
 
 Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
@@ -175,7 +175,7 @@ Here are solutions to some common problems:
 * As mentioned above, use `foo[:bar]` and `foo[:bar](...)` rather than `foo.bar` and `foo.bar(...)`,
 respectively, to access attributes and methods of Python objects.
 
-* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/stevengj/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")["path"]), "")`.
+* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")["path"]), "")`.
 
 ## Python object interfaces
 
@@ -515,7 +515,7 @@ the library.  However, in other cases it is necessary to explicitly
 tell the library which GUI toolkit to use and that an interactive mode
 is desired.  To make this even easier, it is convenient to have
 wrapper modules around popular Python libraries, such as the [PyPlot
-module](https://github.com/stevengj/PyPlot.jl) for Julia.
+module](https://github.com/JuliaPy/PyPlot.jl) for Julia.
 
 ### Low-level Python API access
 
