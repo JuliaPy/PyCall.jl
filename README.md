@@ -6,7 +6,6 @@
 
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.6.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.6)
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
 
 
 This package provides the ability to directly call and **fully
@@ -20,7 +19,7 @@ without copying them.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.5 or later is required.
+install the files.  Julia 0.6 or later is required.
 
 The latest development version of PyCall is available from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to
