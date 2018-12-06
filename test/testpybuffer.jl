@@ -35,6 +35,14 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test_throws ArgumentError PyArray(wrong_endian_arr)
         end
 
+        @testset "Get the right (native) dtype" begin
+            nparr = arrpyo(1:10)
+            npintstr = Int == Int64 ? "int64" : "int32"
+
+            # make sure we're dealing with an Int array
+            @test pystr(nparr["dtype"]) == npintstr
+        end
+
         @testset "NoCopyArray 1d" begin
             ao = arrpyo(1.0:10.0, "d")
             pybuf = PyBuffer(ao, PyBUF_ND_CONTIGUOUS)
