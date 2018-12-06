@@ -239,7 +239,7 @@ function array_format(pybuf::PyBuffer)
     if length(fmt_str) > 1
         type_start_idx = 2
         if fmt_str[1] == '@' || fmt_str[1] == '^'
-            # defaults to native_byteorder: true, is_standard_size: false
+            # defaults to native_byteorder: true, use_native_sizes: true
         elseif fmt_str[1] == '<'
             native_byteorder = ENDIAN_BOM == 0x04030201
             use_native_sizes = false
