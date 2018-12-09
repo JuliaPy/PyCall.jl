@@ -35,12 +35,12 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test_throws ArgumentError PyArray(wrong_endian_arr)
         end
 
-        @testset "Get the right (native) dtype" begin
+        @testset "dtype should match eltype" begin
+            npy2jl = Dict(np["int64"][:__name__]=>Int64,
+                          np["int32"][:__name__]=>Int32)
             nparr = arrpyo(1:10)
-            npintstr = Int == Int64 ? "int64" : "int32"
-
-            # make sure we're dealing with an Int array
-            @test pystr(nparr["dtype"]) == npintstr
+            jltype = npy2jl[pystr(nparr["dtype"])]
+            @test eltype(convert(PyAny, nparr)) == jltype
         end
 
         @testset "NoCopyArray 1d" begin
