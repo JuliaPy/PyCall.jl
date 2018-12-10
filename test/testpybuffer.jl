@@ -36,11 +36,18 @@ pyutf8(s::String) = pyutf8(PyObject(s))
         end
 
         @testset "dtype should match eltype" begin
-            npy2jl = Dict(np["int64"][:__name__]=>Int64,
-                          np["int32"][:__name__]=>Int32)
-            nparr = arrpyo(1:10)
-            jltype = npy2jl[pystr(nparr["dtype"])]
-            @test eltype(convert(PyAny, nparr)) == jltype
+            npy2jl = Dict("int32"=>Int32, "float32"=>Float32,
+                          "int64"=>Int64, "float64"=>Float64)
+            for (pytype, jltype) in npy2jl
+                @testset "dtype $pytype should match eltype $jltype" begin
+                    jlarr = jltype[1:10;]
+                    nparr = arrpyo(jlarr, dtype=pytype)
+                    @test pystr(nparr["dtype"]) == pytype
+                    jlarr2 = convert(PyAny, nparr)
+                    @test eltype(jlarr2) == jltype
+                    @test jlarr2 == jlarr
+                end
+            end
         end
 
         @testset "NoCopyArray 1d" begin
