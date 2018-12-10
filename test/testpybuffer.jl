@@ -35,6 +35,21 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test_throws ArgumentError PyArray(wrong_endian_arr)
         end
 
+        @testset "dtype should match eltype" begin
+            npy2jl = Dict("int32"=>Int32, "float32"=>Float32,
+                          "int64"=>Int64, "float64"=>Float64)
+            for (pytype, jltype) in npy2jl
+                @testset "dtype $pytype should match eltype $jltype" begin
+                    jlarr = jltype[1:10;]
+                    nparr = arrpyo(jlarr, dtype=pytype)
+                    @test pystr(nparr["dtype"]) == pytype
+                    jlarr2 = convert(PyAny, nparr)
+                    @test eltype(jlarr2) == jltype
+                    @test jlarr2 == jlarr
+                end
+            end
+        end
+
         @testset "NoCopyArray 1d" begin
             ao = arrpyo(1.0:10.0, "d")
             pybuf = PyBuffer(ao, PyBUF_ND_CONTIGUOUS)

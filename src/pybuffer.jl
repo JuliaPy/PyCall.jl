@@ -227,31 +227,35 @@ function array_format(pybuf::PyBuffer)
     # TODO: handle more cases: https://www.python.org/dev/peps/pep-3118/#additions-to-the-struct-string-syntax
     # refs: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
     #       https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/_internal.py#L490
-    #       https://docs.python.org/2/library/struct.html#byte-order-size-and-alignment
+    #       https://docs.python.org/3/library/struct.html#byte-order-size-and-alignment
 
     # "NULL implies standard unsigned bytes ("B")" --pep 3118
     pybuf.buf.format == C_NULL && return UInt8, true
 
     fmt_str = get_format_str(pybuf)
     native_byteorder = true
+    use_native_sizes = true
     type_start_idx = 1
-    typestrs = standard_typestrs
     if length(fmt_str) > 1
         type_start_idx = 2
-        if fmt_str[1] == '='
+        if fmt_str[1] == '@' || fmt_str[1] == '^'
+            # defaults to native_byteorder: true, use_native_sizes: true
         elseif fmt_str[1] == '<'
             native_byteorder = ENDIAN_BOM == 0x04030201
+            use_native_sizes = false
         elseif fmt_str[1] == '>' || fmt_str =='!'
             native_byteorder = ENDIAN_BOM == 0x01020304
-        elseif fmt_str[1] == '@' || fmt_str[1] == '^'
-            typestrs = native_typestrs
+            use_native_sizes = false
+        elseif fmt_str[1] == '='
+            use_native_sizes = false
         elseif fmt_str[1] == "Z"
             type_start_idx = 1
         else
             error("Unsupported format string: \"$fmt_str\"")
         end
     end
-    typestrs[fmt_str[type_start_idx:end]], native_byteorder
+    strs2types = use_native_sizes ? native_typestrs : standard_typestrs
+    strs2types[fmt_str[type_start_idx:end]], native_byteorder
 end
 
 #############################################################################
