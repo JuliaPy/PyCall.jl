@@ -142,17 +142,15 @@ function setdata!(a::PyArray{T,N}, o::PyObject) where {T,N}
 end
 
 function copy(a::PyArray{T,N}) where {T,N}
-    if N > 1 && a.c_contig # equivalent to f_contig with reversed dims
-        B = unsafe_wrap(Array, a.data, ntuple((n -> a.dims[N - n + 1]), N))
-        return permutedims(B, (N:-1:1))
-    end
+    # memcpy is ok iff `a` is f_contig (implies same memory layout as the equiv
+    # `Array`) otherwise we do a regular `copyto!`, such that A[I...] == a[I...]
     A = Array{T}(undef, a.dims)
     if a.f_contig
         ccall(:memcpy, Cvoid, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
-        return A
     else
-        return copyto!(A, a)
+        copyto!(A, a)
     end
+    return A
 end
 
 # TODO: need to do bounds-checking of these indices!
