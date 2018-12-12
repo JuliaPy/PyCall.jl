@@ -38,16 +38,30 @@ function default_stride(sz::NTuple{N, Int}, ::Type{T}) where {T,N}
     ntuple(i->stv[i], N)
 end
 
-# whether a contiguous array in column-major (Fortran, Julia) order
-function f_contiguous(T::Type, sz::NTuple{N,Int}, st::NTuple{N,Int}) where N
-    if prod(sz) == 1 || length(sz) == 1
-        # 0 or 1-dim arrays should default to f-contiguous in julia
-        return true
-    end
+"""
+`f_contiguous(T::Type, sz::NTuple{N,Int}, st::NTuple{N,Int})::Bool`
+
+Whether an array is in column-major (Fortran, Julia) order, and
+has elements stored contiguously. Any array that is f_contiguous will have
+identical memory layout to a Julia `Array` of the same size.
+
+`sz` should be the dimensions of the array in number of elements (i.e. what
+     `size(a)` would return)
+`st` should be the stride(s) *in bytes* between elements in each dimension
+"""
+function f_contiguous(::Type{T}, sz::NTuple{N,Int}, st::NTuple{N,Int}) where {T,N}
     if st[1] != sizeof(T)
+        # not contiguous
         return false
     end
+    if prod(sz) == 1 || length(sz) == 1
+        # 0 or 1-dim arrays (with correct stride) should default to f-contiguous
+        # in julia
+        return true
+    end
     for j = 2:N
+        # check stride[cur_dim] == stride[prev_dim]*sz[prev_dim] for all dims>1,
+        # implying contiguous column-major storage (n.b. st[1] == sizeof(T) here)
         if st[j] != st[j-1] * sz[j-1]
             return false
         end
