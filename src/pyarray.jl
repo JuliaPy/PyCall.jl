@@ -13,7 +13,7 @@ end
 
 function PyArray_Info(o::PyObject)
     # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
-    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
+    pybuf = PyBuffer(o, PyBUF_ND_STRIDED)
     T, native_byteorder = array_format(pybuf)
     sz = size(pybuf)
     strd = strides(pybuf)
@@ -121,7 +121,7 @@ the Python buffer interface
 """
 function setdata!(a::PyArray{T,N}, o::PyObject) where {T,N}
     pybufinfo = a.info.pybuf
-    PyBuffer!(pybufinfo, o, PyBUF_ND_CONTIGUOUS)
+    PyBuffer!(pybufinfo, o, PyBUF_ND_STRIDED)
     dataptr = pybufinfo.buf.buf
     a.data = reinterpret(Ptr{T}, dataptr)
     a
@@ -294,7 +294,7 @@ function convert(::Type{Array{PyObject,N}}, o::PyObject) where N
     map(pyincref, convert(Array{PyPtr, N}, o))
 end
 
-array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_CONTIGUOUS))
+array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_STRIDED))
 
 """
 ```
@@ -319,7 +319,7 @@ correctly.
 """
 function NoCopyArray(o::PyObject)
     # n.b. the pydecref(::PyBuffer) finalizer handles releasing the PyBuffer
-    pybuf = PyBuffer(o, PyBUF_ND_CONTIGUOUS)
+    pybuf = PyBuffer(o, PyBUF_ND_STRIDED)
     T, native_byteorder = array_format(pybuf)
     !native_byteorder && throw(ArgumentError(
       "Only native endian format supported, format string: '$(get_format_str(pybuf))'"))
