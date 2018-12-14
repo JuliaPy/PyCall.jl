@@ -112,7 +112,9 @@ const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
 const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
-const PyBUF_ND_CONTIGUOUS = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND | PyBUF_STRIDES | PyBUF_ANY_CONTIGUOUS)
+const PyBUF_ND_STRIDED    = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND |
+                                 PyBUF_STRIDES)
+const PyBUF_ND_CONTIGUOUS = PyBUF_ND_STRIDED | PyBUF_ANY_CONTIGUOUS
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
@@ -128,8 +130,9 @@ function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
 end
 
 """
-`isbuftype(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_ND_CONTIGUOUS)`
-Returns true if the python object `o` supports the buffer protocol. False if not.
+`isbuftype(o::Union{PyObject,PyPtr})`
+Returns true if the python object `o` supports the buffer protocol as a strided
+array. False if not.
 """
 function isbuftype(o::Union{PyObject,PyPtr})
     # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
@@ -137,7 +140,7 @@ function isbuftype(o::Union{PyObject,PyPtr})
     # So we'll just try call PyObject_GetBuffer and check for success/failure
     b = PyBuffer()
     ret = ccall((@pysym :PyObject_GetBuffer), Cint,
-                     (PyPtr, Any, Cint), o, b, PyBUF_ND_CONTIGUOUS)
+                     (PyPtr, Any, Cint), o, b, PyBUF_ND_STRIDED)
     if ret != 0
         pyerr_clear()
     else
