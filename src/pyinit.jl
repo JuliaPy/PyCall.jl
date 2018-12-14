@@ -78,6 +78,23 @@ function Py_Finalize()
     ccall(@pysym(:Py_Finalize), Cvoid, ())
 end
 
+macro _copy_global_to_pie(libpy_handle, symbols...)
+    exprs = [
+        quote
+            if hassym($(esc(libpy_handle)), $sym)
+                unsafe_store!(cglobal((@pysym $sym), Ptr{Cvoid}),
+                              unsafe_load(cglobal($sym, Ptr{Cvoid})))
+            end
+        end
+        for sym in symbols
+    ]
+    quote
+        if is_pie
+            $(exprs...)
+        end
+    end
+end
+
 function __init__()
     # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
     # if e.g. you checkout Conda master, and we'll need to re-build PyCall
@@ -89,6 +106,7 @@ function __init__()
     # issue #189
     libpy_handle = libpython === nothing ? C_NULL :
         Libdl.dlopen(libpython, Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+    @_copy_global_to_pie(libpy_handle, :stdin, :stdout, :stderr)
 
     already_inited = 0 != ccall((@pysym :Py_IsInitialized), Cint, ())
 

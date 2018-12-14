@@ -69,14 +69,39 @@ function show_dlopen_error(lib, e)
     end
 end
 
-# return libpython name, libpython pointer
+# return libpython name, libpython pointer, is_pie
 function find_libpython(python::AbstractString)
     dlopen_flags = Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL
 
+    python = something(Compat.Sys.which(python))
+
+    # If libpython is dynamically linked, use it:
+    lib, = try
+        exec_find_libpython(python, `--dynamic`)
+    catch
+        [nothing]
+    end
+    if lib !== nothing
+        try
+            return (Libdl.dlopen(lib, dlopen_flags), lib, false)
+        catch e
+            show_dlopen_error(lib, e)
+        end
+    end
+
+    # If `python` is a position independent executable, use it as a
+    # shared library:
+    try
+        return (Libdl.dlopen(python, dlopen_flags), python, true)
+    catch e
+        show_dlopen_error(python, e)
+    end
+
+    # Otherwise, look for common locations of libpython:
     libpaths = exec_find_libpython(python, `--list-all`)
     for lib in libpaths
         try
-            return (Libdl.dlopen(lib, dlopen_flags), lib)
+            return (Libdl.dlopen(lib, dlopen_flags), lib, false)
         catch e
             show_dlopen_error(lib, e)
         end
@@ -95,7 +120,7 @@ function find_libpython(python::AbstractString)
             # it easier for users to investigate Python setup
             # PyCall.jl trying to use.  It also helps PyJulia to
             # compare libpython.
-            return (libpython, Libdl.dlpath(libpython))
+            return (libpython, Libdl.dlpath(libpython), false)
         catch e
             show_dlopen_error(lib, e)
         end
@@ -191,7 +216,7 @@ try # make sure deps.jl file is removed on error
         Conda.add("numpy")
     end
 
-    (libpython, libpy_name) = find_libpython(python)
+    (libpython, libpy_name, is_pie) = find_libpython(python)
     programname = pysys(python, "executable")
 
     # Get PYTHONHOME, either from the environment or from Python
@@ -227,6 +252,7 @@ try # make sure deps.jl file is removed on error
     const pyversion_build = $(repr(pyversion))
     const PYTHONHOME = "$(escape_string(PYTHONHOME))"
     const wPYTHONHOME = $(wstringconst(PYTHONHOME))
+    const is_pie = $(repr(is_pie))
 
     "True if we are using the Python distribution in the Conda package."
     const conda = $use_conda

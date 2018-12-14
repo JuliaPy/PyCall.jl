@@ -112,7 +112,6 @@ def _linked_libpython_windows():
         return None
 
 
-
 def library_name(name, suffix=SHLIB_SUFFIX, is_windows=is_windows):
     """
     Convert a file basename `name` to a library name (no "lib" and ".so" etc.)
@@ -197,7 +196,6 @@ def candidate_names(suffix=SHLIB_SUFFIX):
         yield dlprefix + stem + suffix
 
 
-
 @uniquified
 def candidate_paths(suffix=SHLIB_SUFFIX):
     """
@@ -263,8 +261,13 @@ def normalize_path(path, suffix=SHLIB_SUFFIX, is_apple=is_apple):
 
     Parameters
     ----------
-    path : str ot None
+    path : str or None
         A candidate path to a shared library.
+
+    Returns
+    -------
+    path : str or None
+        Normalized existing path or `None`.
     """
     if not path:
         return None
@@ -357,6 +360,11 @@ def cli_find_libpython(cli_op, verbose):
         print_all(candidate_names())
     elif cli_op == "candidate-paths":
         print_all(p for p in candidate_paths() if p and os.path.isabs(p))
+    elif cli_op == "dynamic":
+        path = normalize_path(linked_libpython())
+        if path is None:
+            return 1
+        print(path, end="")
     else:
         path = find_libpython()
         if path is None:
@@ -385,6 +393,10 @@ def main(args=None):
         "--candidate-paths",
         action="store_const", dest="cli_op", const="candidate-paths",
         help="Print list of candidate paths of libpython.")
+    group.add_argument(
+        "--dynamic",
+        action="store_const", dest="cli_op", const="dynamic",
+        help="Print the path to dynamically linked libpython.")
 
     ns = parser.parse_args(args)
     parser.exit(cli_find_libpython(**vars(ns)))

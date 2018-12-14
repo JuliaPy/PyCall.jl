@@ -7,7 +7,14 @@ filter(f, d::AbstractDict) = Base.filter(f, d)
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
-Compat.@info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
+Compat.@info """
+Python version $pyversion from $(PyCall.libpython),
+PYTHONHOME=$(PyCall.PYTHONHOME)
+is_pie=$(PyCall.is_pie)
+ENV[PYTHONPATH]=$PYTHONPATH
+ENV[PYTHONHOME]=$PYTHONHOME
+ENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE
+"""
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
