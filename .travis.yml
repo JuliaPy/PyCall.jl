@@ -2,7 +2,6 @@ language: julia
 os:
     - linux
 julia:
-    - 0.6
     - 0.7
     - nightly
 addons:
@@ -14,8 +13,6 @@ env:
   global:
     - PYCALL_DEBUG_BUILD="yes"
   matrix:
-    - PYTHON=python  # python 2.7
-    - PYTHON=python3 # python 3.5
     - PYTHON=Conda # not actually a python version, here to test Conda.jl's python
 matrix:
   include:
@@ -23,7 +20,7 @@ matrix:
       language: julia
       os: osx
       env: PYTHON=python
-      julia: 0.6
+      julia: 0.7
     - &test-macos-py3
       <<: *test-macos-py2
       before_install:
@@ -35,9 +32,6 @@ matrix:
     - &test-macos-conda
       <<: *test-macos-py2
       env: PYTHON=Conda
-    - {<<: *test-macos-py2,   julia: 0.7}
-    - {<<: *test-macos-py3,   julia: 0.7}
-    - {<<: *test-macos-conda, julia: 0.7}
     - {<<: *test-macos-py2,   julia: nightly}
     - {<<: *test-macos-py3,   julia: nightly}
     - {<<: *test-macos-conda, julia: nightly}
