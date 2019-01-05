@@ -3,6 +3,7 @@ VERSION < v"0.7.0-beta2.199" && __precompile__()
 module PyCall
 
 using Compat, VersionParsing
+using Compat: Pkg, @info, @debug
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion,
@@ -685,6 +686,33 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
                 The pyimport exception was: $e
                 """)
         end
+    end
+end
+
+"""
+    conda_add(packages::AbstractVector{<: AbstractString})
+
+Install conda `pakcages` _if_ PyCall is configured to use Conda.jl;
+otherwise this function does nothing.  It is intended to be used from
+`deps/build.jl` of the packages depending on PyCall, for safely
+installing Python packages via conda.  More precisely, this function
+detects if Python executable is re-installed during installing
+`packages` and then re-build PyCall if it happens.
+"""
+function conda_add(packages::AbstractVector{<: AbstractString})
+    if !conda
+        @debug "PyCall is not configured to use Conda.jl. Skip installing $packages."
+        return
+    end
+
+    before = Conda.version("python")
+    for pkg in packages
+        Conda.add(pkg)
+    end
+    after = Conda.version("python")
+    if before != after
+        @info "Python version is changed from $before to $after. Re-building PyCall.jl"
+        Pkg.build("PyCall")
     end
 end
 
