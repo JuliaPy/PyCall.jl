@@ -1,10 +1,6 @@
-using Compat.Serialization
-import Compat.Serialization: serialize, deserialize
-if VERSION < v"0.7.0-DEV.3476"
-    import Base.Serializer: serialize_type
-else
-    import Compat.Serialization: serialize_type
-end
+using Serialization
+import Serialization: serialize, deserialize
+import Serialization: serialize_type
 
 const _pickle = PyNULL()
 

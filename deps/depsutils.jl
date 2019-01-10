@@ -1,4 +1,4 @@
-import Compat.Libdl
+import Libdl
 
 hassym(lib, sym) = Libdl.dlsym_e(lib, sym) != C_NULL
 

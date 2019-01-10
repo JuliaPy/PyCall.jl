@@ -1,8 +1,7 @@
 # operators on Python objects
 
 # binary operators
-import Base: +,-,*,/,//,%,&,|,^,<<,>>
-import Compat: ⊻
+import Base: +,-,*,/,//,%,&,|,^,<<,>>,⊻
 for (op,py) in ((:+,:PyNumber_Add), (:-,:PyNumber_Subtract), (:*,:PyNumber_Multiply),
                 (:/,:PyNumber_TrueDivide), (:%,:PyNumber_Remainder),
                 (:&,:PyNumber_And), (:|,:PyNumber_Or),

@@ -5,8 +5,8 @@
 # As a result, if you switch to a different version or path of Python, you
 # will probably need to re-run Pkg.build("PyCall").
 
-using Compat, VersionParsing
-import Conda, Compat.Libdl
+using VersionParsing
+import Conda, Libdl
 
 struct UseCondaPython <: Exception end
 
@@ -45,7 +45,7 @@ pysys(python::AbstractString, var::AbstractString) = pyvar(python, "sys", var)
 
 #########################################################################
 
-const dlprefix = Compat.Sys.iswindows() ? "" : "lib"
+const dlprefix = Sys.iswindows() ? "" : "lib"
 
 # print out extra info to help with remote debugging
 const PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
@@ -127,30 +127,30 @@ wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
 # problems in the unlikely event of read-only directories.
 function writeifchanged(filename, str)
     if !isfile(filename) || read(filename, String) != str
-        Compat.@info string(abspath(filename), " has been updated")
+        @info string(abspath(filename), " has been updated")
         write(filename, str)
     else
-        Compat.@info string(abspath(filename), " has not changed")
+        @info string(abspath(filename), " has not changed")
     end
 end
 
 # return the first arg that exists in the PATH
 function whichfirst(args...)
     for x in args
-        if Compat.Sys.which(x) !== nothing
+        if Sys.which(x) !== nothing
             return x
         end
     end
     return ""
 end
 
-const prefsfile = VERSION < v"0.7" ? "PYTHON" : joinpath(first(DEPOT_PATH), "prefs", "PyCall")
+const prefsfile = joinpath(first(DEPOT_PATH), "prefs", "PyCall")
 mkpath(dirname(prefsfile))
 
 try # make sure deps.jl file is removed on error
     python = try
         let py = get(ENV, "PYTHON", isfile(prefsfile) ? readchomp(prefsfile) :
-                     (Compat.Sys.isunix() && !Compat.Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ?
+                     (Sys.isunix() && !Sys.isapple()) || Sys.ARCH ∉ (:i686, :x86_64) ?
                      whichfirst("python3", "python") : "Conda"),
             vers = isempty(py) || py == "Conda" ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
             if vers < v"2.7"
@@ -173,13 +173,13 @@ try # make sure deps.jl file is removed on error
     catch e1
         if Sys.ARCH in (:i686, :x86_64)
             if isa(e1, UseCondaPython)
-                Compat.@info string("Using the Python distribution in the Conda package by default.\n",
+                @info string("Using the Python distribution in the Conda package by default.\n",
                      "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
             else
-                Compat.@info string( "No system-wide Python was found; got the following error:\n",
+                @info string( "No system-wide Python was found; got the following error:\n",
                       "$e1\nusing the Python distribution in the Conda package")
             end
-            abspath(Conda.PYTHONDIR, "python" * (Compat.Sys.iswindows() ? ".exe" : ""))
+            abspath(Conda.PYTHONDIR, "python" * (Sys.iswindows() ? ".exe" : ""))
         else
             error("No system-wide Python was found; got the following error:\n",
                   "$e1")
@@ -205,7 +205,7 @@ try # make sure deps.jl file is removed on error
         # to always be the same on Windows, where it causes
         # problems if we try to include both.
         exec_prefix = pysys(python, "exec_prefix")
-        Compat.Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+        Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
     else
         ENV["PYTHONHOME"]
     end
@@ -213,7 +213,7 @@ try # make sure deps.jl file is removed on error
     # cache the Python version as a Julia VersionNumber
     pyversion = vparse(pyvar(python, "platform", "python_version()"))
 
-    Compat.@info "PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name"
+    @info "PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name"
 
     if pyversion < v"2.7"
         error("Python 2.7 or later is required for PyCall")
