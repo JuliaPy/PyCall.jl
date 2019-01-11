@@ -1,5 +1,5 @@
-using PyCall, Compat
-using Compat.Test, Compat.Dates, Compat.Serialization
+using PyCall
+using Test, Dates, Serialization
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -7,7 +7,7 @@ filter(f, d::AbstractDict) = Base.filter(f, d)
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
-Compat.@info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
+@info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
@@ -128,10 +128,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test collect(PyObject([1,"hello",5])) == [1,"hello",5]
 
     @test try @eval (@pyimport os.path) catch ex
-        if VERSION >= v"0.7.0-DEV.1729"
-            ex = (ex::LoadError).error
-        end
-        isa(ex, ArgumentError)
+        isa((ex::LoadError).error, ArgumentError)
     end
 
     @test PyObject("hello") == PyObject("hello")
@@ -170,7 +167,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # IO (issue #107)
     #@test roundtripeq(stdout) # No longer true since #250
-    let buf = Compat.IOBuffer(read=false, write=true), obuf = PyObject(buf)
+    let buf = IOBuffer(read=false, write=true), obuf = PyObject(buf)
         @test !obuf[:isatty]()
         @test obuf[:writable]()
         @test !obuf[:readable]()
@@ -687,53 +684,44 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
-@static if VERSION < v"0.7.0-DEV.5126" # julia#25261
-    # PyIterator not defined in this julia version
-else
-    @testset "PyIterator" begin
-        arr = [1,2]
-        o = PyObject(arr)
-        c_pyany = collect(PyCall.PyIterator{PyAny}(o))
-        @test c_pyany == arr
-        @test c_pyany[1] isa Integer
-        @test c_pyany[2] isa Integer
+@testset "PyIterator" begin
+    arr = [1,2]
+    o = PyObject(arr)
+    c_pyany = collect(PyCall.PyIterator{PyAny}(o))
+    @test c_pyany == arr
+    @test c_pyany[1] isa Integer
+    @test c_pyany[2] isa Integer
 
-        c_f64 = collect(PyCall.PyIterator{Float64}(o))
-        @test c_f64 == arr
-        @test eltype(c_f64) == Float64
+    c_f64 = collect(PyCall.PyIterator{Float64}(o))
+    @test c_f64 == arr
+    @test eltype(c_f64) == Float64
 
-        i1 = PyObject([1])
-        i2 = PyObject([2])
-        l = PyObject([i1,i2])
+    i1 = PyObject([1])
+    i2 = PyObject([2])
+    l = PyObject([i1,i2])
 
-        piter = PyCall.PyIterator(l)
-        @test length(piter) == 2
-        @test length(collect(piter)) == 2
-        r1, r2 = collect(piter)
-        @test r1.o === i1.o
-        @test r2.o  === i2.o
+    piter = PyCall.PyIterator(l)
+    @test length(piter) == 2
+    @test length(collect(piter)) == 2
+    r1, r2 = collect(piter)
+    @test r1.o === i1.o
+    @test r2.o  === i2.o
 
-        @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
-        @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
+    @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
+    @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
 
-        # 594
-        @test collect(zip(py"iter([1, 2, 3])", 1:3)) ==
-        [(1, 1), (2, 2), (3, 3)]
-        @test collect(zip(PyCall.PyIterator{Int}(py"iter([1, 2, 3])"), 1:3)) ==
-        [(1, 1), (2, 2), (3, 3)]
-        @test collect(zip(PyCall.PyIterator(py"[1, 2, 3]"o), 1:3)) ==
-        [(1, 1), (2, 2), (3, 3)]
-    end
+    # 594
+    @test collect(zip(py"iter([1, 2, 3])", 1:3)) ==
+    [(1, 1), (2, 2), (3, 3)]
+    @test collect(zip(PyCall.PyIterator{Int}(py"iter([1, 2, 3])"), 1:3)) ==
+    [(1, 1), (2, 2), (3, 3)]
+    @test collect(zip(PyCall.PyIterator(py"[1, 2, 3]"o), 1:3)) ==
+    [(1, 1), (2, 2), (3, 3)]
 end
-  
+
 @testset "atexit" begin
-    if VERSION < v"0.7-"
-        setup = ""
-    else
-        setup = Base.load_path_setup_code()
-    end
     script = """
-    $setup
+    Base.load_path_setup_code()
 
     using PyCall
 
