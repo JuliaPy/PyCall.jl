@@ -129,10 +129,10 @@ PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
 function convert(::Type{Ptr{Cvoid}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
-        v = po["value"]
+        v = po."value"
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL :
-          convert(Ptr{Cvoid}, convert(UInt, po["value"]))
+          convert(Ptr{Cvoid}, convert(UInt, po."value"))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
                        Ptr{Cvoid}, (PyPtr,Ptr{UInt8}),
@@ -657,13 +657,13 @@ const mpc = PyNULL()
 function mpmath_init()
     if ispynull(mpmath)
         copy!(mpmath, pyimport("mpmath"))
-        copy!(mpf, mpmath["mpf"])
-        copy!(mpc, mpmath["mpc"])
+        copy!(mpf, mpmath."mpf")
+        copy!(mpc, mpmath."mpc")
     end
     curprec = precision(BigFloat)
     if mpprec[1] != curprec
         mpprec[1] = curprec
-        mpmath["mp"]["prec"] = mpprec[1]
+        mpmath."mp"."prec" = mpprec[1]
     end
 end
 
@@ -686,8 +686,8 @@ convert(::Type{BigFloat}, o::PyObject) = parse(BigFloat, pystr(o))
 
 function convert(::Type{Complex{BigFloat}}, o::PyObject)
     try
-        Complex{BigFloat}(convert(BigFloat, o["real"]),
-                          convert(BigFloat, o["imag"]))
+        Complex{BigFloat}(convert(BigFloat, o."real"),
+                          convert(BigFloat, o."imag"))
     catch
         convert(Complex{BigFloat}, convert(Complex{Float64}, o))
     end
@@ -772,7 +772,7 @@ function pysequence_query(o::PyObject)
         # only handle PyList for now
         return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
     else
-        otypestr = get(o["__array_interface__"], PyObject, "typestr")
+        otypestr = get(o."__array_interface__", PyObject, "typestr")
         typestr = convert(AbstractString, otypestr) # Could this just be String now?
         T = npy_typestrs[typestr[2:end]]
         if T == PyPtr

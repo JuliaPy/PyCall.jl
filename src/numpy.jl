@@ -62,14 +62,14 @@ function npyinitialize()
     numpy = pyimport("numpy")
 
     # directory for numpy include files to parse
-    inc = pycall(numpy["get_include"], AbstractString)
+    inc = pycall(numpy."get_include", AbstractString)
 
     # numpy.number types
-    copy!(npy_number, numpy["number"])
-    copy!(npy_integer, numpy["integer"])
-    copy!(npy_floating, numpy["floating"])
-    copy!(npy_complexfloating, numpy["complexfloating"])
-    copy!(npy_bool, numpy["bool_"])
+    copy!(npy_number, numpy."number")
+    copy!(npy_integer, numpy."integer")
+    copy!(npy_floating, numpy."floating")
+    copy!(npy_complexfloating, numpy."complexfloating")
+    copy!(npy_bool, numpy."bool_")
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try
@@ -236,7 +236,7 @@ mutable struct PyArray_Info
     readonly::Bool
 
     function PyArray_Info(a::PyObject)
-        ai = PyDict{AbstractString,PyObject}(a["__array_interface__"])
+        ai = PyDict{AbstractString,PyObject}(a."__array_interface__")
         typestr = convert(AbstractString, ai["typestr"])
         T = npy_typestrs[typestr[2:end]]
         datatuple = convert(Tuple{Int,Bool}, ai["data"])

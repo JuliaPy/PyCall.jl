@@ -86,10 +86,7 @@ PyPtr(o::PyObject) = getfield(o, :o)
 
 `PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`. 
 """
-≛(o::PyObject, p::PyPtr) = PyPtr(o) == p
-≛(p::PyPtr, o::PyObject) = o ≛ p
-≛(o1::PyObject, o2::PyObject) = PyPtr(o1) == PyPtr(o2)
-≛(p1::PyPtr, p2::PyPtr) = p1 == p2
+≛(o1::Union{PyObject,PyPtr}, o2::Union{PyObject,PyPtr}) = PyPtr(o1) == PyPtr(o2)
 
 """
     PyNULL()
@@ -260,8 +257,8 @@ end
 
 function Base.Docs.doc(o::PyObject)
     if hasproperty(o, "__doc__")
-        d = o["__doc__"]
-        if !(PyPtr(d) ≛ pynothing[])
+        d = o."__doc__"
+        if !(d ≛ pynothing[])
             return Base.Docs.Text(convert(AbstractString, d))
         end
     end
@@ -311,7 +308,7 @@ end
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
 propertynames(o::PyObject) = map(x->Symbol(first(x)), 
-                                pycall(inspect["getmembers"], PyObject, o))
+                                pycall(inspect."getmembers", PyObject, o))
 
 function setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     if ispynull(o)
@@ -325,7 +322,10 @@ function setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     o
 end
 
-getindex(o::PyObject, s::Union{Symbol, AbstractString}) = getproperty(o, s)
+function getindex(o::PyObject, s::Union{Symbol, AbstractString})
+    Base.depwarn("`getindex(o::PyObject, s::Union{Symbol, AbstractString})` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.s` instead of `o[:s]`.", :getindex)
+    return getproperty(o, s)
+end
 
 
 # If I make this
@@ -343,7 +343,10 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     o
 end
 
-haskey(o::PyObject, s::Union{Symbol,AbstractString}) = hasproperty(o, s)
+function haskey(o::PyObject, s::Union{Symbol,AbstractString})
+    Base.depwarn("`haskey(o::PyObject, s::Union{Symbol, AbstractString})` is deprecated, use `hasproperty(o, s)` instead.", :haskey)
+    return hasproperty(o, s)
+end
 
 function hasproperty(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
@@ -376,12 +379,12 @@ If the Python module contains identifiers that are reserved words in Julia (e.g.
 """
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     members = convert(Vector{Tuple{AbstractString,PyObject}},
-                      pycall(inspect["getmembers"], PyObject, o))
+                      pycall(inspect."getmembers", PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     m = Module(mname, false)
     consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
-                  convert(Vector{Symbol}, o["__all__"])
+                  convert(Vector{Symbol}, o."__all__")
               catch
                   [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
@@ -625,8 +628,8 @@ function _pywith(EXPR,VAR,TYPE,BLOCK)
             end
         end
         mgrT = pytypeof(mgr)
-        exit = mgrT["__exit__"]
-        value = @pycall mgrT["__enter__"](mgr)::$(esc(TYPE))
+        exit = mgrT."__exit__"
+        value = @pycall mgrT."__enter__"(mgr)::$(esc(TYPE))
         exc = true
         try
             try
@@ -634,7 +637,7 @@ function _pywith(EXPR,VAR,TYPE,BLOCK)
                 $(esc(BLOCK))
             catch err
                 exc = false
-                if !(@pycall exit(mgr, pyimport(:sys)[:exc_info]()...)::Bool)
+                if !(@pycall exit(mgr, pyimport(:sys).exc_info()...)::Bool)
                     throw(err)
                 end
             end
@@ -835,7 +838,7 @@ end
 pushfirst!(a::PyObject, item) = insert!(a, 1, item)
 
 function prepend!(a::PyObject, items)
-    if isa(items,PyObject) && PyPtr(items) == PyPtr(a)
+    if isa(items,PyObject) && items ≛ a
         # avoid infinite loop in prepending a to itself
         return prepend!(a, collect(items))
     end

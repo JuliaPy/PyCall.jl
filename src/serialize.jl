@@ -15,7 +15,7 @@ function serialize(s::AbstractSerializer, pyo::PyObject)
     if ispynull(pyo)
         serialize(s, PyPtr(pyo))
     else
-        b = PyBuffer(pycall(pickle()["dumps"], PyObject, pyo))
+        b = PyBuffer(pycall(pickle()."dumps", PyObject, pyo))
         serialize(s, unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
     end
 end
@@ -41,6 +41,6 @@ function deserialize(s::AbstractSerializer, t::Type{PyObject})
         @assert b == C_NULL
         return PyNULL()
     else
-        return pycall(pickle()["loads"], PyObject, pybytes(b))
+        return pycall(pickle()."loads", PyObject, pybytes(b))
     end
 end
