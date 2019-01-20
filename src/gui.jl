@@ -148,7 +148,7 @@ function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     maxtime = PyObject(50)
     install_doevent(sec) do async
         app = pycall(instance, PyObject)
-        if PyPtr(app) != pynothing[]
+        if !(app ≛ pynothing[])
             app["_in_event_loop"] = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
@@ -176,7 +176,7 @@ function wx_eventloop(sec::Real=50e-3)
     EventLoopActivator = wx["EventLoopActivator"]
     install_doevent(sec) do async
         app = pycall(GetApp, PyObject)
-        if PyPtr(app) != pynothing[]
+        if !(app ≛ pynothing[])
             app["_in_event_loop"] = true
             evtloop = pycall(EventLoop, PyObject)
             ea = pycall(EventLoopActivator, PyObject, evtloop)
@@ -200,10 +200,10 @@ function Tk_eventloop(sec::Real=50e-3)
     root = PyObject(nothing)
     install_doevent(sec) do async
         new_root = Tk["_default_root"]
-        if PyPtr(new_root) != pynothing[]
+        if !(new_root ≛ pynothing[])
             root = new_root
         end
-        if PyPtr(root) != pynothing[]
+        if !(root ≛ pynothing[])
             while pycall(root["dooneevent"], Bool, flag)
             end
         end

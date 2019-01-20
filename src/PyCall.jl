@@ -882,14 +882,14 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
         function show(io::IO, mime::$mime, o::PyObject)
             if !ispynull(o) && hasproperty(o, $method)
                 r = pycall(o[$method], PyObject)
-                PyPtr(r) != pynothing[] && return write(io, convert($T, r))
+                !(r ≛ pynothing[]) && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
         end
         Base.$showable(::$mime, o::PyObject) =
             !ispynull(o) && hasproperty(o, $method) && let meth = o[$method]
-                PyPtr(meth) != pynothing[] &&
-                PyPtr(pycall(meth, PyObject)) != pynothing[]
+                !(meth ≛ pynothing[]) &&
+                !(pycall(meth, PyObject) ≛ pynothing[])
             end
     end
 end
