@@ -120,8 +120,10 @@ Keyword arguments can also be passed. For example, matplotlib's
 [pyplot](http://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
+    using PyCall
     @pyimport matplotlib.pyplot as plt
-    x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
+    x = range(0, stop=2*pi, length=1000); 
+    y = sin.(3 .* x + 4 .* cos.(2 .* x));
     plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
     plt.show()
 
