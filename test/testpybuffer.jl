@@ -42,7 +42,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
                 @testset "dtype $pytype should match eltype $jltype" begin
                     jlarr = jltype[1:10;]
                     nparr = arrpyo(jlarr, dtype=pytype)
-                    @test pystr(nparr["dtype"]) == pytype
+                    @test pystr(nparr."dtype") == pytype
                     jlarr2 = convert(PyAny, nparr)
                     @test eltype(jlarr2) == jltype
                     @test jlarr2 == jlarr

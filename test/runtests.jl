@@ -97,7 +97,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test get(d.o, 1) == "hello"
         set!(d.o, 34, "goodbye")
         @test d[34] == "goodbye"
-        @test sort!(keys(Int, d)) == sort!(collect(d.o[:keys]())) == sort!(collect(keys(d))) == [1, 34]
+        @test sort!(keys(Int, d)) == sort!(collect(d.o.keys())) == sort!(collect(keys(d))) == [1, 34]
         @test eltype(d) == eltype(typeof(d)) == Pair{Int, String}
     end
 
@@ -578,22 +578,22 @@ end
 # @pywith errors correctly handled
 @pydef mutable struct IgnoreError
     function __init__(self, ignore)
-        self[:ignore] = ignore
+        self.ignore = ignore
     end
     __enter__(self) = ()
-    __exit__(self, typ, value, tb) = self[:ignore]
+    __exit__(self, typ, value, tb) = self.ignore
 end
 
 # @pydef example from README
-@pydef mutable struct Doubler <: PyCall.builtin[:AssertionError]
-    __init__(self, x=10) = (self[:x] = x)
+@pydef mutable struct Doubler <: PyCall.builtin.AssertionError
+    __init__(self, x=10) = (self.x = x)
     function my_method(self, arg1::Number)
         return arg1 + 20
     end
     type_str(self, obj::T) where T = string(T)
-    x2.get(self) = self[:x] * 2
+    x2.get(self) = self.x * 2
     function x2.set!(self, new_val)
-        self[:x] = new_val / 2
+        self.x = new_val / 2
     end
 end
 
@@ -601,7 +601,7 @@ end
 @pydef mutable struct ObjectCounter
     obj_count = 1 - 1
     function __init__(::PyObject)
-        ObjectCounter[:obj_count] += 1
+        ObjectCounter.obj_count += 1
     end
 end
 
@@ -611,14 +611,14 @@ end
     d.x2 = 30
     @test d.x == 15
     @test d.type_str(10) == string(PyInt)
-    @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
+    @test PyCall.builtin.isinstance(d, PyCall.builtin.AssertionError)
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
 
-    @test ObjectCounter[:obj_count] == 0
+    @test ObjectCounter.obj_count == 0
     a = ObjectCounter()
-    @test ObjectCounter[:obj_count] == 1
+    @test ObjectCounter.obj_count == 1
 end
 
 @testset "callback" begin
