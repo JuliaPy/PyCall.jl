@@ -306,7 +306,11 @@ getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 propertynames(o::PyObject) = map(x->Symbol(first(x)), 
                                 pycall(inspect."getmembers", PyObject, o))
 
-function setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
+# avoiding method ambiguity
+setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
+setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
+
+function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
@@ -358,7 +362,7 @@ end
 
 #########################################################################
 
-keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
+keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect."getmembers",
                                 PyVector{Tuple{Symbol,PyObject}}, o)]
 
 #########################################################################
@@ -731,9 +735,7 @@ end
 
 Look up a string or symbol `s` among the global Python builtins. If `s` is a string it returns a PyObject, while if `s` is a symbol it returns the builtin converted to `PyAny`.
 """
-function pybuiltin(name)
-    builtin[name]
-end
+pybuiltin(name) = getproperty(builtin, name)
 
 #########################################################################
 include("pyfncall.jl")

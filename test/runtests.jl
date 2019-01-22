@@ -163,7 +163,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
     # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
-    pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
+    pyutf8(s::PyObject) = pycall(s."encode", PyObject, "utf-8")
     pyutf8(s::String) = pyutf8(PyObject(s))
 
     # IO (issue #107)
@@ -401,7 +401,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     # issue #345
-    let weakdict = pyimport("weakref")["WeakValueDictionary"]
+    let weakdict = pyimport("weakref")."WeakValueDictionary"
         # (use weakdict for the value, since Python supports
         #  weak references to type objects)
         @test convert(Dict{Int,PyObject}, weakdict(Dict(3=>weakdict))) == Dict(3=>weakdict)
@@ -607,10 +607,10 @@ end
 
 @testset "pydef" begin
     d = Doubler(5)
-    @test d[:x] == 5
-    d[:x2] = 30
-    @test d[:x] == 15
-    @test d[:type_str](10) == string(PyInt)
+    @test d.x == 5
+    d.x2 = 30
+    @test d.x == 15
+    @test d.type_str(10) == string(PyInt)
     @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
@@ -747,7 +747,7 @@ end
         println("atexit called")
     end
     """
-    out = read(`$(Base.julia_cmd()) -e $script`, String)
+    out = read(`$(Base.julia_cmd()) --startup-file=no -e $script`, String)
     @test occursin("atexit called", out)
 end
 
