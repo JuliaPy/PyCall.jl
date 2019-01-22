@@ -3,6 +3,7 @@
 #########################################################################
 # Iterating over Python objects in Julia
 
+Base.IteratorSize(::Type{PyObject}) = Base.SizeUnknown()
 function _start(po::PyObject)
     sigatomic_begin()
     try
@@ -29,15 +30,80 @@ end
 
     Base.done(po::PyObject, s) = ispynull(s[1])
 else
-    function Base.iterate(po::PyObject, s=_start(po))
+    """
+        PyIterator{T}(pyobject)
+
+    Wrap `pyobject::PyObject` into an iterator, that produces items of type `T`. To be more precise `convert(T, item)` is applied in each iteration. This can be useful to avoid automatic conversion of items into corresponding julia types.
+    ```jldoctest
+    julia> using PyCall
+
+    julia> l = PyObject([PyObject(1), PyObject(2)])
+    PyObject [1, 2]
+
+    julia> piter = PyCall.PyIterator{PyAny}(l)
+    PyCall.PyIterator{PyAny,Base.HasLength()}(PyObject [1, 2])
+
+    julia> collect(piter)
+    2-element Array{Any,1}:
+     1
+     2
+
+    julia> piter = PyCall.PyIterator(l)
+    PyCall.PyIterator{PyObject,Base.HasLength()}(PyObject [1, 2])
+
+    julia> collect(piter)
+    2-element Array{PyObject,1}:
+     PyObject 1
+     PyObject 2
+    ```
+    """
+    struct PyIterator{T,S}
+        o::PyObject
+    end
+
+    function _compute_IteratorSize(o::PyObject)
+        S = try
+            length(o)
+            Base.HasLength
+        catch err
+            if !(err isa PyError && pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError))
+                rethrow()
+            end
+            Base.SizeUnknown
+        end
+    end
+    function PyIterator(o::PyObject) 
+        PyIterator{PyObject}(o)
+    end
+    function (::Type{PyIterator{T}})(o::PyObject) where {T}
+        S = _compute_IteratorSize(o)
+        PyIterator{T,S}(o)
+    end
+    
+    Base.eltype(::Type{<:PyIterator{T}}) where T = T
+    Base.eltype(::Type{<:PyIterator{PyAny}}) = Any
+    Base.length(piter::PyIterator) = length(piter.o)
+
+    Base.IteratorSize(::Type{<: PyIterator{T,S}}) where {T,S} = S()
+
+    _start(piter::PyIterator) = _start(piter.o)
+    
+    function Base.iterate(piter::PyIterator{T}, s=_start(piter)) where {T}
         ispynull(s[1]) && return nothing
         sigatomic_begin()
         try
             nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
-            return (convert(PyAny, s[1]), (nxt, s[2]))
+            return (convert(T,s[1]), (nxt, s[2]))
         finally
             sigatomic_end()
         end
+    end
+    function Base.iterate(po::PyObject, s=_start(po))
+        # avoid the constructor that calls length
+        # since that might be an expensive operation
+        # even if length is cheap, this adds 10% performance
+        piter = PyIterator{PyAny, Base.SizeUnknown}(po)
+        iterate(piter, s)
     end
 end
 
