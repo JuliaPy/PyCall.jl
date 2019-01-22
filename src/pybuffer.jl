@@ -29,7 +29,7 @@ end
 mutable struct PyBuffer
     buf::Py_buffer
     PyBuffer() = begin
-        b = new(Py_buffer(C_NULL, C_NULL, 0, 0,
+        b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
         @compat finalizer(pydecref, b)
@@ -37,6 +37,13 @@ mutable struct PyBuffer
     end
 end
 
+"""
+`pydecref(o::PyBuffer)`
+Release the reference to buffer `o`
+N.b. As per https://docs.python.org/3/c-api/buffer.html#c.PyBuffer_Release,
+It is an error to call this function on a PyBuffer that was not obtained via
+the python c-api function `PyObject_GetBuffer(), unless o.obj is a PyPtr(C_NULL)`
+"""
 function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
@@ -86,6 +93,9 @@ function Base.stride(b::PyBuffer, d::Integer)
     return Int(unsafe_load(b.buf.strides, d))
 end
 
+# Strides in bytes
+Base.strides(b::PyBuffer) = ((stride(b,i) for i in 1:b.buf.ndim)...,)
+
 # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
 iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
@@ -93,7 +103,6 @@ iscontiguous(b::PyBuffer) =
 
 #############################################################################
 # pybuffer constant values from Include/object.h
-const PyBUF_MAX_NDIM = convert(Cint, 64)
 const PyBUF_SIMPLE    = convert(Cint, 0)
 const PyBUF_WRITABLE  = convert(Cint, 0x0001)
 const PyBUF_FORMAT    = convert(Cint, 0x0004)
@@ -103,14 +112,40 @@ const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
 const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
+const PyBUF_ND_CONTIGUOUS = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND | PyBUF_STRIDES | PyBUF_ANY_CONTIGUOUS)
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
-    b = PyBuffer()
+    return PyBuffer!(PyBuffer(), o, flags)
+end
+
+function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
+    pydecref(b) # ensure b is properly released
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Any, Cint), o, b, flags)
     return b
+end
+
+"""
+`isbuftype(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_ND_CONTIGUOUS)`
+Returns true if the python object `o` supports the buffer protocol. False if not.
+"""
+function isbuftype(o::Union{PyObject,PyPtr})
+    # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
+    # so we can't access it easily. It basically just checks if PyObject_GetBuffer exists
+    # So we'll just try call PyObject_GetBuffer and check for success/failure
+    b = PyBuffer()
+    ret = ccall((@pysym :PyObject_GetBuffer), Cint,
+                     (PyPtr, Any, Cint), o, b, PyBUF_ND_CONTIGUOUS)
+    if ret != 0
+        pyerr_clear()
+    else
+        # handle pointer types
+        T, native_byteorder = array_format(b)
+        T <: Ptr && (ret = 1)
+    end
+    return ret == 0
 end
 
 #############################################################################
@@ -152,6 +187,71 @@ function Base.write(io::IO, b::PyBuffer)
     else
         return writedims(io, b, 0, 1)
     end
+end
+
+# ref: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
+
+const standard_typestrs = Dict{String,DataType}(
+                           "?"=>Bool,        "P"=>Ptr{Cvoid},
+                           "b"=>Int8,        "B"=>UInt8,
+                           "h"=>Int16,       "H"=>UInt16,
+                           "i"=>Int32,       "I"=>UInt32,
+                           "l"=>Int32,       "L"=>UInt32,
+                           "q"=>Int64,       "Q"=>UInt64,
+                           "e"=>Float16,     "f"=>Float32,
+                           "d"=>Float64,     "g"=>Nothing, # Float128?
+                           # `Nothing` indicates no equiv Julia type
+                           "Z8"=>ComplexF32, "Z16"=>ComplexF64,
+                           "Zf"=>ComplexF32, "Zd"=>ComplexF64)
+
+const native_typestrs = Dict{String,DataType}(
+                           "?"=>Bool,        "P"=>Ptr{Cvoid},
+                           "b"=>Int8,        "B"=>UInt8,
+                           "h"=>Cshort,      "H"=>Cushort,
+                           "i"=>Cint,        "I"=>Cuint,
+                           "l"=>Clong,       "L"=>Culong,
+                           "q"=>Clonglong,   "Q"=>Culonglong,
+                           "e"=>Float16,     "f"=>Cfloat,
+                           "d"=>Cdouble,     "g"=>Nothing, # Float128?
+                           # `Nothing` indicates no equiv Julia type
+                           "Z8"=>ComplexF32, "Z16"=>ComplexF64,
+                           "Zf"=>ComplexF32, "Zd"=>ComplexF64)
+
+const typestrs_native =
+    Dict{DataType, String}(zip(values(native_typestrs), keys(native_typestrs)))
+
+get_format_str(pybuf::PyBuffer) = unsafe_string(convert(Ptr{UInt8}, pybuf.buf.format))
+
+function array_format(pybuf::PyBuffer)
+    # a NULL-terminated format-string ... indicating what is in each element of memory.
+    # TODO: handle more cases: https://www.python.org/dev/peps/pep-3118/#additions-to-the-struct-string-syntax
+    # refs: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
+    #       https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/_internal.py#L490
+    #       https://docs.python.org/2/library/struct.html#byte-order-size-and-alignment
+
+    # "NULL implies standard unsigned bytes ("B")" --pep 3118
+    pybuf.buf.format == C_NULL && return UInt8, true
+
+    fmt_str = get_format_str(pybuf)
+    native_byteorder = true
+    type_start_idx = 1
+    typestrs = standard_typestrs
+    if length(fmt_str) > 1
+        type_start_idx = 2
+        if fmt_str[1] == '='
+        elseif fmt_str[1] == '<'
+            native_byteorder = ENDIAN_BOM == 0x04030201
+        elseif fmt_str[1] == '>' || fmt_str =='!'
+            native_byteorder = ENDIAN_BOM == 0x01020304
+        elseif fmt_str[1] == '@' || fmt_str[1] == '^'
+            typestrs = native_typestrs
+        elseif fmt_str[1] == "Z"
+            type_start_idx = 1
+        else
+            error("Unsupported format string: \"$fmt_str\"")
+        end
+    end
+    typestrs[fmt_str[type_start_idx:end]], native_byteorder
 end
 
 #############################################################################
