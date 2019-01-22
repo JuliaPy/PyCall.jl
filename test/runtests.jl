@@ -732,8 +732,8 @@ else
         @test length(piter) == 2
         @test length(collect(piter)) == 2
         r1, r2 = collect(piter)
-        @test r1.o === i1.o
-        @test r2.o  === i2.o
+        @test getfield(r1, :o) === getfield(i1, :o)
+        @test getfield(r2, :o) === getfield(i2, :o)
 
         @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
         @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
