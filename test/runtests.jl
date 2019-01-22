@@ -415,6 +415,15 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test get(weakdict(Dict(3=>weakdict)),3) == weakdict
     end
 
+    # Weak ref support for pyjlwrap types
+    let weakref = pyimport("weakref")
+        bar = TestConstruct(1)
+        o = PyObject(bar)
+        @test PyCall.is_pyjlwrap(o)
+        r = weakref[:ref](o)
+        @test weakref[:getweakrefcount](o) == 1
+    end
+
     # Expose python docs to Julia doc system
     py"""
     def foo():

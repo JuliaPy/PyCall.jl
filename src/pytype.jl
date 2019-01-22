@@ -168,6 +168,7 @@ const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION_ = (0x00000003<<15)
 #  -- most fields can default to 0 except where noted
 
 const sizeof_PyObject_HEAD = sizeof(Int) + sizeof(PyPtr)
+const sizeof_pyjlwrap_head = sizeof_PyObject_HEAD + sizeof(PyPtr)
 
 mutable struct PyTypeObject
     # PyObject_HEAD (for non-Py_TRACE_REFS build):
@@ -325,17 +326,22 @@ struct Py_jlWrap
     ob_refcnt::Int
     ob_type::PyPtr
 
+    ob_weakrefs::PyPtr
     jl_value::Any
 end
 
 # destructor for jlwrap instance, assuming it was created with pyjlwrap_new
 function pyjlwrap_dealloc(o::PyPtr)
+    p = convert(Ptr{PyPtr}, o)
+    if unsafe_load(p, 3) != PyPtr_NULL
+        ccall((@pysym :PyObject_ClearWeakRefs), Cvoid, (PyPtr,), o)
+    end
     delete!(pycall_gc, o)
     return nothing
 end
 
 unsafe_pyjlwrap_to_objref(o::Union{PyPtr, PyObject}) =
-  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, PyPtr(o)), 3))
+  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, PyPtr(o)), 4))
 
 function pyjlwrap_repr(o::PyPtr)
     try
@@ -440,7 +446,8 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
         pycall_gc[PyPtr(o)] = value
         ptr = pointer_from_objref(value)
     end
-    unsafe_store!(p, ptr, 3)
+    unsafe_store!(p, C_NULL, 3)
+    unsafe_store!(p, ptr, 4)
     return o
 end
 

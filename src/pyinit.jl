@@ -27,7 +27,7 @@ const pyxrange = Ref{PyPtr}(0)
 function pyjlwrap_init()
     # PyMemberDef stores explicit pointers, hence must be initialized at runtime
     push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
-                                        T_PYSSIZET, sizeof_PyObject_HEAD, READONLY,
+                                        T_PYSSIZET, sizeof_pyjlwrap_head, READONLY,
                                         pyjlwrap_doc),
                             PyMemberDef(C_NULL,0,0,0,C_NULL))
 
@@ -57,6 +57,7 @@ function pyjlwrap_init()
         t.tp_iter = pyjlwrap_getiter_ptr
         t.tp_hash = sizeof(Py_hash_t) < sizeof(Int) ?
                     pyjlwrap_hash32_ptr : pyjlwrap_hash_ptr
+        t.tp_weaklistoffset = fieldoffset(Py_jlWrap, 3)
     end
 end
 
