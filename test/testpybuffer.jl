@@ -15,7 +15,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
     end
 
     if !npy_initialized
-        println("Skipping array related buffer tests since NumPy not available")
+        println(stderr, "Warning: skipping array related buffer tests since NumPy not available")
     else
         np = pyimport("numpy")
         listpy = pybuiltin("list")
@@ -47,6 +47,89 @@ pyutf8(s::String) = pyutf8(PyObject(s))
                     @test eltype(jlarr2) == jltype
                     @test jlarr2 == jlarr
                 end
+            end
+        end
+
+        # f_contiguous(T, sz, st)
+        @testset "f_contiguous 1D" begin
+            # contiguous case: stride == sizeof(T)
+            @test f_contiguous(Float64, (4,), (8,)) == true
+            # non-contiguous case: stride != sizeof(T)
+            @test f_contiguous(Float64, (4,), (16,)) == false
+        end
+
+        @testset "f_contiguous 2D" begin
+            # contiguous: st[1] == sizeof(T), st[2] == st[1]*sz[1]
+            @test f_contiguous(Float64, (4, 2), (8, 32)) == true
+            # non-contiguous: stride != sizeof(T), but st[2] == st[1]*sz[1]
+            @test f_contiguous(Float64, (4, 2), (16, 64)) == false
+            # non-contiguous: stride == sizeof(T), but st[2] != st[1]*sz[1]
+            @test f_contiguous(Float64, (4, 2), (8, 64)) == false
+        end
+
+        @testset "copy f_contig 1d" begin
+            apyo = arrpyo(1.0:10.0, "d")
+            pyarr = PyArray(apyo)
+            jlcopy = copy(pyarr)
+            @test pyarr.f_contig == true
+            @test pyarr.c_contig == true
+            @test all(jlcopy .== pyarr)
+            # check it's not aliasing the same data
+            jlcopy[1] = -1.0
+            @test pyarr[1] == 1.0
+        end
+
+        @testset "copy c_contig 2d" begin
+            apyo = pytestarray(2,3) # arrpyo([[1,2,3],[4,5,6]], "d")
+            pyarr = PyArray(apyo)
+            jlcopy = copy(pyarr)
+            @test pyarr.c_contig == true
+            @test pyarr.f_contig == false
+            # check all is in order
+            for i in 1:size(pyarr, 1)
+                for j in 1:size(pyarr, 1)
+                    @test jlcopy[i,j] == pyarr[i,j]
+                end
+            end
+            # check it's not aliasing the same data
+            jlcopy[1,1] = -1.0
+            @test pyarr[1,1] == 1.0
+        end
+
+        @testset "Non contiguous PyArrays" begin
+            @testset "1d non-contiguous" begin
+                # create an array of four Int32s, with stride 8
+                nparr = pycall(np["ndarray"], PyObject, 4,
+                                buffer=UInt32[1,0,1,0,1,0,1,0],
+                                dtype="i4", strides=(8,))
+                pyarr = PyArray(nparr)
+
+                # The convert goes via a PyArray then a `copy`
+                @test convert(PyAny, nparr) == [1, 1, 1, 1]
+
+                @test eltype(pyarr) == Int32
+                @test sizeof(eltype(pyarr)) == 4
+                @test pyarr.info.st == (8,)
+                # not f_contig because not contiguous
+                @test pyarr.f_contig == false
+                @test copy(pyarr) == Int32[1, 1, 1, 1]
+            end
+
+            @testset "2d non-contiguous" begin
+                nparr = pycall(np["ndarray"], PyObject,
+                                buffer=UInt32[1,0,2,0,1,0,2,0,
+                                              1,0,2,0,1,0,2,0], order="f",
+                                dtype="i4", shape=(2, 4), strides=(8,16))
+                pyarr = PyArray(nparr)
+
+                # The convert goes via a PyArray then a `copy`
+                @test convert(PyAny, nparr) == [1 1 1 1; 2 2 2 2]
+                pyarr = convert(PyArray, nparr)
+                @test eltype(pyarr) == Int32
+                @test pyarr.info.st == (8, 16)
+                # not f_contig because not contiguous
+                @test pyarr.f_contig == false
+                @test copy(pyarr) == Int32[1 1 1 1; 2 2 2 2]
             end
         end
 
