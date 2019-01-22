@@ -105,7 +105,7 @@ function __init__()
     end
 
     # Will get reinitialized properly on first use
-    Compat.Sys.iswindows() && (PyActCtx[] = C_NULL)
+    Sys.iswindows() && (PyActCtx[] = C_NULL)
 
     # Make sure python wasn't upgraded underneath us
     new_pyversion = vparse(split(unsafe_string(ccall(@pysym(:Py_GetVersion),
@@ -149,15 +149,10 @@ function __init__()
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
-        @static if VERSION >= v"0.7.0-DEV.1963"
-            ref0 = Ref{UInt32}(0)
-            GC.@preserve ref0 ccall(@pysym(:PySys_SetArgvEx), Cvoid,
-                                         (Cint, Ref{Ptr{Cvoid}}, Cint),
-                                         1, pointer_from_objref(ref0), 0)
-        else
-            ccall(@pysym(:PySys_SetArgvEx), Cvoid, (Cint, Ptr{Cwstring}, Cint),
-                  1, [""], 0)
-        end
+        ref0 = Ref{UInt32}(0)
+        GC.@preserve ref0 ccall(@pysym(:PySys_SetArgvEx), Cvoid,
+                                        (Cint, Ref{Ptr{Cvoid}}, Cint),
+                                        1, pointer_from_objref(ref0), 0)
 
         # Some Python code checks sys.ps1 to see if it is running
         # interactively, and refuses to be interactive otherwise.

@@ -1,4 +1,4 @@
-using Compat, Compat.Test, PyCall
+using Test, PyCall
 
 py"""
 def mklist(*args, **kwargs):

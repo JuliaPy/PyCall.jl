@@ -2,8 +2,8 @@ language: julia
 os:
     - linux
 julia:
-    - 0.6
     - 0.7
+    - 1.0
     - nightly
 addons:
   apt:
@@ -23,7 +23,7 @@ matrix:
       language: julia
       os: osx
       env: PYTHON=python
-      julia: 0.6
+      julia: 1.0
     - &test-macos-py3
       <<: *test-macos-py2
       before_install:
@@ -35,9 +35,9 @@ matrix:
     - &test-macos-conda
       <<: *test-macos-py2
       env: PYTHON=Conda
-    - {<<: *test-macos-py2,   julia: 0.7}
-    - {<<: *test-macos-py3,   julia: 0.7}
-    - {<<: *test-macos-conda, julia: 0.7}
+    - {<<: *test-macos-py2,   julia: 1.0}
+    - {<<: *test-macos-py3,   julia: 1.0}
+    - {<<: *test-macos-conda, julia: 1.0}
     - {<<: *test-macos-py2,   julia: nightly}
     - {<<: *test-macos-py3,   julia: nightly}
     - {<<: *test-macos-conda, julia: nightly}

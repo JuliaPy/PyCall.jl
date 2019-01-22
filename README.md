@@ -4,8 +4,6 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
 [![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
 
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.6.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.6)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
 
 
@@ -20,7 +18,7 @@ without copying them.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.5 or later is required.
+install the files.  Julia 0.7 or later is required.
 
 The latest development version of PyCall is available from
 <https://github.com/stevengj/PyCall.jl>.  If you want to switch to

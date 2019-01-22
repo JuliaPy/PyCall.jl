@@ -27,7 +27,7 @@ macro with_ioraise(expr)
 end
 
 function jl_io_readline(io::IO, nb)
-    d = Compat.readline(io, keep=true)
+    d = readline(io, keep=true)
     if sizeof(d) > nb ≥ 0
         error("byte-limited readline is not yet supported by PyCall")
     end
@@ -38,7 +38,7 @@ function jl_io_readlines(io::IO, nb)
     ret = PyObject[]
     nread = 0
     while (nb < 0 || nread ≤ nb) && !eof(io)
-        d = Compat.readline(io, keep=true)
+        d = readline(io, keep=true)
         nread += sizeof(d)
         push!(ret, PyObject(d))
     end

@@ -1,4 +1,4 @@
-using Compat.Test, PyCall, Compat
+using Test, PyCall
 using PyCall: f_contiguous, PyBUF_ND_CONTIGUOUS, array_format, npy_initialized,
 NoCopyArray, isbuftype, setdata!
 

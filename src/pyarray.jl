@@ -339,11 +339,8 @@ function NoCopyArray(o::PyObject)
       "Array datatype '$(get_format_str(pybuf))' not supported"))
     # TODO more checks on strides etc
     sz = size(pybuf)
-    @static if VERSION >= v"0.7.0-DEV.3526" # julia#25647
-        arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, own=false)
-    else
-        arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, false)
-    end
+    arr = unsafe_wrap(Array, convert(Ptr{T}, pybuf.buf.buf), sz, own=false)
+
     !f_contiguous(T, sz, strides(pybuf)) &&
         (arr = PermutedDimsArray(reshape(arr, reverse(sz)), (pybuf.buf.ndim:-1:1)))
     return arr

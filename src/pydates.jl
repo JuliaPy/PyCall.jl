@@ -1,6 +1,6 @@
 # Conversion functions for date and time objects in the Python datetime
 # module and the Julia Dates module.
-import Compat.Dates
+import Dates
 
 # Unfortunately, the Python C API (in Python/Include/datetime.h) is somewhat
 # painful to call from Julia because it consists mainly of macros that

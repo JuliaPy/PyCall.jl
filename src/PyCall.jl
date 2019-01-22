@@ -1,8 +1,6 @@
-VERSION < v"0.7.0-beta2.199" && __precompile__()
-
 module PyCall
 
-using Compat, VersionParsing
+using VersionParsing
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion,
@@ -18,13 +16,9 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty,
        filter!, hash, splice!, pop!, ==, isequal, push!,
-       append!, insert!, prepend!, unsafe_convert
-
-@static if VERSION >= v"0.7-"
-    import Base: getproperty, setproperty!, propertynames
-end
-
-import Compat: pushfirst!, popfirst!, firstindex, lastindex
+       append!, insert!, prepend!, unsafe_convert,
+       pushfirst!, popfirst!, firstindex, lastindex,
+       getproperty, setproperty!, propertynames
 
 # Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -75,7 +69,7 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        @compat finalizer(pydecref, po)
+        finalizer(pydecref, po)
         return po
     end
 end
@@ -401,7 +395,7 @@ end
 
 #########################################################################
 
-@static if Compat.Sys.iswindows()
+@static if Sys.iswindows()
     # Many python extensions are linked against a very specific version of the
     # MSVC runtime library. To load this library, libpython declares an
     # appropriate manifest, but unfortunately most extensions do not.
@@ -574,14 +568,8 @@ macro pyimport(name, optional_varname...)
     mname = modulename(name)
     Name = pyimport_name(name, optional_varname)
     quoteName = Expr(:quote, Name)
-    # VERSION 0.7
-    @static if isdefined(Base, Symbol("@isdefined"))
-        isdef_check = :(isdefined($__module__, $quoteName))
-    else
-        isdef_check = :(isdefined($quoteName))
-    end
     quote
-        if !$isdef_check
+        if !isdefined($__module__, $quoteName)
             const $(esc(Name)) = pywrap(pyimport($mname))
         elseif !isa($(esc(Name)), Module)
             error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
@@ -699,7 +687,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
         pyimport(modulename)
     catch e
         if conda
-            Compat.@info "Installing $modulename via the Conda $condapkg package..."
+            @info "Installing $modulename via the Conda $condapkg package..."
             isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
@@ -883,7 +871,6 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
-    showable = VERSION < v"0.7.0-DEV.4047" ? :mimewritable : :showable
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
             if !ispynull(o) && hasproperty(o, $method)
@@ -892,8 +879,8 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
             end
             throw(MethodError(show, (io, mime, o)))
         end
-        Base.$showable(::$mime, o::PyObject) =
-            !ispynull(o) && hasproperty(o, $method) && let meth = o[$method]
+        Base.showable(::$mime, o::PyObject) =
+            !ispynull(o) && hasproperty(o, $method) && let meth = o.$method
                 !(meth ≛ pynothing[]) &&
                 !(pycall(meth, PyObject) ≛ pynothing[])
             end
