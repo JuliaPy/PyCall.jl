@@ -413,8 +413,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         bar = TestConstruct(1)
         o = PyObject(bar)
         @test PyCall.is_pyjlwrap(o)
-        r = weakref[:ref](o)
-        @test weakref[:getweakrefcount](o) == 1
+        r = weakref.ref(o)
+        @test weakref.getweakrefcount(o) == 1
     end
 
     # Expose python docs to Julia doc system
@@ -743,7 +743,7 @@ end
 
     using PyCall
 
-    pyimport("atexit")[:register]() do
+    pyimport("atexit").register() do
         println("atexit called")
     end
     """

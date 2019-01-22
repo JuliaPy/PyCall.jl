@@ -52,11 +52,11 @@ function npyinitialize()
     if pyversion.major < 3
         PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr),
                                      Ptr{Ptr{Cvoid}}, (PyPtr,),
-                                     npy_multiarray["_ARRAY_API"])
+                                     npy_multiarray."_ARRAY_API")
     else
         PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
                                      Ptr{Ptr{Cvoid}}, (PyPtr,Ptr{Cvoid}),
-                                     npy_multiarray["_ARRAY_API"], C_NULL)
+                                     npy_multiarray."_ARRAY_API", C_NULL)
     end
 
     numpy = pyimport("numpy")

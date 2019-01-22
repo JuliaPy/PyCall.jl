@@ -554,7 +554,7 @@ end
 # Our approach is to wrap an iterator over d.o["items"]
 # which necessitates including d.o["items"] in the state.
 function _start(d::PyDict{K,V,false}) where {K,V}
-    d_items = pycall(d.o["items"], PyObject)
+    d_items = pycall(d.o."items", PyObject)
     (d_items, iterate(d_items))
 end
 function Base.iterate(d::PyDict{K,V,false}, itr=_start(d)) where {K,V}
