@@ -160,7 +160,7 @@ function __init__()
         if isinteractive()
             let sys = pyimport("sys")
                 if !hasproperty(sys, "ps1")
-                    sys["ps1"] = ">>> "
+                    sys."ps1" = ">>> "
                 end
             end
         end

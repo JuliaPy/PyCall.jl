@@ -331,20 +331,9 @@ function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}
     return getproperty(o, s)
 end
 
-
-# If I make this
-# setindex!(o::PyObject, v, s::Union{Symbol,AbstractString}) = setproperty!(o, s, v)
-# the tests (Pkg.test("PyCall")) won't go through. Don't know why.....
-function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
-    if ispynull(o)
-        throw(ArgumentError("assign of NULL PyObject"))
-    end
-    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
-        pyerr_clear()
-        throw(KeyError(s))
-    end
-    o
+function setindex!(o::PyObject, v, s::Union{Symbol, AbstractString})
+    Base.depwarn("`setindex!(o::PyObject, v, s::Union{Symbol, AbstractString})` is deprecated in favor of `setproperty!(o, s, v)`.", :setindex!)
+    return _setproperty!(o, s, v)
 end
 
 function haskey(o::PyObject, s::Union{Symbol,AbstractString})
