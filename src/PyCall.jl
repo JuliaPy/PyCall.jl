@@ -322,8 +322,12 @@ function setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     o
 end
 
-function getindex(o::PyObject, s::Union{Symbol, AbstractString})
-    Base.depwarn("`getindex(o::PyObject, s::Union{Symbol, AbstractString})` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.s` instead of `o[:s]`.", :getindex)
+function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}
+    if T == Symbol
+        Base.depwarn("`getindex(o::PyObject, s::Symbol)` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.s` instead of `o[:s]`.", :getindex)
+    else
+        Base.depwarn("`getindex(o::PyObject, s::AbstractString)` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.\"s\"` instead of `o[\"s\"]`.", :getindex)
+    end
     return getproperty(o, s)
 end
 
