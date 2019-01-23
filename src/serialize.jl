@@ -9,7 +9,7 @@ pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(PyCall.pyversion.major â‰
 function serialize(s::AbstractSerializer, pyo::PyObject)
     serialize_type(s, PyObject)
     if ispynull(pyo)
-        serialize(s, PyPtr(pyo))
+        serialize(s, PyPtr_NULL)
     else
         b = PyBuffer(pycall(pickle()."dumps", PyObject, pyo))
         serialize(s, unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
