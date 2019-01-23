@@ -153,8 +153,8 @@ pyreturn(x) = PyPtr(pyincref(PyObject(x)))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
-    setfield!(dest, :o, PyPtr(src))
-    return pyincref(dest)
+    setfield!(dest, :o, PyPtr(pyincref(src)))
+    return dest
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
@@ -272,7 +272,7 @@ function hash(o::PyObject)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(PyPtr(o)))
+        hashsalt(unsafe_pyjlwrap_to_objref(o))
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error

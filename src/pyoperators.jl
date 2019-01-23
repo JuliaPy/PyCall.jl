@@ -59,8 +59,7 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
         if ispynull(o1) || ispynull(o2)
             return $(py==Py_EQ || py==Py_NE || op==:isless ? :($op(PyPtr(o1), PyPtr(o2))) : false)
         elseif is_pyjlwrap(o1) && is_pyjlwrap(o2)
-            return $op(unsafe_pyjlwrap_to_objref(PyPtr(o1)),
-                       unsafe_pyjlwrap_to_objref(PyPtr(o2)))
+            return $op(unsafe_pyjlwrap_to_objref(o1), unsafe_pyjlwrap_to_objref(o2))
         else
             if $(op == :isless || op == :isequal)
                 return Bool(@pycheckz ccall((@pysym :PyObject_RichCompareBool), Cint,
@@ -79,5 +78,5 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
     end
 end
 # default to false since hash(x) != hash(PyObject(x)) in general
-isequal(o1::PyObject, o2::Any) = !ispynull(o1) && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(PyPtr(o1)), o2) : false
+isequal(o1::PyObject, o2::Any) = !ispynull(o1) && is_pyjlwrap(o1) ? isequal(unsafe_pyjlwrap_to_objref(o1), o2) : false
 isequal(o1::Any, o2::PyObject) = isequal(o2, o1)
