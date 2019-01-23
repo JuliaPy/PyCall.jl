@@ -461,7 +461,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     let o = PyObject(Any[1,2]), c = o
         broadcast!(+, o, o, Any[3,4]) # o .+= x doesn't work yet in 0.7
         @test collect(o) == [1,2,3,4]
-        @test PyPtr(o) == PyPtr(c) # updated in-place
+        GC.@preserve o c @test(PyPtr(o) == PyPtr(c)) # updated in-place
     end
 
     # more flexible bool conversions, matching Python "truth value testing"

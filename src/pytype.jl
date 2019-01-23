@@ -341,7 +341,7 @@ function pyjlwrap_dealloc(o::PyPtr)
 end
 
 unsafe_pyjlwrap_to_objref(o::Union{PyPtr, PyObject}) =
-  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, PyPtr(o)), 4))
+  GC.@preserve o unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, PyPtr(o)), 4))
 
 function pyjlwrap_repr(o::PyPtr)
     try
@@ -425,9 +425,6 @@ pyjlwrap_type(init::Function, name::AbstractString) =
     pyjlwrap_type!(init, PyTypeObject(), name)
 
 # Given a jlwrap type, create a new instance (and save value for gc)
-# (Careful: not sure if this works if value is an isbits type,
-#  since, the jl_value_t* may be to a temporary copy.  But don't need
-#  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),

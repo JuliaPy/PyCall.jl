@@ -79,7 +79,7 @@ PyPtr(o::PyObject) = getfield(o, :o)
 """
     ≛(x, y)
 
-`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`. 
+`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`.
 """
 ≛(o1::Union{PyObject,PyPtr}, o2::Union{PyObject,PyPtr}) = PyPtr(o1) == PyPtr(o2)
 
@@ -150,12 +150,12 @@ a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
 wrapping/converted from `x` is created.
 """
 pyreturn(x::Any) = pystealref!(PyObject(x))
-pyreturn(x::PyObject) = pyincref_(PyPtr(x))
+pyreturn(o::PyObject) = PyPtr(pyincref(o))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
-    setfield!(dest, :o, PyPtr(src))
-    return pyincref(dest)
+    setfield!(dest, :o, PyPtr(pyincref(src)))
+    return dest
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
@@ -273,7 +273,7 @@ function hash(o::PyObject)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(PyPtr(o)))
+        hashsalt(unsafe_pyjlwrap_to_objref(o))
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
@@ -303,7 +303,7 @@ end
 
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
-propertynames(o::PyObject) = map(x->Symbol(first(x)), 
+propertynames(o::PyObject) = map(x->Symbol(first(x)),
                                 pycall(inspect."getmembers", PyObject, o))
 
 # avoiding method ambiguity
