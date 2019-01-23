@@ -79,7 +79,7 @@ PyPtr(o::PyObject) = getfield(o, :o)
 """
     ≛(x, y)
 
-`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`. 
+`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`.
 """
 ≛(o1::Union{PyObject,PyPtr}, o2::Union{PyObject,PyPtr}) = PyPtr(o1) == PyPtr(o2)
 
@@ -149,8 +149,7 @@ Prepare `PyPtr` from `x` for passing it to Python.  If `x` is already
 a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
 wrapping/converted from `x` is created.
 """
-pyreturn(x::Any) = pystealref!(PyObject(x))
-pyreturn(x::PyObject) = pyincref_(PyPtr(x))
+pyreturn(x) = PyPtr(pyincref(PyObject(x)))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
@@ -303,7 +302,7 @@ end
 
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
-propertynames(o::PyObject) = map(x->Symbol(first(x)), 
+propertynames(o::PyObject) = map(x->Symbol(first(x)),
                                 pycall(inspect."getmembers", PyObject, o))
 
 # avoiding method ambiguity
