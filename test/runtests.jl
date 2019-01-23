@@ -128,10 +128,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     @test collect(PyObject([1,"hello",5])) == [1,"hello",5]
 
-    @test try @eval (@pyimport os.path) catch ex
-        isa((ex::LoadError).error, ArgumentError)
-    end
-
     @test PyObject("hello") == PyObject("hello")
     @test PyObject("hello") != PyObject("hellö")
     @test PyObject(hash) == PyObject(hash)
