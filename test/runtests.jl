@@ -15,7 +15,7 @@ roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
 roundtripeq(x) = roundtrip(x) == x
 
-@pyimport math
+const math = pyimport("math")
 
 struct TestConstruct
     x
