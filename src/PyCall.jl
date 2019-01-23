@@ -79,7 +79,7 @@ PyPtr(o::PyObject) = getfield(o, :o)
 """
     ≛(x, y)
 
-`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`. 
+`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`.
 """
 ≛(o1::Union{PyObject,PyPtr}, o2::Union{PyObject,PyPtr}) = PyPtr(o1) == PyPtr(o2)
 
@@ -303,7 +303,7 @@ end
 
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
-propertynames(o::PyObject) = map(x->Symbol(first(x)), 
+propertynames(o::PyObject) = map(x->Symbol(first(x)),
                                 pycall(inspect."getmembers", PyObject, o))
 
 # avoiding method ambiguity
@@ -765,47 +765,23 @@ function set!(o::PyObject, k, v)
 end
 
 #########################################################################
-# Support [] for integer keys, and other duck-typed sequence/list operations,
-# as those don't conflict with symbols/strings used for attributes.
+# We will eventually allow o[i] to be a synonym for Python, but to
+# get there we first need to deprecate the old methods that subtracted
+# 1 from integer indices.
 
-# Index conversion: Python is zero-based.  It also has -1 based
-# backwards indexing, but we don't support this, in favor of the
-# Julian syntax o[end-1] etc.
-function ind2py(i::Integer)
-    i <= 0 && throw(BoundsError())
-    return i-1
-end
+@deprecate getindex(o::PyObject, i::Integer) get(o, i-1)
+@deprecate setindex!(o::PyObject, v, i::Integer) set!(o, i-1, v)
+@deprecate getindex(o::PyObject, i1::Integer, i2::Integer) get(o, (i1-1,i2-1))
+@deprecate setindex!(o::PyObject, v, i1::Integer, i2::Integer) set!(o, (i1-1,i2-1), v)
+@deprecate getindex(o::PyObject, I::Integer...) get(o, I .- 1)
+@deprecate setindex!(o::PyObject, v, I::Integer...) set!(o, I .- 1, v)
+@deprecate splice!(o::PyObject, i::Integer) let v=get(o, i-1); delete!(o, i-1); v; end
+@deprecate insert!(a::PyObject, i::Integer, item) PyCall._insert!(a, i-1, item)
+@deprecate firstindex(o::PyObject) 1
+@deprecate lastindex(o::PyObject) length(o)
 
-_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
-getindex(o::PyObject, i::Integer) = _getindex(o, i, PyAny)
-function setindex!(o::PyObject, v, i::Integer)
-    @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
-    v
-end
-getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2)))
-setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py(i2)), v)
-getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
-setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
 length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
 size(o::PyObject) = (length(o),)
-firstindex(o::PyObject) = 1
-lastindex(o::PyObject) = length(o)
-
-function splice!(a::PyObject, i::Integer)
-    v = a[i]
-    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
-    v
-end
-
-pop!(a::PyObject) = splice!(a, length(a))
-popfirst!(a::PyObject) = splice!(a, 1)
-
-function empty!(a::PyObject)
-    for i in length(a):-1:1
-        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
-    end
-    a
-end
 
 # The following operations only work for the list type and subtypes thereof:
 function push!(a::PyObject, item)
@@ -813,14 +789,25 @@ function push!(a::PyObject, item)
                      a, PyObject(item))
     a
 end
+function pop!(o::PyObject)
+    i = length(o) - 1
+    v = get(o, i)
+    delete!(o, i)
+    return v
+end
 
-function insert!(a::PyObject, i::Integer, item)
+function _insert!(a::PyObject, i::Integer, item)
     @pycheckz ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
-                     a, ind2py(i), PyObject(item))
+                     a, i, PyObject(item))
     a
 end
 
-pushfirst!(a::PyObject, item) = insert!(a, 1, item)
+function popfirst!(o::PyObject)
+    v = get(o, 0)
+    delete!(o, 0)
+    return v
+end
+pushfirst!(a::PyObject, item) = _insert!(a, 0, item)
 
 function prepend!(a::PyObject, items)
     if isa(items,PyObject) && items ≛ a
@@ -828,7 +815,7 @@ function prepend!(a::PyObject, items)
         return prepend!(a, collect(items))
     end
     for (i,x) in enumerate(items)
-        insert!(a, i, x)
+        _insert!(a, i-1, x)
     end
     a
 end
@@ -843,6 +830,24 @@ end
 append!(a::PyObject, items::PyObject) =
     PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat),
                              PyPtr, (PyPtr, PyPtr), a, items))
+
+if pyversion >= v"3.3"
+    function empty!(o::PyObject)
+        pydecref(pycall(o."clear", PyObject)) # list.clear() was added in 3.3
+        return o
+    end
+else
+    function empty!(o::PyObject)
+        if hasproperty(o, "clear") # for dict, set, etc.
+            pydecref(pycall(o."clear", PyObject))
+        else
+            for i = length(o)-1:-1:0
+                delete!(o, i)
+            end
+        end
+        return o
+    end
+end
 
 #########################################################################
 # operators on Python objects
