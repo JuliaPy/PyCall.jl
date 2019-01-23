@@ -65,7 +65,7 @@ end
 
 ##########################################################################
 
-pyio_jl(self::PyObject) = unsafe_pyjlwrap_to_objref(self["io"].o)::IO
+pyio_jl(self::PyObject) = unsafe_pyjlwrap_to_objref(self."io")::IO
 
 const PyIO = PyNULL()
 
@@ -75,8 +75,8 @@ function pyio_initialize()
     if !pyio_initialized::Bool
         copy!(PyIO, @pydef_object mutable struct PyIO
             function __init__(self, io::IO; istextio=false)
-                self[:io] = pyjlwrap_new(io) # avoid recursion
-                self[:istextio] = istextio
+                self.io = pyjlwrap_new(io) # avoid recursion
+                self.istextio = istextio
             end
             close(self) = @with_ioraise(close(pyio_jl(self)))
             closed.get(self) = @with_ioraise(!isopen(pyio_jl(self)))
@@ -104,11 +104,11 @@ function pyio_initialize()
             writelines(self, seq) =
                 @with_ioraise(for s in seq write(pyio_jl(self), s) end)
             read(self, nb=typemax(Int)) =
-                @with_ioraise(self[:istextio] ?
+                @with_ioraise(self.istextio ?
                               String(read(pyio_jl(self), nb < 0 ? typemax(Int) : nb)) :
                               pybytes(read(pyio_jl(self), nb < 0 ? typemax(Int) : nb)))
             readall(self) =
-                @with_ioraise(self[:istextio] ? read(pyio_jl(self), String) :
+                @with_ioraise(self.istextio ? read(pyio_jl(self), String) :
                                                 pybytes(read(pyio_jl(self))))
             readinto(self, b) = @with_ioraise(pybytes(readbytes!(pyio_jl(self), b)))
             write(self, b) = @with_ioraise(write(pyio_jl(self), b))

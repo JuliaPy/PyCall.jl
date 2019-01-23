@@ -179,7 +179,10 @@ end
 function pyraise(e::PyError, ::Vector = [])
     ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
           e.T, e.val, e.traceback)
-    e.T.o = e.val.o = e.traceback.o = C_NULL # refs were stolen
+    # refs were stolen
+    setfield!(e.T, :o, C_NULL)
+    setfield!(e.val, :o, C_NULL)
+    setfield!(e.traceback, :o, C_NULL)
 end
 
 """

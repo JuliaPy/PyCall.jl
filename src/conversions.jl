@@ -129,10 +129,10 @@ PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
 
 function convert(::Type{Ptr{Cvoid}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
-        v = po["value"]
+        v = po."value"
         # ctypes stores the NULL pointer specially, grrr
         pynothing_query(v) == Nothing ? C_NULL :
-          convert(Ptr{Cvoid}, convert(UInt, po["value"]))
+          convert(Ptr{Cvoid}, convert(UInt, po."value"))
     elseif pyisinstance(po, @pyglobalobj(:PyCapsule_Type))
         @pycheck ccall((@pysym :PyCapsule_GetPointer),
                        Ptr{Cvoid}, (PyPtr,Ptr{UInt8}),
@@ -244,7 +244,7 @@ PyVector(o::PyObject) = PyVector{PyAny}(o)
 PyObject(a::PyVector) = a.o
 convert(::Type{PyVector}, o::PyObject) = PyVector(o)
 convert(::Type{PyVector{T}}, o::PyObject) where {T} = PyVector{T}(o)
-unsafe_convert(::Type{PyPtr}, a::PyVector) = a.o.o
+unsafe_convert(::Type{PyPtr}, a::PyVector) = PyPtr(a.o)
 PyVector(a::PyVector) = a
 PyVector(a::AbstractVector{T}) where {T} = PyVector{T}(array2py(a))
 
@@ -456,7 +456,7 @@ PyDict(d::AbstractDict{Any,V}) where {V} = PyDict{PyAny,V}(PyObject(d))
 PyDict(d::AbstractDict{K,Any}) where {K} = PyDict{K,PyAny}(PyObject(d))
 convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
-unsafe_convert(::Type{PyPtr}, d::PyDict) = d.o.o
+unsafe_convert(::Type{PyPtr}, d::PyDict) = PyPtr(d.o)
 
 haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
 keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
@@ -554,7 +554,7 @@ end
 # Our approach is to wrap an iterator over d.o["items"]
 # which necessitates including d.o["items"] in the state.
 function _start(d::PyDict{K,V,false}) where {K,V}
-    d_items = pycall(d.o["items"], PyObject)
+    d_items = pycall(d.o."items", PyObject)
     (d_items, iterate(d_items))
 end
 function Base.iterate(d::PyDict{K,V,false}, itr=_start(d)) where {K,V}
@@ -631,13 +631,13 @@ const mpc = PyNULL()
 function mpmath_init()
     if ispynull(mpmath)
         copy!(mpmath, pyimport("mpmath"))
-        copy!(mpf, mpmath["mpf"])
-        copy!(mpc, mpmath["mpc"])
+        copy!(mpf, mpmath."mpf")
+        copy!(mpc, mpmath."mpc")
     end
     curprec = precision(BigFloat)
     if mpprec[1] != curprec
         mpprec[1] = curprec
-        mpmath["mp"]["prec"] = mpprec[1]
+        mpmath."mp"."prec" = mpprec[1]
     end
 end
 
@@ -660,8 +660,8 @@ convert(::Type{BigFloat}, o::PyObject) = parse(BigFloat, pystr(o))
 
 function convert(::Type{Complex{BigFloat}}, o::PyObject)
     try
-        Complex{BigFloat}(convert(BigFloat, o["real"]),
-                          convert(BigFloat, o["imag"]))
+        Complex{BigFloat}(convert(BigFloat, o."real"),
+                          convert(BigFloat, o."imag"))
     catch
         convert(Complex{BigFloat}, convert(Complex{Float64}, o))
     end
@@ -721,7 +721,7 @@ pystring_query(o::PyObject) = pyisinstance(o, @pyglobalobj PyString_Type) ? Abst
 # we never automatically convert to Function.
 pyfunction_query(o::PyObject) = Union{}
 
-pynothing_query(o::PyObject) = o.o == pynothing[] ? Nothing : Union{}
+pynothing_query(o::PyObject) = o ≛ pynothing[] ? Nothing : Union{}
 
 # We refrain from converting all objects that support the mapping protocol (PyMapping_Check)
 # to avoid converting types like Pandas `DataFrame` that are only lossily
@@ -816,7 +816,7 @@ function convert(::Type{PyAny}, o::PyObject)
     try
         T = pytype_query(o)
         if T == PyObject && is_pyjlwrap(o)
-            return unsafe_pyjlwrap_to_objref(o.o)
+            return unsafe_pyjlwrap_to_objref(o)
         end
         convert(T, o)
     catch

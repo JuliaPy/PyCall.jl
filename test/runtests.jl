@@ -1,4 +1,5 @@
 using PyCall
+using PyCall: hasproperty
 using Test, Dates, Serialization
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
@@ -29,7 +30,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
     np = pyimport_e("numpy")
     if !ispynull(np) # numpy is installed, so test
-        let o = get(pycall(np["array"], PyObject, 1:3), PyObject, 2)
+        let o = get(pycall(np."array", PyObject, 1:3), PyObject, 2)
             @test convert(Int32, o) === Int32(3)
             @test convert(Int64, o) === Int64(3)
             @test convert(Float64, o) === Float64(3)
@@ -79,7 +80,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test roundtrip(testkw)(314157, y=1) == 314159
 
     # check type stability of pycall with an explicit return type
-    @inferred pycall(PyObject(1)[:__add__], Int, 2)
+    @inferred pycall(PyObject(1).__add__, Int, 2)
 
     if PyCall.npy_initialized
         @test PyArray(PyObject([1. 2 3;4 5 6])) == [1. 2 3;4 5 6]
@@ -96,7 +97,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test get(d.o, 1) == "hello"
         set!(d.o, 34, "goodbye")
         @test d[34] == "goodbye"
-        @test sort!(keys(Int, d)) == sort!(collect(d.o[:keys]())) == sort!(collect(keys(d))) == [1, 34]
+        @test sort!(keys(Int, d)) == sort!(collect(d.o.keys())) == sort!(collect(keys(d))) == [1, 34]
         @test eltype(d) == eltype(typeof(d)) == Pair{Int, String}
     end
 
@@ -162,57 +163,57 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
     # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
-    pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
+    pyutf8(s::PyObject) = pycall(s."encode", PyObject, "utf-8")
     pyutf8(s::String) = pyutf8(PyObject(s))
 
     # IO (issue #107)
     #@test roundtripeq(stdout) # No longer true since #250
     let buf = IOBuffer(read=false, write=true), obuf = PyObject(buf)
-        @test !obuf[:isatty]()
-        @test obuf[:writable]()
-        @test !obuf[:readable]()
-        @test obuf[:seekable]()
-        obuf[:write](pyutf8("hello"))
-        obuf[:flush]()  # should be a no-op, since there's no flushing IOBuffer
-        @test position(buf) == obuf[:tell]() == 5
-        let p = obuf[:seek](-2, 1)
+        @test !obuf.isatty()
+        @test obuf.writable()
+        @test !obuf.readable()
+        @test obuf.seekable()
+        obuf.write(pyutf8("hello"))
+        obuf.flush()  # should be a no-op, since there's no flushing IOBuffer
+        @test position(buf) == obuf.tell() == 5
+        let p = obuf.seek(-2, 1)
             @test p == position(buf) == 3
         end
-        let p = obuf[:seek](0, 0)
+        let p = obuf.seek(0, 0)
             @test p == position(buf) == 0
         end
         @test String(take!(buf)) == "hello"
-        obuf[:writelines](["first\n", "second\n", "third"])
+        obuf.writelines(["first\n", "second\n", "third"])
         @test String(take!(buf)) == "first\nsecond\nthird"
-        obuf[:write](b"möre stuff")
+        obuf.write(b"möre stuff")
         @test String(take!(buf)) == "möre stuff"
-        @test isopen(buf) == !obuf[:closed] == true
-        obuf[:close]()
-        @test isopen(buf) == !obuf[:closed] == false
+        @test isopen(buf) == !obuf.closed == true
+        obuf.close()
+        @test isopen(buf) == !obuf.closed == false
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-        @test !obuf[:writable]()
-        @test obuf[:readable]()
-        @test obuf[:readlines]() == ["hello\n", "again"]
+        @test !obuf.writable()
+        @test obuf.readable()
+        @test obuf.readlines() == ["hello\n", "again"]
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyObject(buf)
-        @test codeunits(obuf[:read](5)) == b"hello"
-        @test codeunits(obuf[:readall]()) == b"\nagain"
+        @test codeunits(obuf.read(5)) == b"hello"
+        @test codeunits(obuf.readall()) == b"\nagain"
     end
     let buf = IOBuffer("hello\nagain"), obuf = PyTextIO(buf)
-        @test obuf[:encoding] == "UTF-8"
-        @test obuf[:read](3) == "hel"
-        @test obuf[:readall]() == "lo\nagain"
+        @test obuf.encoding == "UTF-8"
+        @test obuf.read(3) == "hel"
+        @test obuf.readall() == "lo\nagain"
     end
     let nm = tempname()
         open(nm, "w") do f
             # @test roundtripeq(f)  # PR #250
             pf = PyObject(f)
-            @test pf[:fileno]() == fd(f)
-            @test pf[:writable]()
-            @test !pf[:readable]()
-            pf[:write](pyutf8(nm))
-            pf[:flush]()
+            @test pf.fileno() == fd(f)
+            @test pf.writable()
+            @test !pf.readable()
+            pf.write(pyutf8(nm))
+            pf.flush()
         end
         @test read(nm, String) == nm
     end
@@ -255,6 +256,23 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
+    # hasproperty, getproperty, and propertynames
+    py"""
+    class A:
+        class B:
+            C = 1
+    """
+    A = py"A"
+    @test hasproperty(A, "B")
+    @test getproperty(A, "B") == py"A.B"
+    @test :B in propertynames(A)
+    @static if VERSION >= v"0.7-"
+        @test A.B.C == 1
+        @test_throws KeyError A.X
+    end
+    setproperty!(py"A.B", "C", 2)
+    @test py"A.B.C" == 2
+
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
         @test ndims(b) == 1
@@ -264,9 +282,9 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     let o = PyObject(1+2im)
-        @test haskey(o, :real)
+        @test PyCall.hasproperty(o, :real) # replace by Base.hasproperty in the future
         @test :real in keys(o)
-        @test o[:real] == 1
+        @test o.real == 1
     end
 
     @testset "[]-based sequence access" begin
@@ -308,7 +326,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     # issue #216:
-    @test length(collect(pyimport("itertools")[:combinations]([1,2,3],2))) == 3
+    @test length(collect(pyimport("itertools").combinations([1,2,3],2))) == 3
 
     # PyNULL and copy!
     let x = PyNULL(), y = copy!(x, PyObject(314159))
@@ -376,14 +394,14 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # function attributes
     let o = PyObject(foobar)
-        @test o[:__name__] == o[:func_name] == string(foobar)
-        @test o[:__doc__] == o[:func_doc] == "foobar doc\n"
-        @test o[:__module__] == o[:__defaults__] == o[:func_defaults] ==
-              o[:__closure__] == o[:func_closure] == nothing
+        @test o.__name__ == o.func_name == string(foobar)
+        @test o.__doc__ == o.func_doc == "foobar doc\n"
+        @test o.__module__ == o.__defaults__ == o.func_defaults ==
+              o.__closure__ == o.func_closure == nothing
     end
 
     # issue #345
-    let weakdict = pyimport("weakref")["WeakValueDictionary"]
+    let weakdict = pyimport("weakref")."WeakValueDictionary"
         # (use weakdict for the value, since Python supports
         #  weak references to type objects)
         @test convert(Dict{Int,PyObject}, weakdict(Dict(3=>weakdict))) == Dict(3=>weakdict)
@@ -395,8 +413,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         bar = TestConstruct(1)
         o = PyObject(bar)
         @test PyCall.is_pyjlwrap(o)
-        r = weakref[:ref](o)
-        @test weakref[:getweakrefcount](o) == 1
+        r = weakref.ref(o)
+        @test weakref.getweakrefcount(o) == 1
     end
 
     # Expose python docs to Julia doc system
@@ -443,7 +461,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     let o = PyObject(Any[1,2]), c = o
         broadcast!(+, o, o, Any[3,4]) # o .+= x doesn't work yet in 0.7
         @test collect(o) == [1,2,3,4]
-        @test o.o == c.o # updated in-place
+        @test PyPtr(o) == PyPtr(c) # updated in-place
     end
 
     # more flexible bool conversions, matching Python "truth value testing"
@@ -476,7 +494,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     try
         @test begin
             @pywith pybuiltin("open")(fname,"w") as f begin
-                f[:write]("test")
+                f.write("test")
             end
             open(io->read(io, String), fname)=="test"
         end
@@ -506,20 +524,20 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test_throws BoundsError convert(NTuple{3,Int}, PyObject((3,34)))
 
     let p = PyCall.pickle(), buf = IOBuffer()
-        p[:dump]("hello world", buf)
-        p[:dump](314159, buf)
-        p[:dump](Any[1,1,2,3,5,8], buf)
-        @test p[:load](seekstart(buf)) == "hello world"
-        @test p[:load](buf) == 314159
-        @test p[:load](buf) == [1,1,2,3,5,8]
+        p.dump("hello world", buf)
+        p.dump(314159, buf)
+        p.dump(Any[1,1,2,3,5,8], buf)
+        @test p.load(seekstart(buf)) == "hello world"
+        @test p.load(buf) == 314159
+        @test p.load(buf) == [1,1,2,3,5,8]
     end
 
     # Test that we can call constructors on the python side
     @test pycall(PyObject(TestConstruct), PyAny, 1).x == 1
 
     # Test getattr fallback
-    @test PyObject(TestConstruct(1))[:x] == 1
-    @test_throws KeyError PyObject(TestConstruct(1))[:y]
+    @test PyObject(TestConstruct(1)).x == 1
+    @test_throws KeyError PyObject(TestConstruct(1)).y
 
     # iterating over Julia objects in Python:
     @test py"[x**2 for x in $(PyCall.pyjlwrap_new(1:4))]" ==
@@ -560,22 +578,22 @@ end
 # @pywith errors correctly handled
 @pydef mutable struct IgnoreError
     function __init__(self, ignore)
-        self[:ignore] = ignore
+        self.ignore = ignore
     end
     __enter__(self) = ()
-    __exit__(self, typ, value, tb) = self[:ignore]
+    __exit__(self, typ, value, tb) = self.ignore
 end
 
 # @pydef example from README
-@pydef mutable struct Doubler <: PyCall.builtin[:AssertionError]
-    __init__(self, x=10) = (self[:x] = x)
+@pydef mutable struct Doubler <: PyCall.builtin.AssertionError
+    __init__(self, x=10) = (self.x = x)
     function my_method(self, arg1::Number)
         return arg1 + 20
     end
     type_str(self, obj::T) where T = string(T)
-    x2.get(self) = self[:x] * 2
+    x2.get(self) = self.x * 2
     function x2.set!(self, new_val)
-        self[:x] = new_val / 2
+        self.x = new_val / 2
     end
 end
 
@@ -583,24 +601,24 @@ end
 @pydef mutable struct ObjectCounter
     obj_count = 1 - 1
     function __init__(::PyObject)
-        ObjectCounter[:obj_count] += 1
+        ObjectCounter.obj_count += 1
     end
 end
 
 @testset "pydef" begin
     d = Doubler(5)
-    @test d[:x] == 5
-    d[:x2] = 30
-    @test d[:x] == 15
-    @test d[:type_str](10) == string(PyInt)
-    @test PyCall.builtin[:isinstance](d, PyCall.builtin[:AssertionError])
+    @test d.x == 5
+    d.x2 = 30
+    @test d.x == 15
+    @test d.type_str(10) == string(PyInt)
+    @test PyCall.builtin.isinstance(d, PyCall.builtin.AssertionError)
 
     @test_throws ErrorException @pywith IgnoreError(false) error()
     @test (@pywith IgnoreError(true) error(); true)
 
-    @test ObjectCounter[:obj_count] == 0
+    @test ObjectCounter.obj_count == 0
     a = ObjectCounter()
-    @test ObjectCounter[:obj_count] == 1
+    @test ObjectCounter.obj_count == 1
 end
 
 @testset "callback" begin
@@ -704,8 +722,8 @@ end
     @test length(piter) == 2
     @test length(collect(piter)) == 2
     r1, r2 = collect(piter)
-    @test r1.o === i1.o
-    @test r2.o  === i2.o
+    @test getfield(r1, :o) === getfield(i1, :o)
+    @test getfield(r2, :o) === getfield(i2, :o)
 
     @test Base.IteratorSize(PyCall.PyIterator(PyObject(1))) == Base.SizeUnknown()
     @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
@@ -725,11 +743,11 @@ end
 
     using PyCall
 
-    pyimport("atexit")[:register]() do
+    pyimport("atexit").register() do
         println("atexit called")
     end
     """
-    out = read(`$(Base.julia_cmd()) -e $script`, String)
+    out = read(`$(Base.julia_cmd()) --startup-file=no -e $script`, String)
     @test occursin("atexit called", out)
 end
 

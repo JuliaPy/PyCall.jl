@@ -76,8 +76,8 @@ end
 function gtk_requireversion(gtkmodule::AbstractString, vers::VersionNumber=v"3.0")
     if startswith(gtkmodule, "gi.")
         gi = pyimport("gi")
-        if gi[:get_required_version]("Gtk") === nothing
-            gi[:require_version]("Gtk", string(vers))
+        if gi.get_required_version("Gtk") === nothing
+            gi.require_version("Gtk", string(vers))
         end
     end
 end
@@ -86,8 +86,8 @@ end
 function gtk_eventloop(gtkmodule::AbstractString, sec::Real=50e-3)
     gtk_requireversion(gtkmodule)
     gtk = pyimport(gtkmodule)
-    events_pending = gtk["events_pending"]
-    main_iteration = gtk["main_iteration"]
+    events_pending = gtk."events_pending"
+    main_iteration = gtk."main_iteration"
     install_doevent(sec) do async
         # handle all pending
         while pycall(events_pending, Bool)
@@ -125,7 +125,7 @@ function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
                     # for some reason I don't understand,
                     # if libpython has already been loaded, then
                     # we need to use Python's setenv rather than Julia's
-                    PyDict(pyimport("os")["environ"])["QT_PLUGIN_PATH"] = realpath(plugin_path)
+                    PyDict(pyimport("os")."environ")."QT_PLUGIN_PATH" = realpath(plugin_path)
                     return true
                 end
             end
@@ -137,15 +137,15 @@ end
 # Qt: (PyQt5, PyQt4, or PySide module)
 function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     fixqtpath()
-    instance = QtCore["QCoreApplication"]["instance"]
-    AllEvents = QtCore["QEventLoop"]["AllEvents"]
-    processEvents = QtCore["QCoreApplication"]["processEvents"]
+    instance = QtCore."QCoreApplication"."instance"
+    AllEvents = QtCore."QEventLoop"."AllEvents"
+    processEvents = QtCore."QCoreApplication"."processEvents"
     pop!(ENV, "QT_PLUGIN_PATH", "") # clean up environment
     maxtime = PyObject(50)
     install_doevent(sec) do async
         app = pycall(instance, PyObject)
-        if app.o != pynothing[]
-            app["_in_event_loop"] = true
+        if !(app ≛ pynothing[])
+            app."_in_event_loop" = true
             pycall(processEvents, PyObject, AllEvents, maxtime)
         end
     end
@@ -167,22 +167,22 @@ end
 # wx:  (based on IPython/lib/inputhookwx.py, which is 3-clause BSD-licensed)
 function wx_eventloop(sec::Real=50e-3)
     wx = pyimport("wx")
-    GetApp = wx["GetApp"]
-    EventLoop = wx["EventLoop"]
-    EventLoopActivator = wx["EventLoopActivator"]
+    GetApp = wx."GetApp"
+    EventLoop = wx."EventLoop"
+    EventLoopActivator = wx."EventLoopActivator"
     install_doevent(sec) do async
         app = pycall(GetApp, PyObject)
-        if app.o != pynothing[]
-            app["_in_event_loop"] = true
+        if !(app ≛ pynothing[])
+            app."_in_event_loop" = true
             evtloop = pycall(EventLoop, PyObject)
             ea = pycall(EventLoopActivator, PyObject, evtloop)
-            Pending = evtloop["Pending"]
-            Dispatch = evtloop["Dispatch"]
+            Pending = evtloop."Pending"
+            Dispatch = evtloop."Dispatch"
             while pycall(Pending, Bool)
                 pycall(Dispatch, PyObject)
             end
             pydecref(ea) # deactivate event loop
-            pycall(app["ProcessIdle"], PyObject)
+            pycall(app."ProcessIdle", PyObject)
         end
     end
 end
@@ -192,15 +192,15 @@ end
 function Tk_eventloop(sec::Real=50e-3)
     Tk = pyimport(tkinter_name())
     _tkinter = pyimport("_tkinter")
-    flag = _tkinter[:ALL_EVENTS] | _tkinter[:DONT_WAIT]
+    flag = _tkinter.ALL_EVENTS | _tkinter.DONT_WAIT
     root = PyObject(nothing)
     install_doevent(sec) do async
-        new_root = Tk["_default_root"]
-        if new_root.o != pynothing[]
+        new_root = Tk."_default_root"
+        if !(new_root ≛ pynothing[])
             root = new_root
         end
-        if root.o != pynothing[]
-            while pycall(root["dooneevent"], Bool, flag)
+        if !(root ≛ pynothing[])
+            while pycall(root."dooneevent", Bool, flag)
             end
         end
     end

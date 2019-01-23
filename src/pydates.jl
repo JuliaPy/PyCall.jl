@@ -133,7 +133,7 @@ end
 
 function convert(::Type{Dates.DateTime}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, PyPtr(o)) + PyDate_HEAD
         if PyDateTime_Check(o)
             Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
                            unsafe_load(dt,3), unsafe_load(dt,4), # month, day
@@ -153,7 +153,7 @@ end
 
 function convert(::Type{Dates.Date}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
+        dt = convert(Ptr{UInt8}, PyPtr(o)) + PyDate_HEAD
         Dates.Date((UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
                    unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
     else
@@ -163,7 +163,7 @@ end
 
 function delta_dsμ(o::PyObject)
     PyDelta_Check(o) || throw(ArgumentError("$o is not a timedelta instance"))
-    p = unsafe_load(convert(Ptr{PyDateTime_Delta{Py_hash_t}}, o.o))
+    p = unsafe_load(convert(Ptr{PyDateTime_Delta{Py_hash_t}}, PyPtr(o)))
     return (p.days, p.seconds, p.microseconds)
 end
 

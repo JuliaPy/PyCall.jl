@@ -2,7 +2,7 @@ using Test, PyCall
 using PyCall: f_contiguous, PyBUF_ND_CONTIGUOUS, array_format, npy_initialized,
 NoCopyArray, isbuftype, setdata!
 
-pyutf8(s::PyObject) = pycall(s["encode"], PyObject, "utf-8")
+pyutf8(s::PyObject) = pycall(s."encode", PyObject, "utf-8")
 pyutf8(s::String) = pyutf8(PyObject(s))
 
 @testset "PyBuffer" begin
@@ -20,15 +20,15 @@ pyutf8(s::String) = pyutf8(PyObject(s))
         np = pyimport("numpy")
         listpy = pybuiltin("list")
         arrpyo(args...; kwargs...) =
-            pycall(np["array"], PyObject, args...; kwargs...)
+            pycall(np."array", PyObject, args...; kwargs...)
         listpyo(args...) = pycall(listpy, PyObject, args...)
         pytestarray(sz::Int...; order="C") =
-            pycall(arrpyo(1.0:prod(sz), "d")["reshape"], PyObject, sz, order=order)
+            pycall(arrpyo(1.0:prod(sz), "d")."reshape", PyObject, sz, order=order)
 
         @testset "Non-native-endian" begin
             wrong_endian_str = ENDIAN_BOM == 0x01020304 ? "<" : ">"
             wrong_endian_arr =
-                pycall(np["ndarray"], PyObject, 2; buffer=UInt8[0,1,3,2],
+                pycall(np."ndarray", PyObject, 2; buffer=UInt8[0,1,3,2],
                                                    dtype=wrong_endian_str*"i2")
             # Not supported, so throws
             @test_throws ArgumentError NoCopyArray(wrong_endian_arr)
@@ -42,7 +42,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
                 @testset "dtype $pytype should match eltype $jltype" begin
                     jlarr = jltype[1:10;]
                     nparr = arrpyo(jlarr, dtype=pytype)
-                    @test pystr(nparr["dtype"]) == pytype
+                    @test pystr(nparr."dtype") == pytype
                     jlarr2 = convert(PyAny, nparr)
                     @test eltype(jlarr2) == jltype
                     @test jlarr2 == jlarr
@@ -99,7 +99,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
         @testset "Non contiguous PyArrays" begin
             @testset "1d non-contiguous" begin
                 # create an array of four Int32s, with stride 8
-                nparr = pycall(np["ndarray"], PyObject, 4,
+                nparr = pycall(np."ndarray", PyObject, 4,
                                 buffer=UInt32[1,0,1,0,1,0,1,0],
                                 dtype="i4", strides=(8,))
                 pyarr = PyArray(nparr)
@@ -116,7 +116,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             end
 
             @testset "2d non-contiguous" begin
-                nparr = pycall(np["ndarray"], PyObject,
+                nparr = pycall(np."ndarray", PyObject,
                                 buffer=UInt32[1,0,2,0,1,0,2,0,
                                               1,0,2,0,1,0,2,0], order="f",
                                 dtype="i4", shape=(2, 4), strides=(8,16))
@@ -202,8 +202,8 @@ pyutf8(s::String) = pyutf8(PyObject(s))
         @testset "similar on PyArray PyVec getindex" begin
             jlarr1 = [1:10;]
             jlarr2 = hcat([1:10;], [1:10;])
-            pyarr1 = pycall(np["array"], PyArray, jlarr1)
-            pyarr2 = pycall(np["array"], PyArray, jlarr2)
+            pyarr1 = pycall(np."array", PyArray, jlarr1)
+            pyarr2 = pycall(np."array", PyArray, jlarr2)
             @test all(pyarr1[1:10]    .== jlarr1[1:10])
             @test all(pyarr2[1:10, 2] .== jlarr2[1:10, 2])
             @test all(pyarr2[1:10, 1:2] .== jlarr2)

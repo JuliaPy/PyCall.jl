@@ -130,10 +130,10 @@ function __init__()
     pyxrange[] = @pyglobalobj(:PyRange_Type)
 
     # ctypes.c_void_p for Ptr types
-    copy!(c_void_p_Type, pyimport("ctypes")["c_void_p"])
+    copy!(c_void_p_Type, pyimport("ctypes")."c_void_p")
 
     # traceback.format_tb function, for show(PyError)
-    copy!(format_traceback, pyimport("traceback")["format_tb"])
+    copy!(format_traceback, pyimport("traceback")."format_tb")
 
     init_datetime()
     pyjlwrap_init()
@@ -159,8 +159,8 @@ function __init__()
         # (e.g. Matplotlib: see PyPlot#79)
         if isinteractive()
             let sys = pyimport("sys")
-                if !haskey(sys, "ps1")
-                    sys["ps1"] = ">>> "
+                if !hasproperty(sys, "ps1")
+                    sys."ps1" = ">>> "
                 end
             end
         end
