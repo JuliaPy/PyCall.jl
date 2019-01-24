@@ -79,7 +79,7 @@ function parse_pydef(expr)
         if isfunction(line)
             def_dict = splitdef(line)
             py_f = def_dict[:name]
-            # The dictionary of the new Julia-side definition. 
+            # The dictionary of the new Julia-side definition.
             jl_def_dict = copy(def_dict)
             if isa(py_f, Symbol)
                 # Method definition
@@ -133,7 +133,7 @@ end
 `@pydef` creates a Python class whose methods are implemented in Julia.
 For instance,
 
-    @pyimport numpy.polynomial as P
+    P = pyimport("numpy.polynomial")
     @pydef type Doubler <: P.Polynomial
         __init__(self, x=10) = (self.x = x)
         my_method(self, arg1::Number) = arg1 + 20

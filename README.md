@@ -97,7 +97,7 @@ Here is a simple example to call Python's `math.sin` function and
 compare it to the built-in Julia `sin`:
 
     using PyCall
-    @pyimport math
+    math = pyimport("math")
     math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
 
 Type conversions are automatically performed for numeric, boolean,
@@ -105,12 +105,6 @@ string, IO stream, date/period, and function types, along with tuples,
 arrays/lists, and dictionaries of these types. (Python functions can
 be converted/passed to Julia functions and vice versa!)  Other types
 are supported via the generic PyObject type, below.
-
-Python submodules must be imported by a separate `@pyimport` call, and
-in this case you must supply an identifier to to use in Julia.  For example
-
-    @pyimport numpy.random as nr
-    nr.rand(3,4)
 
 Multidimensional arrays exploit the NumPy array interface for
 conversions between Python and Julia.  By default, they are passed
@@ -122,7 +116,7 @@ Keyword arguments can also be passed. For example, matplotlib's
 [pyplot](http://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
-    @pyimport matplotlib.pyplot as plt
+    plt = pyimport("matplotlib.pyplot")
     x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
     plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
     plt.show()
@@ -135,7 +129,7 @@ Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
 we could call the Newton solver in scipy.optimize via:
 
-    @pyimport scipy.optimize as so
+    so = pyimport("scipy.optimize")
     so.newton(x -> cos(x) - x, 1)
 
 A macro exists for mimicking Python's "with statement". For example:
@@ -149,23 +143,6 @@ conversion, use `f::PyObject`). Similarly, if the context manager returns a type
 which is automatically converted to a Julia type, you will have override this
 via `@pywith EXPR::PyObject ...`.
 
-
-**Important:** The biggest difference from Python is that object attributes/members are
-accessed with `o[:attribute]` rather than `o.attribute`, so that `o.method(...)` in
-Python is replaced by `o[:method](...)` in Julia.  Also, you use
-`get(o, key)` rather than `o[key]`.  (However, you can access integer
-indices via `o[i]` as in Python, albeit with 1-based Julian indices rather
-than 0-based Python indices.)  (This will be changed to `o.method` once Julia
-0.6 support is dropped, now that Julia supports `.` overloading.)  See also the section on
-`PyObject` below, as well as the `pywrap` function to create anonymous
-modules that simulate `.` access (this is what `@pyimport` does).  For
-example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
-
-    @pyimport Bio.Seq as s
-    @pyimport Bio.Alphabet as a
-    my_dna = s.Seq("AGTACACTGGT", a.generic_dna)
-    my_dna.find("ACT")
-
 ## Troubleshooting
 
 Here are solutions to some common problems:
@@ -174,8 +151,8 @@ Here are solutions to some common problems:
 
 ## Python object interfaces
 
-The `@pyimport` macro is built on top of several routines for
-manipulating Python objects in Julia, via a type `PyObject` described
+PyCall provides many routines for
+manipulating Python objects in Julia via a type `PyObject` described
 below.  These can be used to have greater control over the types and
 data passed between Julia and Python, as well as to access additional
 Python functionality (especially in conjunction with the low-level interfaces
@@ -313,7 +290,7 @@ and the fact that the Julia JIT compiler can no longer infer the type).
 
 ### Calling Python
 
-In most cases, the `@pyimport` macro automatically makes the
+In most cases, PyCall automatically makes the
 appropriate type conversions to Julia types based on runtime
 inspection of the Python objects.  However greater control over these
 type conversions (e.g. to use a no-copy `PyArray` for a Python
@@ -332,13 +309,6 @@ and also by providing more type information to the Julia compiler.
   For convenience, a macro `@pycall` exists which automatically converts
   `@pycall function(args...)::returntype` into
   `pycall(function,returntype,args...)`.
-
-* `pyimport(s)`: Import the Python module `s` (a string or symbol) and
-  return a pointer to it (a `PyObject`).  Functions or other symbols
-  in the module may then be looked up by `s.name` where `name` is a
-  string (for the raw `PyObject`) or symbol (for automatic
-  type-conversion).  Unlike the `@pyimport` macro, this does not
-  define a Julia module.
 
 * `py"..."` evaluates `"..."` as a Python string, equivalent to
   Python's [`eval`](https://docs.python.org/2/library/functions.html#eval) function, and returns the result
@@ -364,18 +334,6 @@ and also by providing more type information to the Julia compiler.
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
   symbol it returns the builtin converted to `PyAny`.  (You can also use `py"s"`
   to look up builtins or other Python globas.)
-
-* `pywrap(o::PyObject)` returns a wrapper `w` that is an anonymous
-  module which provides (read) access to converted versions of `o`'s
-  members as `w.member`.  (For example, `@pyimport module as name` is
-  equivalent to `name = pywrap(pyimport("module"))`.)  If the Python
-  module contains identifiers that are reserved words in Julia
-  (e.g. `function`), they cannot be accessed as `w.member`; one must
-  instead use `w.pymember(:member)` (for the `PyAny` conversion) or
-  `w.pymember("member")` (for the raw `PyObject`).  `pywrap` is rather
-  inefficient since it converts *every* member of `o` at once; you
-  are generally encouraged to simply access members via `o.member`
-  rather than using `pywrap`.
 
 Occasionally, you may need to pass a keyword argument to Python that
 is a [reserved word](https://en.wikipedia.org/wiki/Reserved_word) in Julia.
@@ -405,7 +363,7 @@ documentation `?pyfunction` and `?pyfunctionret` for more information.
 `@pydef` creates a Python class whose methods are implemented in Julia.
 For instance,
 
-    @pyimport numpy.polynomial as P
+    P = pyimport("numpy.polynomial")
     @pydef mutable struct Doubler <: P.Polynomial
         function __init__(self, x=10)
             self.x = x
@@ -443,7 +401,7 @@ The method arguments and return values are automatically converted between Julia
 Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter):
 
     using PyCall
-    @pyimport Tkinter as tk
+    tk = pyimport("Tkinter")
 
     @pydef mutable struct SampleApp <: tk.Tk
         __init__(self, args...; kwargs...) = begin
@@ -581,13 +539,11 @@ end
 
 end
 ```
-Then you can access the `scipy.optimize` functions as `scipy_opt[:newton]`
+Then you can access the `scipy.optimize` functions as `scipy_opt.newton`
 and so on.
 
 Here, instead of `pyimport`, we have used the function `pyimport_conda`.   The second argument is the name of the [Anaconda package](https://docs.continuum.io/anaconda/pkg-docs) that provides this module.   This way, if importing `scipy.optimize` fails because the user hasn't installed `scipy`, it will either (a) automatically install `scipy` and retry the `pyimport` if PyCall is configured to use the [Conda](https://github.com/Luthaf/Conda.jl) Python install (or
 any other Anaconda-based Python distro for which the user has installation privileges), or (b) throw an error explaining that `scipy` needs to be installed, and explain how to configure PyCall to use Conda so that it can be installed automatically.   More generally, you can call `pyimport(module, package, channel)` to specify an optional Anaconda "channel" for installing non-standard Anaconda packages.
-
-(Note that you cannot use `@pyimport` safely with precompilation, because that declares a global constant that internally has a pointer to the module.  You can use `pywrap(pyimport(...))` in your `__init__` function to a assign a global variable using the `.` notation like `@pyimport`, however, albeit without the type stability of the global `const` as above.)
 
 ## Python virtual environment
 

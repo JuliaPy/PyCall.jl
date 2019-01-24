@@ -155,8 +155,7 @@ Prepare `PyPtr` from `x` for passing it to Python.  If `x` is already
 a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
 wrapping/converted from `x` is created.
 """
-pyreturn(x::Any) = pystealref!(PyObject(x))
-pyreturn(o::PyObject) = PyPtr(pyincref(o))
+pyreturn(x) = PyPtr(pyincref(PyObject(x)))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
@@ -367,6 +366,22 @@ keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect."getmembers",
 # we skip wrapping Julia reserved words (which cannot be type members)
 const reserved = Set{String}(["while", "if", "for", "try", "return", "break", "continue", "function", "macro", "quote", "let", "local", "global", "const", "abstract", "typealias", "type", "bitstype", "immutable", "ccall", "do", "module", "baremodule", "using", "import", "export", "importall", "pymember", "false", "true", "Tuple"])
 
+function _pywrap(o::PyObject, mname::Symbol)
+    members = convert(Vector{Tuple{AbstractString,PyObject}},
+    pycall(inspect."getmembers", PyObject, o))
+    filter!(m -> !(m[1] in reserved), members)
+    m = Module(mname, false)
+    consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
+    exports = try
+    convert(Vector{Symbol}, o."__all__")
+    catch
+    [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
+    end
+    Core.eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
+                            Expr(:export, exports...)))
+    m
+end
+
 """
     pywrap(o::PyObject)
 
@@ -377,19 +392,13 @@ For example, `@pyimport module as name` is equivalent to `const name = pywrap(py
 If the Python module contains identifiers that are reserved words in Julia (e.g. function), they cannot be accessed as `w.member`; one must instead use `w.pymember(:member)` (for the PyAny conversion) or w.pymember("member") (for the raw PyObject).
 """
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
-    members = convert(Vector{Tuple{AbstractString,PyObject}},
-                      pycall(inspect."getmembers", PyObject, o))
-    filter!(m -> !(m[1] in reserved), members)
-    m = Module(mname, false)
-    consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
-    exports = try
-                  convert(Vector{Symbol}, o."__all__")
-              catch
-                  [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
-              end
-    Core.eval(m, Expr(:toplevel, consts..., :(pymember(s) = $(getindex)($(o), s)),
-                                              Expr(:export, exports...)))
-    m
+    Base.depwarn("`pywrap(o)`` is deprecated in favor of direct property access `o.foo`.", :pywrap)
+    return _pywrap(o, mname)
+end
+
+function _pywrap_pyimport(o::PyObject, mname::Symbol=:__anon__)
+    Base.depwarn("`@pyimport foo` is deprecated in favor of `foo = pyimport(\"foo\")`.", :_pywrap_pyimport)
+    return _pywrap(o, mname)
 end
 
 #########################################################################
@@ -569,7 +578,7 @@ macro pyimport(name, optional_varname...)
     quoteName = Expr(:quote, Name)
     quote
         if !isdefined($__module__, $quoteName)
-            const $(esc(Name)) = pywrap(pyimport($mname))
+            const $(esc(Name)) = _pywrap_pyimport(pyimport($mname))
         elseif !isa($(esc(Name)), Module)
             error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
         end
