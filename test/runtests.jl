@@ -418,10 +418,14 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     def foo():
         "foo docstring"
         return 0
+    class bar:
+        foo = foo
     """
     global foo354 = py"foo"
+    global barclass = py"bar"
     # use 'content' since `Text` objects test equality by object identity
     @test @doc(foo354).content == "foo docstring"
+    @test @doc(barclass.foo).content == "foo docstring"
 
     # binary operators
     for b in (4, PyObject(4))
