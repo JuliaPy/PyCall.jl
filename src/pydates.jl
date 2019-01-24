@@ -1,6 +1,6 @@
 # Conversion functions for date and time objects in the Python datetime
 # module and the Julia Dates module.
-import Compat.Dates
+import Dates
 
 # Unfortunately, the Python C API (in Python/Include/datetime.h) is somewhat
 # painful to call from Julia because it consists mainly of macros that
@@ -133,18 +133,19 @@ end
 
 function convert(::Type{Dates.DateTime}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
-        if PyDateTime_Check(o)
-            Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
-                           unsafe_load(dt,3), unsafe_load(dt,4), # month, day
-                           unsafe_load(dt,5), unsafe_load(dt,6), # hour, minute
-                           unsafe_load(dt,7), # second
-                           div((UInt(unsafe_load(dt,8)) << 16) |
-                               (UInt(unsafe_load(dt,9)) << 8) |
-                               unsafe_load(dt,10), 1000)) # μs ÷ 1000
-        else
-            Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
-                           unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
+        GC.@preserve o let dt = convert(Ptr{UInt8}, PyPtr(o)) + PyDate_HEAD
+            if PyDateTime_Check(o)
+                Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
+                            unsafe_load(dt,3), unsafe_load(dt,4), # month, day
+                            unsafe_load(dt,5), unsafe_load(dt,6), # hour, minute
+                            unsafe_load(dt,7), # second
+                            div((UInt(unsafe_load(dt,8)) << 16) |
+                                (UInt(unsafe_load(dt,9)) << 8) |
+                                unsafe_load(dt,10), 1000)) # μs ÷ 1000
+            else
+                Dates.DateTime((UInt(unsafe_load(dt,1))<<8)|unsafe_load(dt,2), # Y
+                            unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
+            end
         end
     else
         throw(ArgumentError("unknown DateTime type $o"))
@@ -153,9 +154,10 @@ end
 
 function convert(::Type{Dates.Date}, o::PyObject)
     if PyDate_Check(o)
-        dt = convert(Ptr{UInt8}, o.o) + PyDate_HEAD
-        Dates.Date((UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
-                   unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
+        GC.@preserve o let dt = convert(Ptr{UInt8}, PyPtr(o)) + PyDate_HEAD
+            Dates.Date((UInt(unsafe_load(dt,1)) << 8) | unsafe_load(dt,2), # Y
+                    unsafe_load(dt,3), unsafe_load(dt,4)) # month, day
+        end
     else
         throw(ArgumentError("unknown Date type $o"))
     end
@@ -163,7 +165,7 @@ end
 
 function delta_dsμ(o::PyObject)
     PyDelta_Check(o) || throw(ArgumentError("$o is not a timedelta instance"))
-    p = unsafe_load(convert(Ptr{PyDateTime_Delta{Py_hash_t}}, o.o))
+    p = GC.@preserve o unsafe_load(convert(Ptr{PyDateTime_Delta{Py_hash_t}}, PyPtr(o)))
     return (p.days, p.seconds, p.microseconds)
 end
 

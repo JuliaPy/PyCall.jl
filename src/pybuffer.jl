@@ -32,7 +32,7 @@ mutable struct PyBuffer
         b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
-        @compat finalizer(pydecref, b)
+        finalizer(pydecref, b)
         return b
     end
 end
@@ -112,7 +112,9 @@ const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
 const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
 const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
 const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
-const PyBUF_ND_CONTIGUOUS = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND | PyBUF_STRIDES | PyBUF_ANY_CONTIGUOUS)
+const PyBUF_ND_STRIDED    = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND |
+                                 PyBUF_STRIDES)
+const PyBUF_ND_CONTIGUOUS = PyBUF_ND_STRIDED | PyBUF_ANY_CONTIGUOUS
 
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
@@ -128,8 +130,9 @@ function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
 end
 
 """
-`isbuftype(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_ND_CONTIGUOUS)`
-Returns true if the python object `o` supports the buffer protocol. False if not.
+`isbuftype(o::Union{PyObject,PyPtr})`
+Returns true if the python object `o` supports the buffer protocol as a strided
+array. False if not.
 """
 function isbuftype(o::Union{PyObject,PyPtr})
     # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
@@ -137,7 +140,7 @@ function isbuftype(o::Union{PyObject,PyPtr})
     # So we'll just try call PyObject_GetBuffer and check for success/failure
     b = PyBuffer()
     ret = ccall((@pysym :PyObject_GetBuffer), Cint,
-                     (PyPtr, Any, Cint), o, b, PyBUF_ND_CONTIGUOUS)
+                     (PyPtr, Any, Cint), o, b, PyBUF_ND_STRIDED)
     if ret != 0
         pyerr_clear()
     else
@@ -227,31 +230,35 @@ function array_format(pybuf::PyBuffer)
     # TODO: handle more cases: https://www.python.org/dev/peps/pep-3118/#additions-to-the-struct-string-syntax
     # refs: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
     #       https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/_internal.py#L490
-    #       https://docs.python.org/2/library/struct.html#byte-order-size-and-alignment
+    #       https://docs.python.org/3/library/struct.html#byte-order-size-and-alignment
 
     # "NULL implies standard unsigned bytes ("B")" --pep 3118
     pybuf.buf.format == C_NULL && return UInt8, true
 
     fmt_str = get_format_str(pybuf)
     native_byteorder = true
+    use_native_sizes = true
     type_start_idx = 1
-    typestrs = standard_typestrs
     if length(fmt_str) > 1
         type_start_idx = 2
-        if fmt_str[1] == '='
+        if fmt_str[1] == '@' || fmt_str[1] == '^'
+            # defaults to native_byteorder: true, use_native_sizes: true
         elseif fmt_str[1] == '<'
             native_byteorder = ENDIAN_BOM == 0x04030201
+            use_native_sizes = false
         elseif fmt_str[1] == '>' || fmt_str =='!'
             native_byteorder = ENDIAN_BOM == 0x01020304
-        elseif fmt_str[1] == '@' || fmt_str[1] == '^'
-            typestrs = native_typestrs
+            use_native_sizes = false
+        elseif fmt_str[1] == '='
+            use_native_sizes = false
         elseif fmt_str[1] == "Z"
             type_start_idx = 1
         else
             error("Unsupported format string: \"$fmt_str\"")
         end
     end
-    typestrs[fmt_str[type_start_idx:end]], native_byteorder
+    strs2types = use_native_sizes ? native_typestrs : standard_typestrs
+    strs2types[fmt_str[type_start_idx:end]], native_byteorder
 end
 
 #############################################################################

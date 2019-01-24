@@ -1,8 +1,6 @@
-VERSION < v"0.7.0-beta2.199" && __precompile__()
-
 module PyCall
 
-using Compat, VersionParsing
+using VersionParsing
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion,
@@ -18,8 +16,9 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
        eltype, get, delete!, empty!, length, isempty,
        filter!, hash, splice!, pop!, ==, isequal, push!,
-       append!, insert!, prepend!, unsafe_convert
-import Compat: pushfirst!, popfirst!, firstindex, lastindex
+       append!, insert!, prepend!, unsafe_convert,
+       pushfirst!, popfirst!, firstindex, lastindex,
+       getproperty, setproperty!, propertynames
 
 # Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
@@ -76,10 +75,19 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        @compat finalizer(pydecref, po)
+        finalizer(pydecref, po)
         return po
     end
 end
+
+PyPtr(o::PyObject) = getfield(o, :o)
+
+"""
+    ≛(x, y)
+
+`PyPtr` based comparison of `x` and `y`, which can be of type `PyObject` or `PyPtr`.
+"""
+≛(o1::Union{PyObject,PyPtr}, o2::Union{PyObject,PyPtr}) = PyPtr(o1) == PyPtr(o2)
 
 """
     PyNULL()
@@ -103,7 +111,7 @@ PyNULL() = PyObject(PyPtr_NULL)
 Test where `o` contains a `NULL` pointer to a Python object, i.e. whether
 it is equivalent to a `PyNULL()` object.
 """
-ispynull(o::PyObject) = o.o == PyPtr_NULL
+ispynull(o::PyObject) = o ≛ PyPtr_NULL
 
 function pydecref_(o::Union{PyPtr,PyObject})
     _finalized[] || ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
@@ -112,7 +120,7 @@ end
 
 function pydecref(o::PyObject)
     pydecref_(o)
-    o.o = PyPtr_NULL
+    setfield!(o, :o, PyPtr_NULL)
     return o
 end
 
@@ -135,8 +143,8 @@ will be performed when `o` is garbage collected.  (This means that
 you can no longer use `o`.)  Used for passing objects to Python.
 """
 function pystealref!(o::PyObject)
-    optr = o.o
-    o.o = PyPtr_NULL # don't decref when o is gc'ed
+    optr = PyPtr(o)
+    setfield!(o, :o, PyPtr_NULL) # don't decref when o is gc'ed
     return optr
 end
 
@@ -148,16 +156,16 @@ a `PyObject`, the refcount is incremented.  Otherwise a `PyObject`
 wrapping/converted from `x` is created.
 """
 pyreturn(x::Any) = pystealref!(PyObject(x))
-pyreturn(x::PyObject) = pyincref_(x.o)
+pyreturn(o::PyObject) = PyPtr(pyincref(o))
 
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
-    dest.o = src.o
-    return pyincref(dest)
+    setfield!(dest, :o, PyPtr(pyincref(src)))
+    return dest
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
-  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t.o) == 1
+  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
 
 pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
   t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
@@ -166,7 +174,7 @@ pyquery(q::Ptr{Cvoid}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
 
 # conversion to pass PyObject as ccall arguments:
-unsafe_convert(::Type{PyPtr}, po::PyObject) = po.o
+unsafe_convert(::Type{PyPtr}, po::PyObject) = PyPtr(po)
 
 # use constructor for generic conversions to PyObject
 convert(::Type{PyObject}, o) = PyObject(o)
@@ -238,7 +246,7 @@ function pystring(o::PyObject)
             s = ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
-                return string(o.o)
+                return string(PyPtr(o))
             end
         end
         return convert(AbstractString, PyObject(s))
@@ -250,9 +258,9 @@ function show(io::IO, o::PyObject)
 end
 
 function Base.Docs.doc(o::PyObject)
-    if haskey(o, "__doc__")
-        d = o["__doc__"]
-        if d.o != pynothing[]
+    if hasproperty(o, "__doc__")
+        d = o."__doc__"
+        if !(d ≛ pynothing[])
             return Base.Docs.Text(convert(AbstractString, d))
         end
     end
@@ -271,23 +279,23 @@ function hash(o::PyObject)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(o.o))
+        hashsalt(unsafe_pyjlwrap_to_objref(o))
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
-            return hashsalt(o.o)
+            return hashsalt(PyPtr(o))
         end
         hashsalt(h)
     end
 end
 
 #########################################################################
-# For o::PyObject, make o["foo"] and o[:foo] equivalent to o.foo in Python,
+# For o::PyObject, make o["foo"], o[:foo], and o.foo equivalent to o.foo in Python,
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function getindex(o::PyObject, s::AbstractString)
+function getproperty(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
@@ -299,9 +307,16 @@ function getindex(o::PyObject, s::AbstractString)
     return PyObject(p)
 end
 
-getindex(o::PyObject, s::Symbol) = convert(PyAny, getindex(o, string(s)))
+getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, string(s)))
 
-function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
+propertynames(o::PyObject) = map(x->Symbol(first(x)),
+                                pycall(inspect."getmembers", PyObject, o))
+
+# avoiding method ambiguity
+setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
+setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
+
+function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
@@ -313,9 +328,28 @@ function setindex!(o::PyObject, v, s::Union{Symbol,AbstractString})
     o
 end
 
+function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}
+    if T == Symbol
+        Base.depwarn("`getindex(o::PyObject, s::Symbol)` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.s` instead of `o[:s]`.", :getindex)
+    else
+        Base.depwarn("`getindex(o::PyObject, s::AbstractString)` is deprecated in favor of dot overloading (`getproperty`) so elements should now be accessed as e.g. `o.\"s\"` instead of `o[\"s\"]`.", :getindex)
+    end
+    return getproperty(o, s)
+end
+
+function setindex!(o::PyObject, v, s::Union{Symbol, AbstractString})
+    Base.depwarn("`setindex!(o::PyObject, v, s::Union{Symbol, AbstractString})` is deprecated in favor of `setproperty!(o, s, v)`.", :setindex!)
+    return _setproperty!(o, s, v)
+end
+
 function haskey(o::PyObject, s::Union{Symbol,AbstractString})
+    Base.depwarn("`haskey(o::PyObject, s::Union{Symbol, AbstractString})` is deprecated, use `hasproperty(o, s)` instead.", :haskey)
+    return hasproperty(o, s)
+end
+
+function hasproperty(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
-        throw(ArgumentError("haskey of NULL PyObject"))
+        throw(ArgumentError("hasproperty of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
                       (PyPtr, Cstring), o, s)
@@ -323,7 +357,7 @@ end
 
 #########################################################################
 
-keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect["getmembers"],
+keys(o::PyObject) = Symbol[m[1] for m in pycall(inspect."getmembers",
                                 PyVector{Tuple{Symbol,PyObject}}, o)]
 
 #########################################################################
@@ -344,12 +378,12 @@ If the Python module contains identifiers that are reserved words in Julia (e.g.
 """
 function pywrap(o::PyObject, mname::Symbol=:__anon__)
     members = convert(Vector{Tuple{AbstractString,PyObject}},
-                      pycall(inspect["getmembers"], PyObject, o))
+                      pycall(inspect."getmembers", PyObject, o))
     filter!(m -> !(m[1] in reserved), members)
     m = Module(mname, false)
     consts = [Expr(:const, Expr(:(=), Symbol(x[1]), convert(PyAny, x[2]))) for x in members]
     exports = try
-                  convert(Vector{Symbol}, o["__all__"])
+                  convert(Vector{Symbol}, o."__all__")
               catch
                   [Symbol(x[1]) for x in filter(x -> x[1][1] != '_', members)]
               end
@@ -360,7 +394,7 @@ end
 
 #########################################################################
 
-@static if Compat.Sys.iswindows()
+@static if Sys.iswindows()
     # Many python extensions are linked against a very specific version of the
     # MSVC runtime library. To load this library, libpython declares an
     # appropriate manifest, but unfortunately most extensions do not.
@@ -533,14 +567,8 @@ macro pyimport(name, optional_varname...)
     mname = modulename(name)
     Name = pyimport_name(name, optional_varname)
     quoteName = Expr(:quote, Name)
-    # VERSION 0.7
-    @static if isdefined(Base, Symbol("@isdefined"))
-        isdef_check = :(isdefined($__module__, $quoteName))
-    else
-        isdef_check = :(isdefined($quoteName))
-    end
     quote
-        if !$isdef_check
+        if !isdefined($__module__, $quoteName)
             const $(esc(Name)) = pywrap(pyimport($mname))
         elseif !isa($(esc(Name)), Module)
             error("@pyimport: ", $(Expr(:quote, Name)), " already defined")
@@ -593,8 +621,8 @@ function _pywith(EXPR,VAR,TYPE,BLOCK)
             end
         end
         mgrT = pytypeof(mgr)
-        exit = mgrT["__exit__"]
-        value = @pycall mgrT["__enter__"](mgr)::$(esc(TYPE))
+        exit = mgrT."__exit__"
+        value = @pycall mgrT."__enter__"(mgr)::$(esc(TYPE))
         exc = true
         try
             try
@@ -602,7 +630,7 @@ function _pywith(EXPR,VAR,TYPE,BLOCK)
                 $(esc(BLOCK))
             catch err
                 exc = false
-                if !(@pycall exit(mgr, pyimport(:sys)[:exc_info]()...)::Bool)
+                if !(@pycall exit(mgr, pyimport(:sys).exc_info()...)::Bool)
                     throw(err)
                 end
             end
@@ -658,7 +686,7 @@ function pyimport_conda(modulename::AbstractString, condapkg::AbstractString,
         pyimport(modulename)
     catch e
         if conda
-            Compat.@info "Installing $modulename via the Conda $condapkg package..."
+            @info "Installing $modulename via the Conda $condapkg package..."
             isempty(channel) || Conda.add_channel(channel)
             Conda.add(condapkg)
             pyimport(modulename)
@@ -702,9 +730,7 @@ end
 
 Look up a string or symbol `s` among the global Python builtins. If `s` is a string it returns a PyObject, while if `s` is a symbol it returns the builtin converted to `PyAny`.
 """
-function pybuiltin(name)
-    builtin[name]
-end
+pybuiltin(name) = getproperty(builtin, name)
 
 #########################################################################
 include("pyfncall.jl")
@@ -745,47 +771,23 @@ function set!(o::PyObject, k, v)
 end
 
 #########################################################################
-# Support [] for integer keys, and other duck-typed sequence/list operations,
-# as those don't conflict with symbols/strings used for attributes.
+# We will eventually allow o[i] to be a synonym for Python, but to
+# get there we first need to deprecate the old methods that subtracted
+# 1 from integer indices.
 
-# Index conversion: Python is zero-based.  It also has -1 based
-# backwards indexing, but we don't support this, in favor of the
-# Julian syntax o[end-1] etc.
-function ind2py(i::Integer)
-    i <= 0 && throw(BoundsError())
-    return i-1
-end
+@deprecate getindex(o::PyObject, i::Integer) get(o, i-1)
+@deprecate setindex!(o::PyObject, v, i::Integer) set!(o, i-1, v)
+@deprecate getindex(o::PyObject, i1::Integer, i2::Integer) get(o, (i1-1,i2-1))
+@deprecate setindex!(o::PyObject, v, i1::Integer, i2::Integer) set!(o, (i1-1,i2-1), v)
+@deprecate getindex(o::PyObject, I::Integer...) get(o, I .- 1)
+@deprecate setindex!(o::PyObject, v, I::Integer...) set!(o, I .- 1, v)
+@deprecate splice!(o::PyObject, i::Integer) let v=get(o, i-1); delete!(o, i-1); v; end
+@deprecate insert!(a::PyObject, i::Integer, item) PyCall._insert!(a, i-1, item)
+@deprecate firstindex(o::PyObject) 1
+@deprecate lastindex(o::PyObject) length(o)
 
-_getindex(o::PyObject, i::Integer, T) = convert(T, PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr, Int), o, ind2py(i))))
-getindex(o::PyObject, i::Integer) = _getindex(o, i, PyAny)
-function setindex!(o::PyObject, v, i::Integer)
-    @pycheckz ccall((@pysym :PySequence_SetItem), Cint, (PyPtr, Int, PyPtr), o, ind2py(i), PyObject(v))
-    v
-end
-getindex(o::PyObject, i1::Integer, i2::Integer) = get(o, (ind2py(i1),ind2py(i2)))
-setindex!(o::PyObject, v, i1::Integer, i2::Integer) = set!(o, (ind2py(i1),ind2py(i2)), v)
-getindex(o::PyObject, I::Integer...) = get(o, map(ind2py, I))
-setindex!(o::PyObject, v, I::Integer...) = set!(o, map(ind2py, I), v)
 length(o::PyObject) = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
 size(o::PyObject) = (length(o),)
-firstindex(o::PyObject) = 1
-lastindex(o::PyObject) = length(o)
-
-function splice!(a::PyObject, i::Integer)
-    v = a[i]
-    @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
-    v
-end
-
-pop!(a::PyObject) = splice!(a, length(a))
-popfirst!(a::PyObject) = splice!(a, 1)
-
-function empty!(a::PyObject)
-    for i in length(a):-1:1
-        @pycheckz ccall((@pysym :PySequence_DelItem), Cint, (PyPtr, Int), a, i-1)
-    end
-    a
-end
 
 # The following operations only work for the list type and subtypes thereof:
 function push!(a::PyObject, item)
@@ -793,22 +795,33 @@ function push!(a::PyObject, item)
                      a, PyObject(item))
     a
 end
+function pop!(o::PyObject)
+    i = length(o) - 1
+    v = get(o, i)
+    delete!(o, i)
+    return v
+end
 
-function insert!(a::PyObject, i::Integer, item)
+function _insert!(a::PyObject, i::Integer, item)
     @pycheckz ccall((@pysym :PyList_Insert), Cint, (PyPtr, Int, PyPtr),
-                     a, ind2py(i), PyObject(item))
+                     a, i, PyObject(item))
     a
 end
 
-pushfirst!(a::PyObject, item) = insert!(a, 1, item)
+function popfirst!(o::PyObject)
+    v = get(o, 0)
+    delete!(o, 0)
+    return v
+end
+pushfirst!(a::PyObject, item) = _insert!(a, 0, item)
 
 function prepend!(a::PyObject, items)
-    if isa(items,PyObject) && items.o == a.o
+    if isa(items,PyObject) && items ≛ a
         # avoid infinite loop in prepending a to itself
         return prepend!(a, collect(items))
     end
     for (i,x) in enumerate(items)
-        insert!(a, i, x)
+        _insert!(a, i-1, x)
     end
     a
 end
@@ -823,6 +836,24 @@ end
 append!(a::PyObject, items::PyObject) =
     PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat),
                              PyPtr, (PyPtr, PyPtr), a, items))
+
+if pyversion >= v"3.3"
+    function empty!(o::PyObject)
+        pydecref(pycall(o."clear", PyObject)) # list.clear() was added in 3.3
+        return o
+    end
+else
+    function empty!(o::PyObject)
+        if hasproperty(o, "clear") # for dict, set, etc.
+            pydecref(pycall(o."clear", PyObject))
+        else
+            for i = length(o)-1:-1:0
+                delete!(o, i)
+            end
+        end
+        return o
+    end
+end
 
 #########################################################################
 # operators on Python objects
@@ -842,19 +873,18 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
                        (MIME"image/svg+xml", "_repr_svg_"),
                        (MIME"text/latex", "_repr_latex_"))
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
-    showable = VERSION < v"0.7.0-DEV.4047" ? :mimewritable : :showable
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
-            if !ispynull(o) && haskey(o, $method)
+            if !ispynull(o) && hasproperty(o, $method)
                 r = pycall(o[$method], PyObject)
-                r.o != pynothing[] && return write(io, convert($T, r))
+                !(r ≛ pynothing[]) && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
         end
-        Base.$showable(::$mime, o::PyObject) =
-            !ispynull(o) && haskey(o, $method) && let meth = o[$method]
-                meth.o != pynothing[] &&
-                pycall(meth, PyObject).o != pynothing[]
+        Base.showable(::$mime, o::PyObject) =
+            !ispynull(o) && hasproperty(o, $method) && let meth = o.$method
+                !(meth ≛ pynothing[]) &&
+                !(pycall(meth, PyObject) ≛ pynothing[])
             end
     end
 end
@@ -862,7 +892,7 @@ end
 #########################################################################
 # Expose Python docstrings to the Julia doc system
 
-Docs.getdoc(o::PyObject) = Text(convert(String, o["__doc__"]))
+Docs.getdoc(o::PyObject) = Text(convert(String, o."__doc__"))
 
 #########################################################################
 

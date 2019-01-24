@@ -340,8 +340,8 @@ function pyjlwrap_dealloc(o::PyPtr)
     return nothing
 end
 
-unsafe_pyjlwrap_to_objref(o::PyPtr) =
-  unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, o), 4))
+unsafe_pyjlwrap_to_objref(o::Union{PyPtr, PyObject}) =
+  GC.@preserve o unsafe_pointer_to_objref(unsafe_load(convert(Ptr{Ptr{Cvoid}}, PyPtr(o)), 4))
 
 function pyjlwrap_repr(o::PyPtr)
     try
@@ -397,7 +397,7 @@ function pyjlwrap_getattr(self_::PyPtr, attr__::PyPtr)
     catch e
         @pyraise e
     finally
-        attr_.o = PyPtr_NULL # don't decref
+        setfield!(attr_, :o, PyPtr_NULL) # don't decref
     end
     return PyPtr_NULL
 end
@@ -425,14 +425,11 @@ pyjlwrap_type(init::Function, name::AbstractString) =
     pyjlwrap_type!(init, PyTypeObject(), name)
 
 # Given a jlwrap type, create a new instance (and save value for gc)
-# (Careful: not sure if this works if value is an isbits type,
-#  since, the jl_value_t* may be to a temporary copy.  But don't need
-#  to wrap isbits types in Python objects anyway.)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
     # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
                                  PyPtr, (Any,), pyT))
-    p = convert(Ptr{Ptr{Cvoid}}, o.o)
+    p = convert(Ptr{Ptr{Cvoid}}, PyPtr(o))
     if isimmutable(value)
         # It is undefined to call `pointer_from_objref` on immutable objects.
         # The compiler is free to return basically anything since the boxing is not
@@ -440,10 +437,10 @@ function pyjlwrap_new(pyT::PyTypeObject, value::Any)
         # Below is a well defined way to get a pointer (`ptr`) and an object that defines
         # the lifetime of the pointer `ref`.
         ref = Ref{Any}(value)
-        pycall_gc[o.o] = ref
+        pycall_gc[PyPtr(o)] = ref
         ptr = unsafe_load(Ptr{Ptr{Cvoid}}(pointer_from_objref(ref)))
     else
-        pycall_gc[o.o] = value
+        pycall_gc[PyPtr(o)] = value
         ptr = pointer_from_objref(value)
     end
     unsafe_store!(p, C_NULL, 3)

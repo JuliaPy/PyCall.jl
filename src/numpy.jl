@@ -52,24 +52,24 @@ function npyinitialize()
     if pyversion.major < 3
         PyArray_API = @pycheck ccall((@pysym :PyCObject_AsVoidPtr),
                                      Ptr{Ptr{Cvoid}}, (PyPtr,),
-                                     npy_multiarray["_ARRAY_API"])
+                                     npy_multiarray."_ARRAY_API")
     else
         PyArray_API = @pycheck ccall((@pysym :PyCapsule_GetPointer),
                                      Ptr{Ptr{Cvoid}}, (PyPtr,Ptr{Cvoid}),
-                                     npy_multiarray["_ARRAY_API"], C_NULL)
+                                     npy_multiarray."_ARRAY_API", C_NULL)
     end
 
     numpy = pyimport("numpy")
 
     # directory for numpy include files to parse
-    inc = pycall(numpy["get_include"], AbstractString)
+    inc = pycall(numpy."get_include", AbstractString)
 
     # numpy.number types
-    copy!(npy_number, numpy["number"])
-    copy!(npy_integer, numpy["integer"])
-    copy!(npy_floating, numpy["floating"])
-    copy!(npy_complexfloating, numpy["complexfloating"])
-    copy!(npy_bool, numpy["bool_"])
+    copy!(npy_number, numpy."number")
+    copy!(npy_integer, numpy."integer")
+    copy!(npy_floating, numpy."floating")
+    copy!(npy_complexfloating, numpy."complexfloating")
+    copy!(npy_bool, numpy."bool_")
 
     # Parse __multiarray_api.h to obtain length and meaning of PyArray_API
     try

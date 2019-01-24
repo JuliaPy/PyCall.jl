@@ -135,12 +135,12 @@ For instance,
 
     @pyimport numpy.polynomial as P
     @pydef type Doubler <: P.Polynomial
-        __init__(self, x=10) = (self[:x] = x)
+        __init__(self, x=10) = (self.x = x)
         my_method(self, arg1::Number) = arg1 + 20
-        x2.get(self) = self[:x] * 2
-        x2.set!(self, new_val) = (self[:x] = new_val / 2)
+        x2.get(self) = self.x * 2
+        x2.set!(self, new_val) = (self.x = new_val / 2)
     end
-    Doubler()[:x2]
+    Doubler().x2
 
 is essentially equivalent to the following Python code:
 

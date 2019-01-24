@@ -17,7 +17,7 @@ EnumProcessModules(hProcess, lphModule, cb, lpcbNeeded) =
         hProcess, lphModule, cb, lpcbNeeded)
 
 symbols_present = false
-@static if Compat.Sys.iswindows()
+@static if Sys.iswindows()
     lpcbneeded = Ref{UInt32}()
     proc_handle = ccall(:GetCurrentProcess, stdcall, Ptr{Cvoid}, ())
     handles = Vector{Ptr{Cvoid}}(undef, 20)
@@ -48,7 +48,7 @@ if !symbols_present
     # need SetPythonHome to avoid warning, #299
     Py_SetPythonHome(libpy_handle, pyversion_build, PYTHONHOME)
 else
-    @static if Compat.Sys.iswindows()
+    @static if Sys.iswindows()
         pathbuf = Vector{UInt16}(undef, 1024)
         ret = ccall(:GetModuleFileNameW, stdcall, UInt32,
             (Ptr{Cvoid}, Ptr{UInt16}, UInt32),
@@ -64,7 +64,7 @@ else
         libpy_handle = proc_handle
         # Now determine the name of the python library that these symbols are from
         some_address_in_libpython = Libdl.dlsym(libpy_handle, :Py_GetVersion)
-        some_address_in_main_exe = Libdl.dlsym(proc_handle, Compat.Sys.isapple() ? :_mh_execute_header : :main)
+        some_address_in_main_exe = Libdl.dlsym(proc_handle, Sys.isapple() ? :_mh_execute_header : :main)
         dlinfo1 = Ref{Dl_info}()
         dlinfo2 = Ref{Dl_info}()
         ccall(:dladdr, Cint, (Ptr{Cvoid}, Ptr{Dl_info}), some_address_in_libpython,

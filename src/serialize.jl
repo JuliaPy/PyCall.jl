@@ -1,10 +1,6 @@
-using Compat.Serialization
-import Compat.Serialization: serialize, deserialize
-if VERSION < v"0.7.0-DEV.3476"
-    import Base.Serializer: serialize_type
-else
-    import Compat.Serialization: serialize_type
-end
+using Serialization
+import Serialization: serialize, deserialize
+import Serialization: serialize_type
 
 const _pickle = PyNULL()
 
@@ -13,9 +9,9 @@ pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(PyCall.pyversion.major â‰
 function serialize(s::AbstractSerializer, pyo::PyObject)
     serialize_type(s, PyObject)
     if ispynull(pyo)
-        serialize(s, pyo.o)
+        serialize(s, PyPtr_NULL)
     else
-        b = PyBuffer(pycall(pickle()["dumps"], PyObject, pyo))
+        b = PyBuffer(pycall(pickle()."dumps", PyObject, pyo))
         serialize(s, unsafe_wrap(Array, Ptr{UInt8}(pointer(b)), sizeof(b)))
     end
 end
@@ -41,6 +37,6 @@ function deserialize(s::AbstractSerializer, t::Type{PyObject})
         @assert b == C_NULL
         return PyNULL()
     else
-        return pycall(pickle()["loads"], PyObject, pybytes(b))
+        return pycall(pickle()."loads", PyObject, pybytes(b))
     end
 end

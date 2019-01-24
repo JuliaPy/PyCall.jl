@@ -4,8 +4,6 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
 [![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
 
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.5.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.5)
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.6.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.6)
 [![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
 
 
@@ -20,10 +18,10 @@ without copying them.
 ## Installation
 
 Within Julia, just use the package manager to run `Pkg.add("PyCall")` to
-install the files.  Julia 0.5 or later is required.
+install the files. Julia 0.7 or later is required.
 
 The latest development version of PyCall is available from
-<https://github.com/stevengj/PyCall.jl>.  If you want to switch to
+<https://github.com/JuliaPy/PyCall.jl>.  If you want to switch to
 this after installing the package, run `Pkg.checkout("PyCall"); Pkg.build("PyCall")`.
 
 By default on Mac and Windows systems, `Pkg.add("PyCall")`
@@ -39,7 +37,7 @@ the `python3` program (if any, otherwise `python`) in your PATH.
 
 The advantage of a Conda-based configuration is particularly
 compelling if you are installing PyCall in order to use packages like
-[PyPlot.jl](https://github.com/stevengj/PyPlot.jl) or
+[PyPlot.jl](https://github.com/JuliaPy/PyPlot.jl) or
 [SymPy.jl](https://github.com/JuliaPy/SymPy.jl), as these can then
 automatically install their Python dependencies.  (To exploit this in
 your own packages, use the `pyimport_conda` function described below.)
@@ -83,10 +81,10 @@ different virtualenv, then you should switch virtualenvs and run
 `rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
 
 **Note:** Usually, the necessary libraries are installed along with
-Python, but [pyenv on MacOS](https://github.com/stevengj/PyCall.jl/issues/122)
+Python, but [pyenv on MacOS](https://github.com/JuliaPy/PyCall.jl/issues/122)
 requires you to install it with `env PYTHON_CONFIGURE_OPTS="--enable-framework"
 pyenv install 3.4.3`.  The Enthought Canopy Python distribution is
-currently [not supported](https://github.com/stevengj/PyCall.jl/issues/42).
+currently [not supported](https://github.com/JuliaPy/PyCall.jl/issues/42).
 As a general rule, we tend to recommend the [Anaconda Python
 distribution](https://store.continuum.io/cshop/anaconda/) on MacOS and
 Windows, or using the Julia Conda package, in order to minimize headaches.
@@ -129,7 +127,7 @@ options, and this functionality is accessed from Julia by:
 
 However, for better integration with Julia graphics backends and to
 avoid the need for the `show` function, we recommend using matplotlib
-via the Julia [PyPlot module](https://github.com/stevengj/PyPlot.jl).
+via the Julia [PyPlot module](https://github.com/JuliaPy/PyPlot.jl).
 
 Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
@@ -141,7 +139,7 @@ we could call the Newton solver in scipy.optimize via:
 A macro exists for mimicking Python's "with statement". For example:
 
     @pywith pybuiltin("open")("file.txt","w") as f begin
-        f[:write]("hello")
+        f.write("hello")
     end
 
 The type of `f` can be specified with `f::T` (for example, to override automatic
@@ -164,18 +162,13 @@ example, using [Biopython](http://biopython.org/wiki/Seq) we can do:
     @pyimport Bio.Seq as s
     @pyimport Bio.Alphabet as a
     my_dna = s.Seq("AGTACACTGGT", a.generic_dna)
-    my_dna[:find]("ACT")
-
-whereas in Python the last step would have been `my_dna.find("ACT")`.
+    my_dna.find("ACT")
 
 ## Troubleshooting
 
 Here are solutions to some common problems:
 
-* As mentioned above, use `foo[:bar]` and `foo[:bar](...)` rather than `foo.bar` and `foo.bar(...)`,
-respectively, to access attributes and methods of Python objects.
-
-* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/stevengj/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")["path"]), "")`.
+* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")."path"), "")`.
 
 ## Python object interfaces
 
@@ -201,9 +194,9 @@ dates/periods, and functions, along with tuples and arrays/lists
 thereof, but more are planned.  (Julia symbols are converted to Python
 strings.)
 
-Given `o::PyObject`, `o[:attribute]` is equivalent to `o.attribute`
+Given `o::PyObject`, `o.attribute` in Julia is equivalent to `o.attribute`
 in Python, with automatic type conversion.  To get an attribute as a
-`PyObject` without type conversion, do `o["attribute"]` instead.
+`PyObject` without type conversion, do `o."attribute"` instead.
 The `keys(o::PyObject)` function returns an array of the available
 attribute symbols.
 
@@ -340,10 +333,10 @@ and also by providing more type information to the Julia compiler.
 
 * `pyimport(s)`: Import the Python module `s` (a string or symbol) and
   return a pointer to it (a `PyObject`).  Functions or other symbols
-  in the module may then be looked up by `s[name]` where `name` is a
+  in the module may then be looked up by `s.name` where `name` is a
   string (for the raw `PyObject`) or symbol (for automatic
   type-conversion).  Unlike the `@pyimport` macro, this does not
-  define a Julia module and members cannot be accessed with `s.name`.
+  define a Julia module.
 
 * `py"..."` evaluates `"..."` as a Python string, equivalent to
   Python's [`eval`](https://docs.python.org/2/library/functions.html#eval) function, and returns the result
@@ -379,7 +372,7 @@ and also by providing more type information to the Julia compiler.
   instead use `w.pymember(:member)` (for the `PyAny` conversion) or
   `w.pymember("member")` (for the raw `PyObject`).  `pywrap` is rather
   inefficient since it converts *every* member of `o` at once; you
-  are generally encouraged to simply access members via `o[:member]`
+  are generally encouraged to simply access members via `o.member`
   rather than using `pywrap`.
 
 Occasionally, you may need to pass a keyword argument to Python that
@@ -413,15 +406,15 @@ For instance,
     @pyimport numpy.polynomial as P
     @pydef mutable struct Doubler <: P.Polynomial
         function __init__(self, x=10)
-            self[:x] = x
+            self.x = x
         end
         my_method(self, arg1::Number) = arg1 + 20
-        x2.get(self) = self[:x] * 2
+        x2.get(self) = self.x * 2
         function x2.set!(self, new_val)
-            self[:x] = new_val / 2
+            self.x = new_val / 2
         end
     end
-    Doubler()[:x2]
+    Doubler().x2
 
 is essentially equivalent to the following Python code:
 
@@ -452,14 +445,14 @@ Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter):
 
     @pydef mutable struct SampleApp <: tk.Tk
         __init__(self, args...; kwargs...) = begin
-            tk.Tk[:__init__](self, args...; kwargs...)
-            self[:label] = tk.Label(text="Hello, world!")
-            self[:label][:pack](padx=10, pady=10)
+            tk.Tk.__init__(self, args...; kwargs...)
+            self.label = tk.Label(text="Hello, world!")
+            self.label.pack(padx=10, pady=10)
         end
     end
 
     app = SampleApp()
-    app[:mainloop]()
+    app.mainloop()
 
 Class variables are also supported:
 
@@ -467,7 +460,7 @@ Class variables are also supported:
     @pydef mutable struct ObjectCounter
         obj_count = 0 # Class variable
         function __init__(::PyObject)
-            ObjectCounter[:obj_count] += 1
+            ObjectCounter.obj_count += 1
         end
     end
 
@@ -515,7 +508,7 @@ the library.  However, in other cases it is necessary to explicitly
 tell the library which GUI toolkit to use and that an interactive mode
 is desired.  To make this even easier, it is convenient to have
 wrapper modules around popular Python libraries, such as the [PyPlot
-module](https://github.com/stevengj/PyPlot.jl) for Julia.
+module](https://github.com/JuliaPy/PyPlot.jl) for Julia.
 
 ### Low-level Python API access
 
