@@ -1,5 +1,4 @@
-using PyCall, Compat, Compat.Test
-using Compat: @info, @warn
+using PyCall, Test
 
 
 function test_venv_has_python(path)
@@ -37,7 +36,7 @@ function test_venv_activation(path)
     env = copy(ENV)
     env["PYCALL_JL_RUNTIME_PYTHON"] = newpython
     jlcmd = setenv(`$(Base.julia_cmd()) --startup-file=no -e $code`, env)
-    if Compat.Sys.iswindows()
+    if Sys.iswindows()
         # Marking the test broken in Windows.  It seems that
         # venv copies .dll on Windows and libpython check in
         # PyCall.__init__ detects that.
@@ -58,9 +57,9 @@ end
 
 @testset "virtualenv activation" begin
     pyname = "python$(pyversion.major).$(pyversion.minor)"
-    if Compat.Sys.which("virtualenv") === nothing
+    if Sys.which("virtualenv") === nothing
         @info "No virtualenv command. Skipping the test..."
-    elseif Compat.Sys.which(pyname) === nothing
+    elseif Sys.which(pyname) === nothing
         @info "No $pyname command. Skipping the test..."
     else
         mktempdir() do tmppath
