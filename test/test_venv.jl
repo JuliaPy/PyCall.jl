@@ -26,9 +26,9 @@ function test_venv_activation(path)
     code = """
     $setup_code
     using PyCall
-    println(PyCall.pyimport("sys")[:executable])
-    println(PyCall.pyimport("sys")[:exec_prefix])
-    println(PyCall.pyimport("pip")[:__file__])
+    println(PyCall.pyimport("sys").executable)
+    println(PyCall.pyimport("sys").exec_prefix)
+    println(PyCall.pyimport("pip").__file__)
     """
     # Note that `pip` is just some arbitrary non-standard
     # library.  Using standard library like `os` does not work
@@ -93,14 +93,14 @@ end
     # Otherwise, `venv` does not work with this Python executable:
     # https://bugs.python.org/issue30811
     sys = PyCall.pyimport("sys")
-    if haskey(sys, :real_prefix)
+    if hasproperty(sys, :real_prefix)
         # sys.real_prefix is set by virtualenv and does not exist in
         # standard Python:
         # https://github.com/pypa/virtualenv/blob/16.0.0/virtualenv_embedded/site.py#L554
         candidates = [
-            PyCall.venv_python(sys[:real_prefix], "$(pyversion.major).$(pyversion.minor)"),
-            PyCall.venv_python(sys[:real_prefix], "$(pyversion.major)"),
-            PyCall.venv_python(sys[:real_prefix]),
+            PyCall.venv_python(sys.real_prefix, "$(pyversion.major).$(pyversion.minor)"),
+            PyCall.venv_python(sys.real_prefix, "$(pyversion.major)"),
+            PyCall.venv_python(sys.real_prefix),
             PyCall.pyprogramname,  # must exists
         ]
         python = candidates[findfirst(isfile, candidates)]
