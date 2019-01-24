@@ -896,6 +896,7 @@ end
 # Expose Python docstrings to the Julia doc system
 
 Docs.getdoc(o::PyObject) = Text(convert(String, o."__doc__"))
+Docs.Binding(o::PyObject, s::Symbol) = getproperty(o, s)
 
 #########################################################################
 
