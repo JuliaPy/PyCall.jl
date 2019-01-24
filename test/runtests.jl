@@ -15,7 +15,7 @@ roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
 roundtripeq(x) = roundtrip(x) == x
 
-@pyimport math
+const math = pyimport("math")
 
 struct TestConstruct
     x
@@ -127,10 +127,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test math.sin(3) ≈ sin(3)
 
     @test collect(PyObject([1,"hello",5])) == [1,"hello",5]
-
-    @test try @eval (@pyimport os.path) catch ex
-        isa((ex::LoadError).error, ArgumentError)
-    end
 
     @test PyObject("hello") == PyObject("hello")
     @test PyObject("hello") != PyObject("hellö")
