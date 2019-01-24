@@ -64,7 +64,8 @@ function npyinitialize()
     numpy = pyimport("numpy")
 
     # emit a warning if both Julia and NumPy are linked with MKL (#433)
-    if LinearAlgebra.BLAS.vendor() === :mkl && hasproperty(numpy, "__config__")
+    if LinearAlgebra.BLAS.vendor() === :mkl &&
+       LinearAlgebra.BLAS.BlasInt === Int64 && hasproperty(numpy, "__config__")
         config = numpy."__config__"
         if hasproperty(config, "blas_opt_info")
             blaslibs = get(config."blas_opt_info", Vector{String}, "libraries", String[])
