@@ -144,8 +144,8 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             nca = NoCopyArray(ao)
             @test !(nca isa PermutedDimsArray)
             @test nca isa Array
-            @test nca[3] == ao[3]
-            @test nca[4] == ao[4]
+            @test nca[3] == get(ao,2)
+            @test nca[4] == get(ao,3)
         end
 
         @testset "NoCopyArray 2d f-contig" begin
@@ -162,8 +162,8 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test nca isa Array
             @test size(nca) == (3,4)
             @test strides(nca) == (1,3)
-            @test nca[3,2] == ao[3,2]
-            @test nca[2,3] == ao[2,3]
+            @test nca[3,2] == get(ao, (2,1))
+            @test nca[2,3] == get(ao, (1,2))
         end
 
         @testset "NoCopyArray 3d c-contig" begin
@@ -179,8 +179,8 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test !(nca isa Array)
             @test size(nca) == (3,4,5)
             @test strides(nca) == (20,5,1)
-            @test nca[2,3,4] == ao[2,3,4]
-            @test nca[3,2,4] == ao[3,2,4]
+            @test nca[2,3,4] == get(ao, (1,2,3))
+            @test nca[3,2,4] == get(ao, (2,1,3))
         end
 
         @testset "isbuftype" begin
