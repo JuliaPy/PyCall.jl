@@ -38,6 +38,8 @@ const npy_floating = PyNULL()
 const npy_complexfloating = PyNULL()
 const npy_bool = PyNULL()
 
+import LinearAlgebra # for MKL check
+
 function npyinitialize()
     global npy_initialized
 
@@ -60,6 +62,18 @@ function npyinitialize()
     end
 
     numpy = pyimport("numpy")
+
+    # emit a warning if both Julia and NumPy are linked with MKL (#433)
+    if LinearAlgebra.BLAS.vendor() === :mkl &&
+       LinearAlgebra.BLAS.BlasInt === Int64 && hasproperty(numpy, "__config__")
+        config = numpy."__config__"
+        if hasproperty(config, "blas_opt_info")
+            blaslibs = get(config."blas_opt_info", Vector{String}, "libraries", String[])
+            if any(s -> occursin("mkl", lowercase(s)), blaslibs)
+                @warn "both Julia and NumPy are linked with MKL, which may cause conflicts and crashes (#433)."
+            end
+        end
+    end
 
     # directory for numpy include files to parse
     inc = pycall(numpy."get_include", AbstractString)
