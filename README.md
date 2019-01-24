@@ -75,10 +75,12 @@ unless you set the `PYTHON` environment variable or delete the file
 
 **Note:** If you use Python
 [virtualenvs](http://docs.python-guide.org/en/latest/dev/virtualenvs/),
-then be aware that PyCall *uses the virtualenv it was built with*, even
-if you switch virtualenvs.  If you want to switch PyCall to use a
-different virtualenv, then you should switch virtualenvs and run
-`rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
+then be aware that PyCall *uses the virtualenv it was built with* by
+default, even if you switch virtualenvs.  If you want to switch PyCall
+to use a different virtualenv, then you should switch virtualenvs and
+run `rm(Pkg.dir("PyCall","deps","PYTHON")); Pkg.build("PyCall")`.
+Alternatively, see [Python virtual environment](#python-virtual-environment)
+section below for switching virtual environment at run-time.
 
 **Note:** Usually, the necessary libraries are installed along with
 Python, but [pyenv on MacOS](https://github.com/JuliaPy/PyCall.jl/issues/122)
@@ -586,6 +588,43 @@ Here, instead of `pyimport`, we have used the function `pyimport_conda`.   The s
 any other Anaconda-based Python distro for which the user has installation privileges), or (b) throw an error explaining that `scipy` needs to be installed, and explain how to configure PyCall to use Conda so that it can be installed automatically.   More generally, you can call `pyimport(module, package, channel)` to specify an optional Anaconda "channel" for installing non-standard Anaconda packages.
 
 (Note that you cannot use `@pyimport` safely with precompilation, because that declares a global constant that internally has a pointer to the module.  You can use `pywrap(pyimport(...))` in your `__init__` function to a assign a global variable using the `.` notation like `@pyimport`, however, albeit without the type stability of the global `const` as above.)
+
+## Python virtual environment
+
+Python's virtual environment created by [`venv`] and [`virtualenv`]
+can be used from `PyCall`, *provided that the Python executable used
+in the virtual environment is linked against the same `libpython` used
+by `PyCall`*.  Note that virtual environment created by `conda` is not
+supported.
+
+To use `PyCall` with a certain virtual environment, set environment
+variable `PYCALL_JL_RUNTIME_PYTHON` *before* importing `PyCall` to
+path to the Python executable.  Example:
+
+```julia
+$ source PATH/TO/bin/activate  # activate virtual environment in system shell
+
+$ julia  # start Julia
+...
+
+julia> ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python")
+"PATH/TO/bin/python3"
+
+julia> using PyCall
+
+julia> pyimport("sys").executable
+"PATH/TO/bin/python3"
+```
+
+This feature works by calling [`Py_SetProgramName`] with the value
+specified by `PYCALL_JL_RUNTIME_PYTHON`.  Similarly, the path passed
+to [`Py_SetPythonHome`] can be controlled by environment variable
+`PYCALL_JL_RUNTIME_PYTHONHOME`.
+
+[`venv`]: https://docs.python.org/3/library/venv.html
+[`virtualenv`]: https://virtualenv.pypa.io/en/latest/
+[`Py_SetProgramName`]: https://docs.python.org/3/c-api/init.html#c.Py_SetProgramName
+[`Py_SetPythonHome`]: https://docs.python.org/3/c-api/init.html#c.Py_SetPythonHome
 
 ## Author
 
