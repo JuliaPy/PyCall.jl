@@ -352,7 +352,7 @@ and also by providing more type information to the Julia compiler.
   `@pycall function(args...)::returntype` into
   `pycall(function,returntype,args...)`.
 
-* `py"..."` evaluates `"..."` as a Python code, equivalent to
+* `py"..."` evaluates `"..."` as Python code, equivalent to
   Python's [`eval`](https://docs.python.org/3/library/functions.html#eval) function, and returns the result
   converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
@@ -379,7 +379,7 @@ and also by providing more type information to the Julia compiler.
   using `py"""...."""` in your module without worrying about name clash
   with other Python code.  Note that Python functions _must_ be defined in
   `__init__`.  Side-effect in Python occurred at top-level Julia scope
-  cannot be used at run-time.
+  cannot be used at run-time for precompiled modules.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
