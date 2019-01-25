@@ -2,13 +2,18 @@ const Py_single_input = 256  # from Python.h
 const Py_file_input = 257
 const Py_eval_input = 258
 
-const _maindict = PyDict{String,PyObject,false}(PyNULL()) # cache of __main__ module dictionary
-function maindict()
-    if ispynull(_maindict.o)
-        _maindict.o = pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__")))
+const _namespaces = Dict{Module,PyDict{String,PyObject,true}}()
+
+pynamespace(m::Module) =
+    get!(_namespaces, m) do
+        if m === Main
+            return PyDict{String,PyObject,true}(pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__"))))
+        else
+            return PyDict{String,PyObject}()
+        end
     end
-    return _maindict
-end
+
+maindict() = pynamespace(Main)
 
 # internal function evaluate a python string, returning PyObject, given
 # Python dictionaries of global and local variables to use in the expression,
@@ -211,7 +216,7 @@ macro py_str(code, options...)
         removelocals = nothing
     end
     quote
-        m = maindict()
+        m = pynamespace($__module__)
         $assignlocals
         ret = $T(pyeval_($code_expr, m, m, $input_type, $fname))
         $removelocals
