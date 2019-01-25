@@ -20,12 +20,11 @@ pynamespace(m::Module) =
         end
     end
 
-maindict() = pynamespace(Main)
-
 # internal function evaluate a python string, returning PyObject, given
 # Python dictionaries of global and local variables to use in the expression,
 # and a current "file name" to use for stack traces
-function pyeval_(s::AbstractString, globals=maindict(), locals=maindict(), input_type=Py_eval_input, fname="PyCall")
+function pyeval_(s::AbstractString, globals=pynamespace(Main), locals=pynamespace(Main),
+                 input_type=Py_eval_input, fname="PyCall")
     sb = String(s) # use temp var to prevent gc before we are done with o
     sigatomic_begin()
     try
@@ -72,7 +71,7 @@ function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
     for (k, v) in kwargs
         locals[string(k)] = v
     end
-    return convert(returntype, pyeval_(s, maindict(), locals, input_type))
+    return convert(returntype, pyeval_(s, pynamespace(Main), locals, input_type))
 end
 
 # get filename from @__FILE__ macro, which returns nothing in the REPL
