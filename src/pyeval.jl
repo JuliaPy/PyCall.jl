@@ -9,7 +9,14 @@ pynamespace(m::Module) =
         if m === Main
             return PyDict{String,PyObject,true}(pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__"))))
         else
-            return PyDict{String,PyObject}()
+            ns = PyDict{String,PyObject}()
+            # In Python 2, it looks like `__builtin__` (w/o 's') must
+            # exist at module namespace.  See also:
+            # http://mail.python.org/pipermail/python-dev/2001-April/014068.html
+            # https://github.com/ipython/ipython/blob/512d47340c09d184e20811ca46aaa2f862bcbafe/IPython/core/interactiveshell.py#L1295-L1299
+            PyObject(ns).setdefault("__builtin__", builtin)
+            PyObject(ns).setdefault("__builtins__", builtin)
+            return ns
         end
     end
 
