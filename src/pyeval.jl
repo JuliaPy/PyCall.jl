@@ -14,8 +14,10 @@ pynamespace(m::Module) =
             # exist at module namespace.  See also:
             # http://mail.python.org/pipermail/python-dev/2001-April/014068.html
             # https://github.com/ipython/ipython/blob/512d47340c09d184e20811ca46aaa2f862bcbafe/IPython/core/interactiveshell.py#L1295-L1299
-            PyObject(ns).setdefault("__builtin__", builtin)
-            PyObject(ns).setdefault("__builtins__", builtin)
+            if pyversion < v"3"
+                PyObject(ns).setdefault("__builtin__", builtin)
+                PyObject(ns).setdefault("__builtins__", builtin)
+            end
             return ns
         end
     end
