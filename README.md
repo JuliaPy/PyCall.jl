@@ -304,11 +304,11 @@ dictionary.
 #### PyTextIO
 
 Julia `IO` streams are converted into Python objects implementing the
-[RawIOBase](http://docs.python.org/2/library/io.html#io.RawIOBase)
+[RawIOBase](http://docs.python.org/3/library/io.html#io.RawIOBase)
 interface, so they can be used for binary I/O in Python.  However,
 some Python code (notably unpickling) expects a stream implementing
 the
-[TextIOBase](http://docs.python.org/2/library/io.html#io.TextIOBase)
+[TextIOBase](http://docs.python.org/3/library/io.html#io.TextIOBase)
 interface, which differs from RawIOBase mainly in that `read` an
 `readall` functions return strings rather than byte arrays.  If you
 need to pass an `IO` stream as a text-IO object, just call
@@ -353,7 +353,7 @@ and also by providing more type information to the Julia compiler.
   `pycall(function,returntype,args...)`.
 
 * `py"..."` evaluates `"..."` as a Python code, equivalent to
-  Python's [`eval`](https://docs.python.org/2/library/functions.html#eval) function, and returns the result
+  Python's [`eval`](https://docs.python.org/3/library/functions.html#eval) function, and returns the result
   converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
   Julia variables and other expressions into the Python code with `$`,
@@ -369,7 +369,9 @@ and also by providing more type information to the Julia compiler.
   If you use `py"""..."""` to pass a *multi-line* string, the string can
   contain arbitrary Python code (not just a single expression) to be evaluated,
   but the return value is `nothing`; this is useful e.g. to define pure-Python
-  functions, and is equivalent to Python's [`exec`](https://docs.python.org/2/reference/simple_stmts.html#exec) statement.  (If you define a Python global `g` in a multiline `py"""..."""`
+  functions, and is equivalent to Python's
+  [`exec`](https://docs.python.org/3/library/functions.html#exec) function.
+  (If you define a Python global `g` in a multiline `py"""..."""`
   string, you can retrieve it in Julia by subsequently evaluating `py"g"`.)
 
   When `py"..."` is used inside a Julia module, it uses a Python namespace
