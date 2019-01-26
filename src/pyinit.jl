@@ -75,6 +75,7 @@ function _set_finalized()
 end
 
 function Py_Finalize()
+    pygui_stop_all()
     ccall(@pysym(:Py_Finalize), Cvoid, ())
 end
 
