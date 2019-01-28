@@ -15,13 +15,13 @@ pynamespace(m::Module) =
             # http://mail.python.org/pipermail/python-dev/2001-April/014068.html
             # https://github.com/ipython/ipython/blob/512d47340c09d184e20811ca46aaa2f862bcbafe/IPython/core/interactiveshell.py#L1295-L1299
             if pyversion < v"3"
-                PyObject(ns).setdefault("__builtin__", builtin)
+                ns["__builtin__"] = builtin
             end
             # Following CPython implementation, we introduce
             # `__builtins__` in the namespace.  See:
             # https://docs.python.org/2/library/__builtin__.html
             # https://docs.python.org/3/library/builtins.html
-            PyObject(ns).setdefault("__builtins__", builtin)
+            ns["__builtins__"] = builtin
             return ns
         end
     end
