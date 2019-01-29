@@ -2,24 +2,40 @@ const Py_single_input = 256  # from Python.h
 const Py_file_input = 257
 const Py_eval_input = 258
 
-const _maindict = PyDict{String,PyObject,false}(PyNULL()) # cache of __main__ module dictionary
-function maindict()
-    if ispynull(_maindict.o)
-        _maindict.o = pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__")))
+const _namespaces = Dict{Module,PyDict{String,PyObject,true}}()
+
+pynamespace(m::Module) =
+    get!(_namespaces, m) do
+        if m === Main
+            return PyDict{String,PyObject,true}(pyincref(@pycheckn ccall((@pysym :PyModule_GetDict), PyPtr, (PyPtr,), pyimport("__main__"))))
+        else
+            ns = PyDict{String,PyObject}()
+            # In Python 2, it looks like `__builtin__` (w/o 's') must
+            # exist at module namespace.  See also:
+            # http://mail.python.org/pipermail/python-dev/2001-April/014068.html
+            # https://github.com/ipython/ipython/blob/512d47340c09d184e20811ca46aaa2f862bcbafe/IPython/core/interactiveshell.py#L1295-L1299
+            if pyversion < v"3"
+                ns["__builtin__"] = builtin
+            end
+            # Following CPython implementation, we introduce
+            # `__builtins__` in the namespace.  See:
+            # https://docs.python.org/2/library/__builtin__.html
+            # https://docs.python.org/3/library/builtins.html
+            ns["__builtins__"] = builtin
+            return ns
+        end
     end
-    return _maindict
-end
 
 # internal function evaluate a python string, returning PyObject, given
 # Python dictionaries of global and local variables to use in the expression,
 # and a current "file name" to use for stack traces
-function pyeval_(s::AbstractString, globals=maindict(), locals=maindict(), input_type=Py_eval_input, fname="PyCall")
-    sb = String(s) # use temp var to prevent gc before we are done with o
+function pyeval_(s::AbstractString, globals=pynamespace(Main), locals=pynamespace(Main),
+                 input_type=Py_eval_input, fname="PyCall")
     sigatomic_begin()
     try
         o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
                                      (Cstring, Cstring, Cint),
-                                     sb, fname, input_type))
+                                     s, fname, input_type))
         return PyObject(@pycheckn ccall((@pysym :PyEval_EvalCode),
                                          PyPtr, (PyPtr, PyPtr, PyPtr),
                                          o, globals, locals))
@@ -60,7 +76,7 @@ function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
     for (k, v) in kwargs
         locals[string(k)] = v
     end
-    return convert(returntype, pyeval_(s, maindict(), locals, input_type))
+    return convert(returntype, pyeval_(s, pynamespace(Main), locals, input_type))
 end
 
 # get filename from @__FILE__ macro, which returns nothing in the REPL
@@ -211,7 +227,7 @@ macro py_str(code, options...)
         removelocals = nothing
     end
     quote
-        m = maindict()
+        m = pynamespace($__module__)
         $assignlocals
         ret = $T(pyeval_($code_expr, m, m, $input_type, $fname))
         $removelocals

@@ -141,6 +141,50 @@ conversion, use `f::PyObject`). Similarly, if the context manager returns a type
 which is automatically converted to a Julia type, you will have override this
 via `@pywith EXPR::PyObject ...`.
 
+If you are already familiar with Python, it perhaps is easier to use
+`py"..."` and `py"""..."""` which are equivalent to Python's
+[`eval`](https://docs.python.org/3/library/functions.html#eval) and
+[`exec`](https://docs.python.org/3/library/functions.html#exec),
+respectively:
+
+```julia
+py"""
+import numpy as np
+
+def sinpi(x):
+    return np.sin(np.pi * x)
+"""
+py"sinpi"(1)
+```
+
+When creating a Julia module, it is a useful pattern to define Python
+functions or classes in Julia's `__init__` and then use it in Julia
+function with `py"..."`.
+
+```julia
+module MyModule
+
+using PyCall
+
+function __init__()
+    py"""
+    import numpy as np
+
+    def one(x):
+        return np.sin(x) ** 2 + np.cos(x) ** 2
+    """
+end
+
+two(x) = py"one"(x) + py"one"(x)
+
+end
+```
+
+Note that Python code in `py"..."` of above example is evaluated in a
+Python namespace dedicated to `MyModule`.  Thus, Python function `one`
+cannot be accessed outside `MyModule`.
+
+
 ## Troubleshooting
 
 Here are solutions to some common problems:
@@ -260,11 +304,11 @@ dictionary.
 #### PyTextIO
 
 Julia `IO` streams are converted into Python objects implementing the
-[RawIOBase](http://docs.python.org/2/library/io.html#io.RawIOBase)
+[RawIOBase](http://docs.python.org/3/library/io.html#io.RawIOBase)
 interface, so they can be used for binary I/O in Python.  However,
 some Python code (notably unpickling) expects a stream implementing
 the
-[TextIOBase](http://docs.python.org/2/library/io.html#io.TextIOBase)
+[TextIOBase](http://docs.python.org/3/library/io.html#io.TextIOBase)
 interface, which differs from RawIOBase mainly in that `read` an
 `readall` functions return strings rather than byte arrays.  If you
 need to pass an `IO` stream as a text-IO object, just call
@@ -308,8 +352,8 @@ and also by providing more type information to the Julia compiler.
   `@pycall function(args...)::returntype` into
   `pycall(function,returntype,args...)`.
 
-* `py"..."` evaluates `"..."` as a Python string, equivalent to
-  Python's [`eval`](https://docs.python.org/2/library/functions.html#eval) function, and returns the result
+* `py"..."` evaluates `"..."` as Python code, equivalent to
+  Python's [`eval`](https://docs.python.org/3/library/functions.html#eval) function, and returns the result
   converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
   Julia variables and other expressions into the Python code with `$`,
@@ -325,8 +369,17 @@ and also by providing more type information to the Julia compiler.
   If you use `py"""..."""` to pass a *multi-line* string, the string can
   contain arbitrary Python code (not just a single expression) to be evaluated,
   but the return value is `nothing`; this is useful e.g. to define pure-Python
-  functions, and is equivalent to Python's [`exec`](https://docs.python.org/2/reference/simple_stmts.html#exec) statement.  (If you define a Python global `g` in a multiline `py"""..."""`
+  functions, and is equivalent to Python's
+  [`exec`](https://docs.python.org/3/library/functions.html#exec) function.
+  (If you define a Python global `g` in a multiline `py"""..."""`
   string, you can retrieve it in Julia by subsequently evaluating `py"g"`.)
+
+  When `py"..."` is used inside a Julia module, it uses a Python namespace
+  dedicated to this Julia module.  Thus, you can define Python function
+  using `py"""...."""` in your module without worrying about name clash
+  with other Python code.  Note that Python functions _must_ be defined in
+  `__init__`.  Side-effect in Python occurred at top-level Julia scope
+  cannot be used at run-time for precompiled modules.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a

@@ -737,6 +737,19 @@ end
     [(1, 1), (2, 2), (3, 3)]
 end
 
+@test_throws PyCall.PyError py"__testing_pynamespace"
+
+module __isolated_namespace
+using PyCall
+py"""
+__testing_pynamespace = True
+"""
+get_testing_pynamespace() = py"__testing_pynamespace"
+end
+
+@test_throws PyCall.PyError py"__testing_pynamespace"
+@test __isolated_namespace.get_testing_pynamespace()
+
 @testset "atexit" begin
     script = """
     Base.load_path_setup_code()
