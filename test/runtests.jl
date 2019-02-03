@@ -262,10 +262,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
     @test :B in propertynames(A)
-    @static if VERSION >= v"0.7-"
-        @test A.B.C == 1
-        @test_throws KeyError A.X
-    end
+    @test A.B.C == 1
+    @test_throws KeyError A.X
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
 
