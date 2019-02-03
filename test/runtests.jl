@@ -263,7 +263,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test getproperty(A, "B") == py"A.B"
     @test :B in propertynames(A)
     @test A.B.C == 1
-    @test_throws KeyError A.X
+    @test_throws PyCall.PyError A.X
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
 
@@ -535,7 +535,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # Test getattr fallback
     @test PyObject(TestConstruct(1)).x == 1
-    @test_throws KeyError PyObject(TestConstruct(1)).y
+    @test_throws PyCall.PyError PyObject(TestConstruct(1)).y
 
     # iterating over Julia objects in Python:
     @test py"[x**2 for x in $(PyCall.pyjlwrap_new(1:4))]" ==

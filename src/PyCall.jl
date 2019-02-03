@@ -292,11 +292,7 @@ function getproperty(o::PyObject, s::AbstractString)
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
-    if p == C_NULL
-        pyerr_clear()
-        throw(KeyError(s))
-    end
+    p = @pycheckn ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     return PyObject(p)
 end
 
@@ -313,11 +309,8 @@ function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     if ispynull(o)
         throw(ArgumentError("assign of NULL PyObject"))
     end
-    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
-        pyerr_clear()
-        throw(KeyError(s))
-    end
+    @pycheckz ccall((@pysym :PyObject_SetAttrString), Cint,
+                    (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
     o
 end
 
