@@ -18,13 +18,8 @@ function test_venv_activation(path)
     newpython = PyCall.python_cmd(venv=path).exec[1]
 
     # Run a fresh Julia process with new Python environment
-    if VERSION < v"0.7.0-"
-        setup_code = ""
-    else
-        setup_code = Base.load_path_setup_code()
-    end
     code = """
-    $setup_code
+    $(Base.load_path_setup_code())
     using PyCall
     println(PyCall.pyimport("sys").executable)
     println(PyCall.pyimport("sys").exec_prefix)
