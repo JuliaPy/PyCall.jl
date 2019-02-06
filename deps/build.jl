@@ -12,28 +12,6 @@ struct UseCondaPython <: Exception end
 
 #########################################################################
 
-# Fix the environment for running `python`, and setts IO encoding to UTF-8.
-# If cmd is the Conda python, then additionally removes all PYTHON* and
-# CONDA* environment variables.
-function pythonenv(cmd::Cmd)
-    env = copy(ENV)
-    if dirname(cmd.exec[1]) == abspath(Conda.PYTHONDIR)
-        pythonvars = String[]
-        for var in keys(env)
-            if startswith(var, "CONDA") || startswith(var, "PYTHON")
-                push!(pythonvars, var)
-            end
-        end
-        for var in pythonvars
-            pop!(env, var)
-        end
-    end
-    # set PYTHONIOENCODING when running python executable, so that
-    # we get UTF-8 encoded text as output (this is not the default on Windows).
-    env["PYTHONIOENCODING"] = "UTF-8"
-    setenv(cmd, env)
-end
-
 pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(read(pythonenv(`$python -c "import $mod; print($mod.$var)"`), String))
 
 pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$var')")
@@ -117,11 +95,6 @@ include("depsutils.jl")
 
 #########################################################################
 
-# A couple of key strings need to be stored as constants so that
-# they persist throughout the life of the program.  In Python 3,
-# they need to be wchar_t* data.
-wstringconst(s) = string("Base.cconvert(Cwstring, \"", escape_string(s), "\")")
-
 # we write configuration files only if they change, both
 # to prevent unnecessary recompilation and to minimize
 # problems in the unlikely event of read-only directories.
@@ -197,15 +170,7 @@ try # make sure deps.jl file is removed on error
     # Get PYTHONHOME, either from the environment or from Python
     # itself (if it is not in the environment or if we are using Conda)
     PYTHONHOME = if !haskey(ENV, "PYTHONHOME") || use_conda
-        # PYTHONHOME tells python where to look for both pure python
-        # and binary modules.  When it is set, it replaces both
-        # `prefix` and `exec_prefix` and we thus need to set it to
-        # both in case they differ. This is also what the
-        # documentation recommends.  However, they are documented
-        # to always be the same on Windows, where it causes
-        # problems if we try to include both.
-        exec_prefix = pysys(python, "exec_prefix")
-        Sys.iswindows() ? exec_prefix : pysys(python, "prefix") * ":" * exec_prefix
+        pythonhome_of(python)
     else
         ENV["PYTHONHOME"]
     end
@@ -223,10 +188,8 @@ try # make sure deps.jl file is removed on error
     const python = "$(escape_string(python))"
     const libpython = "$(escape_string(libpy_name))"
     const pyprogramname = "$(escape_string(programname))"
-    const wpyprogramname = $(wstringconst(programname))
     const pyversion_build = $(repr(pyversion))
     const PYTHONHOME = "$(escape_string(PYTHONHOME))"
-    const wPYTHONHOME = $(wstringconst(PYTHONHOME))
 
     "True if we are using the Python distribution in the Conda package."
     const conda = $use_conda
