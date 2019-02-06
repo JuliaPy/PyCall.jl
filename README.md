@@ -547,7 +547,7 @@ any other Anaconda-based Python distro for which the user has installation privi
 
 ## Python virtual environments
 
-Python virtual environments created by [`venv`] and [`virtualenv`]
+Python virtual environments created by [`venv`](https://docs.python.org/3/library/venv.html) and [`virtualenv`](https://virtualenv.pypa.io/en/latest/)
 can be used from `PyCall`, *provided that the Python executable used
 in the virtual environment is linked against the same `libpython` used
 by `PyCall`*.  Note that virtual environments created by `conda` are not
@@ -573,11 +573,6 @@ julia> pyimport("sys").executable
 ```
 Similarly, the `PYTHONHOME` path can be changed by the environment variable
 `PYCALL_JL_RUNTIME_PYTHONHOME`.
-
-[`venv`]: https://docs.python.org/3/library/venv.html
-[`virtualenv`]: https://virtualenv.pypa.io/en/latest/
-[`Py_SetProgramName`]: https://docs.python.org/3/c-api/init.html#c.Py_SetProgramName
-[`Py_SetPythonHome`]: https://docs.python.org/3/c-api/init.html#c.Py_SetPythonHome
 
 ## Author
 
