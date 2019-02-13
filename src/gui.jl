@@ -125,7 +125,7 @@ function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
                     # for some reason I don't understand,
                     # if libpython has already been loaded, then
                     # we need to use Python's setenv rather than Julia's
-                    PyDict(pyimport("os")."environ")."QT_PLUGIN_PATH" = realpath(plugin_path)
+                    PyDict(pyimport("os")."environ")["QT_PLUGIN_PATH"] = realpath(plugin_path)
                     return true
                 end
             end
