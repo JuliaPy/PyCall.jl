@@ -26,9 +26,9 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :tk && pyexists(tkinter_name())) ||
      ((gui == :qt5 || gui == :qt_pyqt5) && pyexists("PyQt5")) ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
-     (gui == :qt_pyside && pyexists("PySide")) ||
+     (gui == :qt_pyside && (pyexists("PySide") || pyexists("PySide2"))) ||
      (gui == :qt4 && (pyexists("PyQt4") || pyexists("PySide"))) ||
-     (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide"))))
+     (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide") || pyexists("PySide2"))))
 
 # get or set the default GUI; doesn't affect running GUI
 """
@@ -155,7 +155,7 @@ qt_eventloop(QtModule::AbstractString, sec::Real=50e-3) =
     qt_eventloop(pyimport("$QtModule.QtCore"), sec)
 
 function qt_eventloop(sec::Real=50e-3)
-    for QtModule in ("PyQt5", "PyQt4", "PySide")
+    for QtModule in ("PyQt5", "PyQt4", "PySide", "PySide2")
         try
             return qt_eventloop(QtModule, sec)
         catch
@@ -232,7 +232,11 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
         elseif gui == :qt_pyqt4
             eventloops[gui] = qt_eventloop("PyQt4", sec)
         elseif gui == :qt_pyside
-            eventloops[gui] = qt_eventloop("PySide", sec)
+            try
+                eventloops[gui] = qt_eventloop("PySide", sec)
+            catch
+                eventloops[gui] = qt_eventloop("PySide2", sec)
+            end
         elseif gui == :qt4
             try
                 eventloops[gui] = qt_eventloop("PyQt4", sec)
