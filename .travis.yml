@@ -47,6 +47,18 @@ matrix:
 # https://github.com/pytest-dev/pytest/blob/799b72cf6f35c4c4c73797303d3f78c12a795f77/.travis.yml#L38-L52
 # https://github.com/pytest-dev/pytest/pull/3893
 
+    - &test-aot
+      language: julia
+      os: linux
+      env: PYTHON=python3
+      julia: 1.0
+      script:
+        - julia --color=yes -e 'using Pkg; Pkg.add("PackageCompiler")'
+        - julia --color=yes aot/compile.jl
+        - aot/runtests.sh
+      after_success: skip
+    - {<<: *test-aot, julia: nightly}
+
 after_success:
     - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 notifications:
