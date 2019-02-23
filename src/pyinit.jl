@@ -26,6 +26,7 @@ const pyxrange = Ref{PyPtr}(0)
 
 function pyjlwrap_init()
     # PyMemberDef stores explicit pointers, hence must be initialized at runtime
+    empty!(pyjlwrap_members)  # for AOT
     push!(pyjlwrap_members, PyMemberDef(pyjlwrap_membername,
                                         T_PYSSIZET, sizeof_pyjlwrap_head, READONLY,
                                         pyjlwrap_doc),
@@ -125,6 +126,11 @@ function Py_Finalize()
 end
 
 function __init__()
+    # Clear out global states.  This is required only for PyCall
+    # AOT-compiled into system image.
+    _finalized[] = false
+    empty!(_namespaces)
+
     # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
     # if e.g. you checkout Conda master, and we'll need to re-build PyCall
     # for something like pyimport_conda to continue working.
