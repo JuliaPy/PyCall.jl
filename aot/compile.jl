@@ -8,6 +8,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 Pkg.add("MacroTools")
 Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+Pkg.build("PyCall")
 Pkg.activate()
 
 using PackageCompiler
