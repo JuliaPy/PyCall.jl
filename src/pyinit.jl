@@ -130,6 +130,12 @@ function __init__()
     # AOT-compiled into system image.
     _finalized[] = false
     empty!(_namespaces)
+    empty!(eventloops)
+    empty!(npy_api)
+    empty!(pycall_gc)
+    empty!(pyexc)
+    empty!(pytype_queries)
+    empty!(permanent_strings)
 
     # sanity check: in Pkg for Julia 0.7+, the location of Conda can change
     # if e.g. you checkout Conda master, and we'll need to re-build PyCall
