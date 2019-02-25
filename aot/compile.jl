@@ -1,3 +1,9 @@
+#!/bin/bash
+# -*- mode: julia -*-
+#=
+exec "${JULIA:-julia}" "$@" ${BASH_SOURCE[0]}
+=#
+
 using Pkg
 Pkg.activate(@__DIR__)
 Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
