@@ -6,6 +6,7 @@ exec "${JULIA:-julia}" "$@" ${BASH_SOURCE[0]}
 
 using Pkg
 Pkg.activate(@__DIR__)
+Pkg.add("MacroTools")
 Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
 Pkg.activate()
 
