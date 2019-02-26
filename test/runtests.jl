@@ -60,6 +60,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test roundtripeq(C_NULL) && roundtripeq(convert(Ptr{Cvoid}, 12345))
     @test roundtripeq([1,3,4,5]) && roundtripeq([1,3.2,"hello",true])
     @test roundtripeq([1 2 3;4 5 6]) && roundtripeq([1. 2 3;4 5 6])
+    @test roundtripeq([1. 2 3;4 5 6]')
+    @test roundtripeq([1.0+2im 2+3im 3;4 5 6]')
     @test roundtripeq((1,(3.2,"hello"),true)) && roundtripeq(())
     @test roundtripeq(Int32)
     @test roundtripeq(Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
@@ -119,6 +121,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     array2py2arrayeq(x) = PyCall.py2array(Float64,PyCall.array2py(x)) == x
     @test array2py2arrayeq(rand(3))
     @test array2py2arrayeq(rand(3,4))
+    @test array2py2arrayeq(rand(3,4)')
     @test array2py2arrayeq(rand(3,4,5))
 
     @test roundtripeq(2:10) && roundtripeq(10:-1:2)

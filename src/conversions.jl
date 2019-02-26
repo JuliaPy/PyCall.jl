@@ -292,37 +292,31 @@ append!(a::PyVector{T}, items) where {T} = PyVector{T}(append!(a.o, items))
 #########################################################################
 # Lists and 1d arrays.
 
+if VERSION < v"1.1.0-DEV.392" # #29440
+    cirange(I,J) = CartesianIndices(map((i,j) -> i:j, Tuple(I), Tuple(J)))
+else
+    cirange(I,J) = I:J
+end
+
 # recursive conversion of A to a list of list of lists... starting
-# with dimension dim and index i in A.
-function array2py(A::AbstractArray{T, N}, dim::Integer, i::Integer) where {T, N}
-    if dim > N
+# with dimension dim and Cartesian index i in A.
+function array2py(A::AbstractArray{<:Any, N}, dim::Integer, i::CartesianIndex{N}) where {N}
+    if dim > N # base case
         return PyObject(A[i])
-    elseif dim == N # special case last dim to coarsen recursion leaves
-        len = size(A, dim)
-        s = N == 1 ? 1 : stride(A, dim)
-        o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
-        for j = 0:len-1
-            oi = PyObject(A[i+j*s])
+    else # recursively store multidimensional array as list of lists
+        ilast = CartesianIndex(ntuple(j -> j == dim ? lastindex(A, dim) : i[j], Val{N}()))
+        o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), size(A, dim)))
+        for icur in cirange(i,ilast)
+            oi = array2py(A, dim+1, icur)
             @pycheckz ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
-                             o, j, oi)
-            pyincref(oi) # PyList_SetItem steals the reference
-        end
-        return o
-    else # dim < N: store multidimensional array as list of lists
-        len = size(A, dim)
-        s = stride(A, dim)
-        o = PyObject(@pycheckn ccall((@pysym :PyList_New), PyPtr, (Int,), len))
-        for j = 0:len-1
-            oi = array2py(A, dim+1, i+j*s)
-            @pycheckz ccall((@pysym :PyList_SetItem), Cint, (PyPtr,Int,PyPtr),
-                             o, j, oi)
+                             o, icur[dim]-i[dim], oi)
             pyincref(oi) # PyList_SetItem steals the reference
         end
         return o
     end
 end
 
-array2py(A::AbstractArray) = array2py(A, 1, 1)
+array2py(A::AbstractArray) = array2py(A, 1, first(CartesianIndices(A)))
 
 PyObject(A::AbstractArray) =
    ndims(A) <= 1 || hasmethod(stride, Tuple{typeof(A),Int}) ? array2py(A) :
