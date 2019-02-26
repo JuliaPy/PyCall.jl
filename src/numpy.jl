@@ -190,11 +190,17 @@ function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
     try
         return NpyArray(a, false)
     catch
-        array2py(a) # fallback to non-NumPy version
+        return array2py(a) # fallback to non-NumPy version
     end
 end
 
-PyReverseDims(a::StridedArray{T}) where {T<:PYARR_TYPES} = NpyArray(a, true)
+function PyReverseDims(a::StridedArray{T,N}) where {T<:PYARR_TYPES,N}
+    try
+        return NpyArray(a, true)
+    catch
+        return array2py(a, permutedims(a, N:-1:1)) # fallback to non-NumPy version
+    end
+end
 PyReverseDims(a::BitArray) = PyReverseDims(Array(a))
 
 # fallback to physically transposing the array
