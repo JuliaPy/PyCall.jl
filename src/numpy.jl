@@ -198,7 +198,7 @@ function PyReverseDims(a::StridedArray{T,N}) where {T<:PYARR_TYPES,N}
     try
         return NpyArray(a, true)
     catch
-        return array2py(a, permutedims(a, N:-1:1)) # fallback to non-NumPy version
+        return array2py(permutedims(a, N:-1:1)) # fallback to non-NumPy version
     end
 end
 PyReverseDims(a::BitArray) = PyReverseDims(Array(a))
