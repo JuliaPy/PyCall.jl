@@ -1,3 +1,5 @@
+# Included from build.jl, ../test/test_build.jl and ../src/PyCall.jl
+
 import Libdl
 
 hassym(lib, sym) = Libdl.dlsym_e(lib, sym) != C_NULL
