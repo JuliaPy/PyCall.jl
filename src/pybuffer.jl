@@ -251,7 +251,7 @@ function array_format(pybuf::PyBuffer)
             use_native_sizes = false
         elseif fmt_str[1] == '='
             use_native_sizes = false
-        elseif fmt_str[1] == "Z"
+        elseif fmt_str[1] == 'Z'
             type_start_idx = 1
         else
             error("Unsupported format string: \"$fmt_str\"")

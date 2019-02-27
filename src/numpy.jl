@@ -190,12 +190,22 @@ function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
     try
         return NpyArray(a, false)
     catch
-        array2py(a) # fallback to non-NumPy version
+        return array2py(a) # fallback to non-NumPy version
     end
 end
 
-PyReverseDims(a::StridedArray{T}) where {T<:PYARR_TYPES} = NpyArray(a, true)
+function PyReverseDims(a::StridedArray{T,N}) where {T<:PYARR_TYPES,N}
+    try
+        return NpyArray(a, true)
+    catch
+        return array2py(permutedims(a, N:-1:1)) # fallback to non-NumPy version
+    end
+end
 PyReverseDims(a::BitArray) = PyReverseDims(Array(a))
+
+# fallback to physically transposing the array
+PyReverseDims(a::AbstractArray{<:Any,N}) where {N} = PyObject(permutedims(a, N:-1:1))
+PyReverseDims(a::AbstractMatrix) = PyObject(permutedims(a))
 
 """
     PyReverseDims(array)
@@ -209,3 +219,9 @@ libraries that expect row-major data.
 PyReverseDims(a::AbstractArray)
 
 #########################################################################
+
+# transposed arrays can be passed to NumPy without copying
+PyObject(a::Union{LinearAlgebra.Adjoint{<:Real},LinearAlgebra.Transpose}) =
+    PyReverseDims(a.parent)
+
+PyObject(a::LinearAlgebra.Adjoint) = PyObject(Matrix(a)) # non-real arrays require a copy
