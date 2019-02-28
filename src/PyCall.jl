@@ -20,6 +20,10 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        pushfirst!, popfirst!, firstindex, lastindex,
        getproperty, setproperty!, propertynames
 
+if isdefined(Base, :hasproperty) # Julia 1.2
+    import Base: hasproperty
+end
+
 # Python C API is not interrupt-safe.  In principle, we should
 # use sigatomic for every ccall to the Python library, but this
 # should really be fixed in Julia (#2622).  However, we will
