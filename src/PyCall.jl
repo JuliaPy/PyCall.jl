@@ -350,13 +350,16 @@ function haskey(o::PyObject, s::Union{Symbol,AbstractString})
     return hasproperty(o, s)
 end
 
-function hasproperty(o::PyObject, s::Union{Symbol,AbstractString})
+# defining hasproperty on a Union triggers a method ambiguity
+function pyhasproperty(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("hasproperty of NULL PyObject"))
     end
     return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
                       (PyPtr, Cstring), o, s)
 end
+hasproperty(o::PyObject, s::Symbol) = pyhasproperty(o, s)
+hasproperty(o::PyObject, s::AbstractString) = pyhasproperty(o, s)
 
 #########################################################################
 
