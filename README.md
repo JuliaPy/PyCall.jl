@@ -98,7 +98,7 @@ compare it to the built-in Julia `sin`:
 
     using PyCall
     math = pyimport("math")
-    math.sin(math.pi / 4) - sin(pi / 4)  # returns 0.0
+    math.sin(math.pi / 4) # returns ≈ 1/√2 = 0.70710678...
 
 Type conversions are automatically performed for numeric, boolean,
 string, IO stream, date/period, and function types, along with tuples,
