@@ -63,6 +63,12 @@ convert(::Type{T}, po::PyObject) where T<:Complex =
 
 convert(::Type{Nothing}, po::PyObject) = nothing
 
+function Base.float(o::PyObject)
+    a = PyAny(o)
+    a isa PyObject && throw(ArgumentError("don't know how convert $o to a Julia floating-point value"))
+    return float(a)
+end
+
 #########################################################################
 # String conversions (both bytes arrays and unicode strings)
 
