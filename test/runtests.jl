@@ -573,6 +573,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test float(PyObject(1)) === 1.0
     @test float(PyObject(1+2im)) === 1.0 + 2.0im
     @test float(PyObject([1,2,3]))[2] === 2.0
+    @test_throws ArgumentError float(pybuiltin("type"))
 end
 
 ######################################################################
