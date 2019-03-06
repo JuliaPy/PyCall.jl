@@ -66,7 +66,7 @@ convert(::Type{Nothing}, po::PyObject) = nothing
 function Base.float(o::PyObject)
     a = PyAny(o)
     if a isa PyObject
-        hasproperty(o, :__float__) && o.__float__()
+        hasproperty(o, :__float__) && return o.__float__()
         throw(ArgumentError("don't know how convert $o to a Julia floating-point value"))
     end
     return float(a)
