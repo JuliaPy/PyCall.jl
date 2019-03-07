@@ -26,7 +26,7 @@ pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 # default integer type for PyAny conversions
 const PyInt = pyversion < v"3" ? Int : Clonglong
 
-@testset "PyCall" begin
+@testset "conversions" begin
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
     np = pyimport_e("numpy")
     if !ispynull(np) # numpy is installed, so test
@@ -569,6 +569,11 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # issue #533
     @test py"lambda x,y,z: (x,y,z)"(3:6,4:10,5:11) === (PyInt(3):PyInt(6), PyInt(4):PyInt(10), PyInt(5):PyInt(11))
+
+    @test float(PyObject(1)) === 1.0
+    @test float(PyObject(1+2im)) === 1.0 + 2.0im
+    @test float(PyObject([1,2,3]))[2] === 2.0
+    @test_throws ArgumentError float(pybuiltin("type"))
 end
 
 ######################################################################
