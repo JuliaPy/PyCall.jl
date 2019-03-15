@@ -54,7 +54,8 @@ else
             (Ptr{Cvoid}, Ptr{UInt16}, UInt32),
             libpy_handle, pathbuf, length(pathbuf))
         @assert ret != 0
-        libname = String(Base.transcode(UInt8, pathbuf[1:findfirst(pathbuf, 0)-1]))
+        pathlen = something(findfirst(iszero, pathbuf)) - 1
+        libname = String(Base.transcode(UInt8, pathbuf[1:pathlen]))
         if (Libdl.dlopen_e(libname) != C_NULL)
             const libpython = libname
         else
