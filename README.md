@@ -117,7 +117,7 @@ Keyword arguments can also be passed. For example, matplotlib's
 options, and this functionality is accessed from Julia by:
 
     plt = pyimport("matplotlib.pyplot")
-    x = linspace(0,2*pi,1000); y = sin(3*x + 4*cos(2*x));
+    x = range(0;stop=2*pi,length=1000); y = sin.(3*x + 4*cos.(2*x));
     plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
     plt.show()
 
