@@ -49,7 +49,9 @@ can change the Python version by setting the `PYTHON` environment variable
 to the path of the `python` (or `python3` etc.) executable and then re-running `Pkg.build("PyCall")`.
 In Julia:
 
-    ENV["PYTHON"] = "... path of the python program you want ..."
+    ENV["PYTHON"] = "... path of the python executable ..."
+    # ENV["PYTHON"] = "C:\\Python37-x64\\python.exe" # example for Windows
+    # ENV["PYTHON"] = "/usr/bin/python3.7"           # example for *nix
     Pkg.build("PyCall")
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
