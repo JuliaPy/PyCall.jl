@@ -369,6 +369,7 @@ function pyarray_dims(o::PyObject, forcelist=true)
         return () # too many non-List types can pretend to be sequences
     end
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    len < 0 && error("not a PySequence object")
     if len == 0
         return (0,)
     end
@@ -392,9 +393,15 @@ function pyarray_dims(o::PyObject, forcelist=true)
 end
 
 function py2array(T, o::PyObject)
-    dims = pyarray_dims(o)
+    b = PyBuffer()
+    if isbuftype!(o, b)
+        dims = size(b)
+    else
+        dims = pyarray_dims(o)
+    end
+    pydecref(b) # safe for immediate release
     A = Array{pyany_toany(T)}(undef, dims)
-    py2array(T, A, o, 1, 1)
+    py2array(T, A, o, 1, 1) # fixme: faster conversion for supported buffer types?
 end
 
 function convert(::Type{Vector{T}}, o::PyObject) where T
@@ -800,8 +807,8 @@ function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     @return_not_None pyfunction_query(o)
     @return_not_None pydate_query(o)
     @return_not_None pydict_query(o)
-    @return_not_None pysequence_query(o)
     @return_not_None pyptr_query(o)
+    @return_not_None pysequence_query(o)
     @return_not_None pynothing_query(o)
     @return_not_None pymp_query(o)
     for (py,jl) in pytype_queries

@@ -90,6 +90,13 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             @test convert(PyAny, PyReverseDims(A)) == permutedims(A, [3,2,1])
             @test convert(PyAny, PyReverseDims(BitArray(B))) == permutedims(B, [3,2,1])
         end
+        # test dtype=object:
+        let o = pycall(pyimport("numpy").array, PyObject, [3,4,5], dtype=pybuiltin("object"))
+            @test pytype_query(o) == Array{PyObject}
+            @test PyAny(o) == [3,4,5]
+            @test eltype(PyArray(o)) == PyPtr
+            @test pyincref.(PyArray(o)) == [3,4,5]
+        end
     end
     @test PyVector(PyObject([1,3.2,"hello",true])) == [1,3.2,"hello",true]
     @test PyDict(PyObject(Dict(1 => "hello", 2 => "goodbye"))) == Dict(1 => "hello", 2 => "goodbye")

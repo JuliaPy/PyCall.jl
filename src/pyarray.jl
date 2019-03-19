@@ -50,6 +50,7 @@ identical memory layout to a Julia `Array` of the same size.
 `st` should be the stride(s) *in bytes* between elements in each dimension
 """
 function f_contiguous(::Type{T}, sz::NTuple{N,Int}, st::NTuple{N,Int}) where {T,N}
+    N == 0 && return true # 0-dimensional arrays have 1 element, always contiguous
     if st[1] != sizeof(T)
         # not contiguous
         return false

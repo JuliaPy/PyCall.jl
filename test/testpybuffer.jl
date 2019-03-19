@@ -209,4 +209,9 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test all(pyarr2[1:10, 1:2] .== jlarr2)
         end
     end
+
+    # ctypes.c_void_p supports the buffer protocol as a 0-dimensional array
+    let p = convert(Ptr{Cvoid}, 12345)
+        @test PyArray(PyObject(p))[] == p
+    end
 end
