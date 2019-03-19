@@ -88,7 +88,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             # check all is in order
             for i in 1:size(pyarr, 1)
                 for j in 1:size(pyarr, 1)
-                    @test jlcopy[i,j] == pyarr[i,j]
+                    @test jlcopy[i,j] == pyarr[i,j] == pyarr[i,j,1] == pyarr[CartesianIndex(i,j)]
                 end
             end
             # check it's not aliasing the same data

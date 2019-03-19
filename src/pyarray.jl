@@ -155,44 +155,47 @@ function copy(a::PyArray{T,N}) where {T,N}
 end
 
 # TODO: need to do bounds-checking of these indices!
-# TODO: need to GC root these `a`s to guard against the PyArray getting gc'd,
 # e.g. if it's a temporary in a function:
 # `two_rands() = pycall(np.rand, PyArray, 10)[1:2]`
 
+unsafe_data_load(a::PyArray) = GC.@preserve a unsafe_load(a.data)
+unsafe_data_load(a::PyArray, i::Integer) = GC.@preserve a unsafe_load(a.data, i)
 
-getindex(a::PyArray{T,0}) where {T} = unsafe_load(a.data)
-getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_load(a.data, 1 + (i-1)*a.st[1])
+getindex(a::PyArray{T,0}) where {T} = unsafe_data_load(a)
+getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_data_load(a, 1 + (i-1)*a.st[1])
 
 getindex(a::PyArray{T,2}, i::Integer, j::Integer) where {T} =
-  unsafe_load(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
+unsafe_data_load(a, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
 
 function getindex(a::PyArray, i::Integer)
     if a.f_contig
-        return unsafe_load(a.data, i)
+        return unsafe_data_load(a, i)
     else
-        return a[ind2sub(a.dims, i)...]
+        return a[CartesianIndices(A)[i]]
     end
 end
 
-function getindex(a::PyArray, is::Integer...)
+# todo: inline/unroll this when N == ndims(a)
+function data_index(a::PyArray, i::Union{NTuple{N,<:Integer},CartesianIndex{N}}) where {N}
+    n = min(N, ndims(a))
     index = 1
-    n = min(length(is),length(a.st))
-    for i = 1:n
-        index += (is[i]-1)*a.st[i]
+    for dim = 1:n
+        index += (i[dim]-1) * a.st[dim]
     end
-    for i = n+1:length(is)
-        if is[i] != 1
-            throw(BoundsError())
-        end
+    for dim = n+1:N
+        i[dim] == 1 || throw(BoundsError(a, i))
     end
-    unsafe_load(a.data, index)
+    return index
 end
+
+getindex(a::PyArray, i::Integer...) = unsafe_data_load(a, data_index(a, i))
+getindex(a::PyArray, i::CartesianIndex) = unsafe_data_load(a, data_index(a, i))
 
 function writeok_assign(a::PyArray, v, i::Integer)
     if a.info.readonly
         throw(ArgumentError("read-only PyArray"))
     else
-        unsafe_store!(a.data, v, i)
+        GC.@preserve a unsafe_store!(a.data, v, i)
     end
     return a
 end
@@ -207,23 +210,12 @@ function setindex!(a::PyArray, v, i::Integer)
     if a.f_contig
         return writeok_assign(a, v, i)
     else
-        return setindex!(a, v, ind2sub(a.dims, i)...)
+        return setindex!(a, v, CartesianIndices(A)[i])
     end
 end
 
-function setindex!(a::PyArray, v, is::Integer...)
-    index = 1
-    n = min(length(is),length(a.st))
-    for i = 1:n
-        index += (is[i]-1)*a.st[i]
-    end
-    for i = n+1:length(is)
-        if is[i] != 1
-            throw(BoundsError())
-        end
-    end
-    writeok_assign(a, v, index)
-end
+setindex!(a::PyArray, v, i::Integer...) = writeok_assign(a, v, data_index(a, i))
+setindex!(a::PyArray, v, i::CartesianIndex) = writeok_assign(a, v, data_index(a, i))
 
 stride(a::PyArray, i::Integer) = a.st[i]
 
