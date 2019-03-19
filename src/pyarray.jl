@@ -156,7 +156,7 @@ end
 
 unsafe_data_load(a::PyArray, i::Integer) = GC.@preserve a unsafe_load(a.data, i)
 
-@inline data_index(a::PyArray{<:Any,N}, i::Union{NTuple{N,<:Integer},CartesianIndex{N}}) where {N} =
+@inline data_index(a::PyArray{<:Any,N}, i::CartesianIndex{N}) where {N} =
     1 + sum(ntuple(dim -> (i[dim]-1) * a.st[dim], Val{N}())) # Val lets julia unroll/inline
 
 # handle passing fewer/more indices than dimensions by canonicalizing to M==N
