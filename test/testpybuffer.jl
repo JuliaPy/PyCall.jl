@@ -199,6 +199,16 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test all(pyarr[1:10] .== 11.0:20.0)
         end
 
+        @testset "bounds checks" begin
+            a = PyArray(pytestarray(3,4,1))
+            @test a[2,3,1] == a[2,3] == a[2,3,1,1,1] == a[8]
+            @test_throws BoundsError a[5,3,1]
+            @test_throws BoundsError a[2,6,1]
+            @test_throws BoundsError a[2,3,3]
+            @test_throws BoundsError a[2,3,1,2]
+            @test_throws BoundsError PyArray(pytestarray(3,4,2))[2,3]
+        end
+
         @testset "similar on PyArray PyVec getindex" begin
             jlarr1 = [1:10;]
             jlarr2 = hcat([1:10;], [1:10;])

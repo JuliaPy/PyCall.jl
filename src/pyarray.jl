@@ -154,42 +154,46 @@ function copy(a::PyArray{T,N}) where {T,N}
     return A
 end
 
-# TODO: need to do bounds-checking of these indices!
-# e.g. if it's a temporary in a function:
-# `two_rands() = pycall(np.rand, PyArray, 10)[1:2]`
-
 unsafe_data_load(a::PyArray) = GC.@preserve a unsafe_load(a.data)
 unsafe_data_load(a::PyArray, i::Integer) = GC.@preserve a unsafe_load(a.data, i)
 
 getindex(a::PyArray{T,0}) where {T} = unsafe_data_load(a)
-getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_data_load(a, 1 + (i-1)*a.st[1])
 
-getindex(a::PyArray{T,2}, i::Integer, j::Integer) where {T} =
-unsafe_data_load(a, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
+@inline data_index(a::PyArray{<:Any,N}, i::Union{NTuple{N,<:Integer},CartesianIndex{N}}) where {N} =
+    1 + sum(ntuple(dim -> (i[dim]-1) * a.st[dim], Val{N}())) # Val lets julia unroll/inline
 
+# handle passing fewer/more indices than dimensions by canonicalizing to M==N
+@inline function fixindex(a::PyArray{<:Any,N}, i::CartesianIndex{M}) where {M,N}
+    if M == N
+        return i
+    elseif M < N
+        @boundscheck(all(ntuple(k -> size(a,k+M)==1, Val{N-M}())) ||
+                     throw(BoundsError(a, i))) # trailing sizes must == 1
+        return CartesianIndex(Tuple(i)..., ntuple(k -> 1, Val{N-M}())...)
+    else # M > N
+        @boundscheck(all(ntuple(k -> i[k+N]==1, Val{M-N}())) ||
+                     throw(BoundsError(a, i))) # trailing indices must == 1
+        return CartesianIndex(ntuple(k -> i[k], Val{N}()))
+    end
+end
+
+@inline function getindex(a::PyArray, i::CartesianIndex)
+    j = fixindex(a, i)
+    @boundscheck checkbounds(a, j)
+    unsafe_data_load(a, data_index(a, j))
+end
+@inline getindex(a::PyArray, i::Integer...) = a[CartesianIndex(i)]
+@inline getindex(a::PyArray{<:Any,1}, i::Integer) = a[CartesianIndex(i)]
+
+# linear indexing
 function getindex(a::PyArray, i::Integer)
+    @boundscheck checkbounds(a, i)
     if a.f_contig
         return unsafe_data_load(a, i)
     else
-        return a[CartesianIndices(A)[i]]
+        @inbounds return a[CartesianIndices(a)[i]]
     end
 end
-
-# todo: inline/unroll this when N == ndims(a)
-function data_index(a::PyArray, i::Union{NTuple{N,<:Integer},CartesianIndex{N}}) where {N}
-    n = min(N, ndims(a))
-    index = 1
-    for dim = 1:n
-        index += (i[dim]-1) * a.st[dim]
-    end
-    for dim = n+1:N
-        i[dim] == 1 || throw(BoundsError(a, i))
-    end
-    return index
-end
-
-getindex(a::PyArray, i::Integer...) = unsafe_data_load(a, data_index(a, i))
-getindex(a::PyArray, i::CartesianIndex) = unsafe_data_load(a, data_index(a, i))
 
 function writeok_assign(a::PyArray, v, i::Integer)
     if a.info.readonly
@@ -197,25 +201,26 @@ function writeok_assign(a::PyArray, v, i::Integer)
     else
         GC.@preserve a unsafe_store!(a.data, v, i)
     end
-    return a
+    return v
 end
 
-setindex!(a::PyArray{T,0}, v) where {T} = writeok_assign(a, v, 1)
-setindex!(a::PyArray{T,1}, v, i::Integer) where {T} = writeok_assign(a, v, 1 + (i-1)*a.st[1])
+@inline function setindex!(a::PyArray, v, i::CartesianIndex)
+    j = fixindex(a, i)
+    @boundscheck checkbounds(a, j)
+    writeok_assign(a, v, data_index(a, j))
+end
+@inline setindex!(a::PyArray, v, i::Integer...) = setindex!(a, v, CartesianIndex(i))
+@inline setindex!(a::PyArray{<:Any,1}, v, i::Integer) = setindex!(a, v, CartesianIndex(i))
 
-setindex!(a::PyArray{T,2}, v, i::Integer, j::Integer) where {T} =
-  writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
-
+# linear indexing
 function setindex!(a::PyArray, v, i::Integer)
+    @boundscheck checkbounds(a, i)
     if a.f_contig
         return writeok_assign(a, v, i)
     else
-        return setindex!(a, v, CartesianIndices(A)[i])
+        @inbounds return setindex!(a, v, CartesianIndices(a)[i])
     end
 end
-
-setindex!(a::PyArray, v, i::Integer...) = writeok_assign(a, v, data_index(a, i))
-setindex!(a::PyArray, v, i::CartesianIndex) = writeok_assign(a, v, data_index(a, i))
 
 stride(a::PyArray, i::Integer) = a.st[i]
 
