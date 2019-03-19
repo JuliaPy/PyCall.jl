@@ -144,8 +144,6 @@ end
 
 Returns `true` if the python object `o` supports the buffer protocol as a strided
 array. `false` if not.
-
-If a new `PyBuffer()` is passed for the optional `b` argument, it is initialized
 """
 isbuftype(o::Union{PyObject,PyPtr}) = isbuftype!(o, PyBuffer())
 
