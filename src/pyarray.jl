@@ -154,10 +154,7 @@ function copy(a::PyArray{T,N}) where {T,N}
     return A
 end
 
-unsafe_data_load(a::PyArray) = GC.@preserve a unsafe_load(a.data)
 unsafe_data_load(a::PyArray, i::Integer) = GC.@preserve a unsafe_load(a.data, i)
-
-getindex(a::PyArray{T,0}) where {T} = unsafe_data_load(a)
 
 @inline data_index(a::PyArray{<:Any,N}, i::Union{NTuple{N,<:Integer},CartesianIndex{N}}) where {N} =
     1 + sum(ntuple(dim -> (i[dim]-1) * a.st[dim], Val{N}())) # Val lets julia unroll/inline
