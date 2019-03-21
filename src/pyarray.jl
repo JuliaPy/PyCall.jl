@@ -240,19 +240,23 @@ summary(a::PyArray{T}) where {T} = string(Base.dims2string(size(a)), " ",
 #########################################################################
 # PyArray <-> PyObject conversions
 
-const PYARR_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,ComplexF32,ComplexF64,PyPtr}
+const PYARR_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,ComplexF32,ComplexF64,PyPtr,PyObject}
 
 PyObject(a::PyArray) = a.o
 
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
+# PyObject arrays are created by taking a NumPy array of PyPtr and converting
+pyo2ptr(T::Type) = T
+pyo2ptr(::Type{PyObject}) = PyPtr
+pyocopy(a) = copy(a)
+pyocopy(a::AbstractArray{PyPtr}) = GC.@preserve a map(pyincref, a)
+
 function convert(::Type{Array{T, 1}}, o::PyObject) where T<:PYARR_TYPES
     try
-        copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
+        return pyocopy(PyArray{pyo2ptr(T), 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        A = Array{pyany_toany(T)}(undef, len)
-        py2array(T, A, o, 1, 1)
+        return py2vector(T, o)
     end
 end
 
@@ -260,12 +264,12 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:PYARR_TYPES
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T, length(info.sz)}(o, info)) # will check T == eltype(info)
+            return pyocopy(PyArray{pyo2ptr(T), length(info.sz)}(o, info)) # will check T == eltype(info)
         catch
-            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
+            return py2array(T, Array{T}(undef, info.sz...), o, 1, 1)
         end
     catch
-        py2array(T, o)
+        return py2array(T, o)
     end
 end
 
@@ -273,33 +277,17 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:PYARR_TYPES,N}
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T,N}(o, info)) # will check T,N == eltype(info),ndims(info)
+            pyocopy(PyArray{pyo2ptr(T),N}(o, info)) # will check T,N == eltype(info),ndims(info)
         catch
             nd = length(info.sz)
-            if nd != N
-                throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
-            end
-            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
+            nd == N || throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
+            return py2array(T, Array{T}(undef, info.sz...), o, 1, 1)
         end
     catch
         A = py2array(T, o)
-        if ndims(A) != N
-            throw(ArgumentError("cannot convert $(ndims(A))d array to $(N)d"))
-        end
-        A
+        ndims(A) == N || throw(ArgumentError("cannot convert $(ndims(A))d array to $(N)d"))
+        return A
     end
-end
-
-function convert(::Type{Array{PyObject}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr}, o))
-end
-
-function convert(::Type{Array{PyObject,1}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr, 1}, o))
-end
-
-function convert(::Type{Array{PyObject,N}}, o::PyObject) where N
-    map(pyincref, convert(Array{PyPtr, N}, o))
 end
 
 array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_STRIDED))

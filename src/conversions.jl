@@ -404,7 +404,7 @@ function py2array(T, o::PyObject)
     py2array(T, A, o, 1, 1) # fixme: faster conversion for supported buffer types?
 end
 
-function convert(::Type{Vector{T}}, o::PyObject) where T
+function py2vector(T, o::PyObject)
     len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if len < 0 || # not a sequence
        len+1 < 0  # object pretending to be a sequence of infinite length
@@ -413,6 +413,7 @@ function convert(::Type{Vector{T}}, o::PyObject) where T
     end
     py2array(T, Array{pyany_toany(T)}(undef, len), o, 1, 1)
 end
+convert(::Type{Vector{T}}, o::PyObject) where T = py2vector(T, o)
 
 convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
 convert(::Type{Array{T}}, o::PyObject) where {T} = py2array(T, o)
