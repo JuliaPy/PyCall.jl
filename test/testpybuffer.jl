@@ -88,7 +88,7 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             # check all is in order
             for i in 1:size(pyarr, 1)
                 for j in 1:size(pyarr, 1)
-                    @test jlcopy[i,j] == pyarr[i,j]
+                    @test jlcopy[i,j] == pyarr[i,j] == pyarr[i,j,1] == pyarr[CartesianIndex(i,j)]
                 end
             end
             # check it's not aliasing the same data
@@ -199,6 +199,16 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test all(pyarr[1:10] .== 11.0:20.0)
         end
 
+        @testset "bounds checks" begin
+            a = PyArray(pytestarray(3,4,1))
+            @test a[2,3,1] == a[2,3] == a[2,3,1,1,1] == a[8]
+            @test_throws BoundsError a[5,3,1]
+            @test_throws BoundsError a[2,6,1]
+            @test_throws BoundsError a[2,3,3]
+            @test_throws BoundsError a[2,3,1,2]
+            @test_throws BoundsError PyArray(pytestarray(3,4,2))[2,3]
+        end
+
         @testset "similar on PyArray PyVec getindex" begin
             jlarr1 = [1:10;]
             jlarr2 = hcat([1:10;], [1:10;])
@@ -208,5 +218,10 @@ pyutf8(s::String) = pyutf8(PyObject(s))
             @test all(pyarr2[1:10, 2] .== jlarr2[1:10, 2])
             @test all(pyarr2[1:10, 1:2] .== jlarr2)
         end
+    end
+
+    # ctypes.c_void_p supports the buffer protocol as a 0-dimensional array
+    let p = convert(Ptr{Cvoid}, 12345)
+        @test PyArray(PyObject(p))[] == p
     end
 end

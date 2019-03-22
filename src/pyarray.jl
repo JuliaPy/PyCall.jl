@@ -50,6 +50,7 @@ identical memory layout to a Julia `Array` of the same size.
 `st` should be the stride(s) *in bytes* between elements in each dimension
 """
 function f_contiguous(::Type{T}, sz::NTuple{N,Int}, st::NTuple{N,Int}) where {T,N}
+    N == 0 && return true # 0-dimensional arrays have 1 element, always contiguous
     if st[1] != sizeof(T)
         # not contiguous
         return false
@@ -153,75 +154,70 @@ function copy(a::PyArray{T,N}) where {T,N}
     return A
 end
 
-# TODO: need to do bounds-checking of these indices!
-# TODO: need to GC root these `a`s to guard against the PyArray getting gc'd,
-# e.g. if it's a temporary in a function:
-# `two_rands() = pycall(np.rand, PyArray, 10)[1:2]`
+unsafe_data_load(a::PyArray, i::Integer) = GC.@preserve a unsafe_load(a.data, i)
 
+@inline data_index(a::PyArray{<:Any,N}, i::CartesianIndex{N}) where {N} =
+    1 + sum(ntuple(dim -> (i[dim]-1) * a.st[dim], Val{N}())) # Val lets julia unroll/inline
+data_index(a::PyArray{<:Any,0}, i::CartesianIndex{0}) = 1
 
-getindex(a::PyArray{T,0}) where {T} = unsafe_load(a.data)
-getindex(a::PyArray{T,1}, i::Integer) where {T} = unsafe_load(a.data, 1 + (i-1)*a.st[1])
-
-getindex(a::PyArray{T,2}, i::Integer, j::Integer) where {T} =
-  unsafe_load(a.data, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
-
-function getindex(a::PyArray, i::Integer)
-    if a.f_contig
-        return unsafe_load(a.data, i)
-    else
-        return a[ind2sub(a.dims, i)...]
+# handle passing fewer/more indices than dimensions by canonicalizing to M==N
+@inline function fixindex(a::PyArray{<:Any,N}, i::CartesianIndex{M}) where {M,N}
+    if M == N
+        return i
+    elseif M < N
+        @boundscheck(all(ntuple(k -> size(a,k+M)==1, Val{N-M}())) ||
+                     throw(BoundsError(a, i))) # trailing sizes must == 1
+        return CartesianIndex(Tuple(i)..., ntuple(k -> 1, Val{N-M}())...)
+    else # M > N
+        @boundscheck(all(ntuple(k -> i[k+N]==1, Val{M-N}())) ||
+                     throw(BoundsError(a, i))) # trailing indices must == 1
+        return CartesianIndex(ntuple(k -> i[k], Val{N}()))
     end
 end
 
-function getindex(a::PyArray, is::Integer...)
-    index = 1
-    n = min(length(is),length(a.st))
-    for i = 1:n
-        index += (is[i]-1)*a.st[i]
+@inline function getindex(a::PyArray, i::CartesianIndex)
+    j = fixindex(a, i)
+    @boundscheck checkbounds(a, j)
+    unsafe_data_load(a, data_index(a, j))
+end
+@inline getindex(a::PyArray, i::Integer...) = a[CartesianIndex(i)]
+@inline getindex(a::PyArray{<:Any,1}, i::Integer) = a[CartesianIndex(i)]
+
+# linear indexing
+function getindex(a::PyArray, i::Integer)
+    @boundscheck checkbounds(a, i)
+    if a.f_contig
+        return unsafe_data_load(a, i)
+    else
+        @inbounds return a[CartesianIndices(a)[i]]
     end
-    for i = n+1:length(is)
-        if is[i] != 1
-            throw(BoundsError())
-        end
-    end
-    unsafe_load(a.data, index)
 end
 
 function writeok_assign(a::PyArray, v, i::Integer)
     if a.info.readonly
         throw(ArgumentError("read-only PyArray"))
     else
-        unsafe_store!(a.data, v, i)
+        GC.@preserve a unsafe_store!(a.data, v, i)
     end
-    return a
+    return v
 end
 
-setindex!(a::PyArray{T,0}, v) where {T} = writeok_assign(a, v, 1)
-setindex!(a::PyArray{T,1}, v, i::Integer) where {T} = writeok_assign(a, v, 1 + (i-1)*a.st[1])
+@inline function setindex!(a::PyArray, v, i::CartesianIndex)
+    j = fixindex(a, i)
+    @boundscheck checkbounds(a, j)
+    writeok_assign(a, v, data_index(a, j))
+end
+@inline setindex!(a::PyArray, v, i::Integer...) = setindex!(a, v, CartesianIndex(i))
+@inline setindex!(a::PyArray{<:Any,1}, v, i::Integer) = setindex!(a, v, CartesianIndex(i))
 
-setindex!(a::PyArray{T,2}, v, i::Integer, j::Integer) where {T} =
-  writeok_assign(a, v, 1 + (i-1)*a.st[1] + (j-1)*a.st[2])
-
+# linear indexing
 function setindex!(a::PyArray, v, i::Integer)
+    @boundscheck checkbounds(a, i)
     if a.f_contig
         return writeok_assign(a, v, i)
     else
-        return setindex!(a, v, ind2sub(a.dims, i)...)
+        @inbounds return setindex!(a, v, CartesianIndices(a)[i])
     end
-end
-
-function setindex!(a::PyArray, v, is::Integer...)
-    index = 1
-    n = min(length(is),length(a.st))
-    for i = 1:n
-        index += (is[i]-1)*a.st[i]
-    end
-    for i = n+1:length(is)
-        if is[i] != 1
-            throw(BoundsError())
-        end
-    end
-    writeok_assign(a, v, index)
 end
 
 stride(a::PyArray, i::Integer) = a.st[i]
@@ -244,19 +240,23 @@ summary(a::PyArray{T}) where {T} = string(Base.dims2string(size(a)), " ",
 #########################################################################
 # PyArray <-> PyObject conversions
 
-const PYARR_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,ComplexF32,ComplexF64,PyPtr}
+const PYARR_TYPES = Union{Bool,Int8,UInt8,Int16,UInt16,Int32,UInt32,Int64,UInt64,Float16,Float32,Float64,ComplexF32,ComplexF64,PyPtr,PyObject}
 
 PyObject(a::PyArray) = a.o
 
 convert(::Type{PyArray}, o::PyObject) = PyArray(o)
 
+# PyObject arrays are created by taking a NumPy array of PyPtr and converting
+pyo2ptr(T::Type) = T
+pyo2ptr(::Type{PyObject}) = PyPtr
+pyocopy(a) = copy(a)
+pyocopy(a::AbstractArray{PyPtr}) = GC.@preserve a map(pyincref, a)
+
 function convert(::Type{Array{T, 1}}, o::PyObject) where T<:PYARR_TYPES
     try
-        copy(PyArray{T, 1}(o, PyArray_Info(o))) # will check T and N vs. info
+        return pyocopy(PyArray{pyo2ptr(T), 1}(o, PyArray_Info(o))) # will check T and N vs. info
     catch
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-        A = Array{pyany_toany(T)}(undef, len)
-        py2array(T, A, o, 1, 1)
+        return py2vector(T, o)
     end
 end
 
@@ -264,12 +264,12 @@ function convert(::Type{Array{T}}, o::PyObject) where T<:PYARR_TYPES
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T, length(info.sz)}(o, info)) # will check T == eltype(info)
+            return pyocopy(PyArray{pyo2ptr(T), length(info.sz)}(o, info)) # will check T == eltype(info)
         catch
-            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
+            return py2array(T, Array{T}(undef, info.sz...), o, 1, 1)
         end
     catch
-        py2array(T, o)
+        return py2array(T, o)
     end
 end
 
@@ -277,33 +277,17 @@ function convert(::Type{Array{T,N}}, o::PyObject) where {T<:PYARR_TYPES,N}
     try
         info = PyArray_Info(o)
         try
-            copy(PyArray{T,N}(o, info)) # will check T,N == eltype(info),ndims(info)
+            pyocopy(PyArray{pyo2ptr(T),N}(o, info)) # will check T,N == eltype(info),ndims(info)
         catch
             nd = length(info.sz)
-            if nd != N
-                throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
-            end
-            return py2array(T, Array{pyany_toany(T)}(undef, info.sz...), o, 1, 1)
+            nd == N || throw(ArgumentError("cannot convert $(nd)d array to $(N)d"))
+            return py2array(T, Array{T}(undef, info.sz...), o, 1, 1)
         end
     catch
         A = py2array(T, o)
-        if ndims(A) != N
-            throw(ArgumentError("cannot convert $(ndims(A))d array to $(N)d"))
-        end
-        A
+        ndims(A) == N || throw(ArgumentError("cannot convert $(ndims(A))d array to $(N)d"))
+        return A
     end
-end
-
-function convert(::Type{Array{PyObject}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr}, o))
-end
-
-function convert(::Type{Array{PyObject,1}}, o::PyObject)
-    map(pyincref, convert(Array{PyPtr, 1}, o))
-end
-
-function convert(::Type{Array{PyObject,N}}, o::PyObject) where N
-    map(pyincref, convert(Array{PyPtr, N}, o))
 end
 
 array_format(o::PyObject) = array_format(PyBuffer(o, PyBUF_ND_STRIDED))

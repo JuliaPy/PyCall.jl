@@ -47,8 +47,7 @@ the python c-api function `PyObject_GetBuffer()`, unless o.obj is a PyPtr(C_NULL
 function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
-    # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
-    _finalized[] || ccall(@pysym(:PyBuffer_Release), Cvoid, (Any,), o)
+    _finalized[] || ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
     o
 end
 
@@ -96,10 +95,9 @@ end
 # Strides in bytes
 Base.strides(b::PyBuffer) = ((stride(b,i) for i in 1:b.buf.ndim)...,)
 
-# TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
 iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
-               (Any, Cchar), b, 'A')
+               (Ref{PyBuffer}, Cchar), b, 'A')
 
 #############################################################################
 # pybuffer constant values from Include/object.h
@@ -122,34 +120,32 @@ function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
 end
 
 function PyBuffer!(b::PyBuffer, o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
-    # TODO change to `Ref{PyBuffer}` when 0.6 is dropped.
     pydecref(b) # ensure b is properly released
     @pycheckz ccall((@pysym :PyObject_GetBuffer), Cint,
-                     (PyPtr, Any, Cint), o, b, flags)
+                     (PyPtr, Ref{PyBuffer}, Cint), o, b, flags)
     return b
 end
 
-"""
-`isbuftype(o::Union{PyObject,PyPtr})`
-Returns true if the python object `o` supports the buffer protocol as a strided
-array. False if not.
-"""
-function isbuftype(o::Union{PyObject,PyPtr})
+# like isbuftype, but modifies caller's PyBuffer
+function isbuftype!(o::Union{PyObject,PyPtr}, b::PyBuffer)
     # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
     # so we can't access it easily. It basically just checks if PyObject_GetBuffer exists
     # So we'll just try call PyObject_GetBuffer and check for success/failure
-    b = PyBuffer()
     ret = ccall((@pysym :PyObject_GetBuffer), Cint,
                      (PyPtr, Any, Cint), o, b, PyBUF_ND_STRIDED)
     if ret != 0
         pyerr_clear()
-    else
-        # handle pointer types
-        T, native_byteorder = array_format(b)
-        T <: Ptr && (ret = 1)
     end
     return ret == 0
 end
+
+"""
+    isbuftype(o::Union{PyObject,PyPtr})
+
+Returns `true` if the python object `o` supports the buffer protocol as a strided
+array. `false` if not.
+"""
+isbuftype(o::Union{PyObject,PyPtr}) = isbuftype!(o, PyBuffer())
 
 #############################################################################
 
@@ -195,7 +191,8 @@ end
 # ref: https://github.com/numpy/numpy/blob/v1.14.2/numpy/core/src/multiarray/buffer.c#L966
 
 const standard_typestrs = Dict{String,DataType}(
-                           "?"=>Bool,        "P"=>Ptr{Cvoid},
+                           "?"=>Bool,
+                           "P"=>Ptr{Cvoid},  "O"=>PyPtr,
                            "b"=>Int8,        "B"=>UInt8,
                            "h"=>Int16,       "H"=>UInt16,
                            "i"=>Int32,       "I"=>UInt32,
@@ -208,7 +205,8 @@ const standard_typestrs = Dict{String,DataType}(
                            "Zf"=>ComplexF32, "Zd"=>ComplexF64)
 
 const native_typestrs = Dict{String,DataType}(
-                           "?"=>Bool,        "P"=>Ptr{Cvoid},
+                           "?"=>Bool,
+                           "P"=>Ptr{Cvoid},  "O"=>PyPtr,
                            "b"=>Int8,        "B"=>UInt8,
                            "h"=>Cshort,      "H"=>Cushort,
                            "i"=>Cint,        "I"=>Cuint,

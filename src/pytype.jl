@@ -312,8 +312,7 @@ function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, ba
     if t.tp_new == C_NULL
         t.tp_new = @pyglobal :PyType_GenericNew
     end
-    # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Any,), t)
+    @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ref{PyTypeObject},), t)
     ccall((@pysym :Py_IncRef), Cvoid, (Any,), t)
     return t
 end
@@ -414,8 +413,7 @@ const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = Ref(0x00000000)
 function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
     sz = sizeof(Py_jlWrap) + sizeof(PyPtr) # must be > base type
     PyTypeObject!(to, name, sz) do t::PyTypeObject
-        # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-        t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), jlWrapType)
+        t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Ref{PyTypeObject},), jlWrapType)
         ccall((@pysym :Py_IncRef), Cvoid, (Any,), jlWrapType)
         init(t)
     end
@@ -426,9 +424,8 @@ pyjlwrap_type(init::Function, name::AbstractString) =
 
 # Given a jlwrap type, create a new instance (and save value for gc)
 function pyjlwrap_new(pyT::PyTypeObject, value::Any)
-    # TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
     o = PyObject(@pycheckn ccall((@pysym :_PyObject_New),
-                                 PyPtr, (Any,), pyT))
+                                 PyPtr, (Ref{PyTypeObject},), pyT))
     p = convert(Ptr{Ptr{Cvoid}}, PyPtr(o))
     if isimmutable(value)
         # It is undefined to call `pointer_from_objref` on immutable objects.
@@ -452,8 +449,7 @@ function pyjlwrap_new(x::Any)
     pyjlwrap_new(jlWrapType, x)
 end
 
-# TODO change to `Ref{PyTypeObject}` when 0.6 is dropped.
-is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Any), o, jlWrapType) == 1
+is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Ref{PyTypeObject}), o, jlWrapType) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,
