@@ -413,7 +413,8 @@ const Py_TPFLAGS_HAVE_STACKLESS_EXTENSION = Ref(0x00000000)
 function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
     sz = sizeof(Py_jlWrap) + sizeof(PyPtr) # must be > base type
     PyTypeObject!(to, name, sz) do t::PyTypeObject
-        t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Ref{PyTypeObject},), jlWrapType)
+        # need Any here: see JuliaLang/julia#31473 and #670
+        t.tp_base = ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), jlWrapType)
         ccall((@pysym :Py_IncRef), Cvoid, (Any,), jlWrapType)
         init(t)
     end
