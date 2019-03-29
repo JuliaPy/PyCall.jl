@@ -98,7 +98,7 @@ If you are using `pycall` and the function returns an `ndarray`, you can use `Py
 mutable struct PyArray{T,N} <: AbstractArray{T,N}
     o::PyObject
     info::PyArray_Info
-    dims::Dims
+    dims::NTuple{N,Int}
     st::NTuple{N,Int}
     f_contig::Bool
     c_contig::Bool
