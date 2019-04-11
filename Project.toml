@@ -1,7 +1,7 @@
 name = "PyCall"
 uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 authors = ["Steven G. Johnson <stevenj@mit.edu>", "Yichao Yu <yyc1992@gmail.com>", "Takafumi Arakaki <aka.tkf@gmail.com>", "Simon Kornblith <simon@simonster.com>", "Páll Haraldsson <Pall.Haraldsson@gmail.com>", "Jon Malmaud <malmaud@gmail.com>", "Jake Bolewski <jakebolewski@gmail.com>", "Keno Fischer <keno@alumni.harvard.edu>", "Joel Mason <jobba1@hotmail.com>", "Jameson Nash <vtjnash@gmail.com>", "The JuliaPy development team"]
-version = "1.91.1"
+version = "1.91.2"
 
 [deps]
 Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
