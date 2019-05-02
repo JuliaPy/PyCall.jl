@@ -70,6 +70,18 @@ callsym(s::QuoteNode) = s.value
 import Base.Meta.isexpr
 callsym(ex::Expr) = isexpr(ex,:macrocall,2) ? callsym(ex.args[2]) : isexpr(ex,:ccall) ? callsym(ex.args[1]) : ex
 
+"""
+    _handle_error(msg)
+
+Throw a PyError if available, otherwise throw ErrorException.
+This is a hack to manually do the optimization described in
+https://github.com/JuliaLang/julia/issues/29688
+"""
+@noinline function _handle_error(msg)
+    pyerr_check(msg)
+    error(msg, " failed")
+end
+
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
 macro pycheck(ex)
     :(pyerr_check($(string(callsym(ex))), $(esc(ex))))
@@ -80,9 +92,7 @@ macro pycheckv(ex, bad)
     quote
         val = $(esc(ex))
         if val == $(esc(bad))
-            # throw a PyError if available, otherwise throw ErrorException
-            pyerr_check($(string(callsym(ex))))
-            error($(string(callsym(ex))), " failed")
+            _handle_error($(string(callsym(ex))))
         end
         val
     end
