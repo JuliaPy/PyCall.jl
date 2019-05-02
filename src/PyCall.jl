@@ -24,13 +24,6 @@ if isdefined(Base, :hasproperty) # Julia 1.2
     import Base: hasproperty
 end
 
-# Python C API is not interrupt-safe.  In principle, we should
-# use sigatomic for every ccall to the Python library, but this
-# should really be fixed in Julia (#2622).  However, we will
-# use the sigatomic_begin/end functions to protect pycall and
-# similar long-running (or potentially long-running) code.
-import Base: sigatomic_begin, sigatomic_end
-
 import Conda
 import MacroTools   # because of issue #270
 import Base.Iterators: filter

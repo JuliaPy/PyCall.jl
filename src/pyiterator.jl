@@ -5,14 +5,11 @@
 
 Base.IteratorSize(::Type{PyObject}) = Base.SizeUnknown()
 function _start(po::PyObject)
-    sigatomic_begin()
-    try
+    disable_sigint() do
         o = PyObject(@pycheckn ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), po))
         nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), o))
 
         return (nxt,o)
-    finally
-        sigatomic_end()
     end
 end
 
@@ -76,12 +73,9 @@ _start(piter::PyIterator) = _start(piter.o)
 
 function Base.iterate(piter::PyIterator{T}, s=_start(piter)) where {T}
     ispynull(s[1]) && return nothing
-    sigatomic_begin()
-    try
+    disable_sigint() do
         nxt = PyObject(@pycheck ccall((@pysym :PyIter_Next), PyPtr, (PyPtr,), s[2]))
         return (convert(T,s[1]), (nxt, s[2]))
-    finally
-        sigatomic_end()
     end
 end
 function Base.iterate(po::PyObject, s=_start(po))
