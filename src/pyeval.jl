@@ -31,14 +31,15 @@ pynamespace(m::Module) =
 # and a current "file name" to use for stack traces
 function pyeval_(s::AbstractString, globals=pynamespace(Main), locals=pynamespace(Main),
                  input_type=Py_eval_input, fname="PyCall")
-    disable_sigint() do
-        o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                     (Cstring, Cstring, Cint),
-                                     s, fname, input_type))
-        return PyObject(@pycheckn ccall((@pysym :PyEval_EvalCode),
-                                         PyPtr, (PyPtr, PyPtr, PyPtr),
-                                         o, globals, locals))
+    o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
+                                 (Cstring, Cstring, Cint),
+                                 s, fname, input_type))
+    ptr = disable_sigint() do
+        @pycheckn ccall((@pysym :PyEval_EvalCode),
+                        PyPtr, (PyPtr, PyPtr, PyPtr),
+                        o, globals, locals)
     end
+    return PyObject(ptr)
 end
 
 """
