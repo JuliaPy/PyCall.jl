@@ -28,8 +28,8 @@ By default on Mac and Windows systems, `Pkg.add("PyCall")`
 or `Pkg.build("PyCall")` will use the
 [Conda.jl](https://github.com/Luthaf/Conda.jl) package to install a
 minimal Python distribution (via
-[Miniconda](http://conda.pydata.org/docs/install/quick.html)) that is
-private to Julia (not in your `PATH`).  You can use the `Conda` Julia
+[Miniconda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html))
+that is private to Julia (not in your `PATH`).  You can use the `Conda` Julia
 package to install more Python packages, and `import Conda` to print
 the `Conda.PYTHONDIR` directory where `python` was installed.
 On GNU/Linux systems, PyCall will default to using
