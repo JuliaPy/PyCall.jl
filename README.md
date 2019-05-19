@@ -9,7 +9,7 @@
 
 This package provides the ability to directly call and **fully
 interoperate with Python** from [the Julia
-language](http://julialang.org/).  You can import arbitrary Python
+language](https://julialang.org/).  You can import arbitrary Python
 modules from Julia, call Python functions (with automatic conversion
 of types between Julia and Python), define Python classes from Julia
 methods, and share large data structures between Julia and Python
@@ -28,8 +28,8 @@ By default on Mac and Windows systems, `Pkg.add("PyCall")`
 or `Pkg.build("PyCall")` will use the
 [Conda.jl](https://github.com/Luthaf/Conda.jl) package to install a
 minimal Python distribution (via
-[Miniconda](http://conda.pydata.org/docs/install/quick.html)) that is
-private to Julia (not in your `PATH`).  You can use the `Conda` Julia
+[Miniconda](https://conda.io/projects/conda/en/latest/glossary.html#miniconda-glossary))
+that is private to Julia (not in your `PATH`).  You can use the `Conda` Julia
 package to install more Python packages, and `import Conda` to print
 the `Conda.PYTHONDIR` directory where `python` was installed.
 On GNU/Linux systems, PyCall will default to using
@@ -68,7 +68,8 @@ global variable of the `PyCall` module.  You can also look at
 using the Conda Python, `PyCall.conda` will be `true`.
 
 (Technically, PyCall does not use the `python` program per se: it links
-directly to the `libpython` library.  But it finds the location of `libpython` by running `python` during `Pkg.build`.)
+directly to the `libpython` library.  But it finds the location of
+`libpython` by running `python` during `Pkg.build`.)
 
 Subsequent builds of PyCall (e.g. when you update the package via
 `Pkg.update`) will use the same Python executable name by default,
@@ -76,7 +77,7 @@ unless you set the `PYTHON` environment variable or delete the file
 `Pkg.dir("PyCall","deps","PYTHON")`.
 
 **Note:** If you use Python
-[virtualenvs](http://docs.python-guide.org/en/latest/dev/virtualenvs/),
+[virtualenvs](https://docs.python-guide.org/en/latest/dev/virtualenvs/),
 then be aware that PyCall *uses the virtualenv it was built with* by
 default, even if you switch virtualenvs.  If you want to switch PyCall
 to use a different virtualenv, then you should switch virtualenvs and
@@ -115,7 +116,7 @@ copy is made; no-copy conversion of Python to Julia arrays can be achieved
 with the `PyArray` type below.
 
 Keyword arguments can also be passed. For example, matplotlib's
-[pyplot](http://matplotlib.org/) uses keyword arguments to specify plot
+[pyplot](https://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
     plt = pyimport("matplotlib.pyplot")
@@ -308,11 +309,11 @@ dictionary.
 #### PyTextIO
 
 Julia `IO` streams are converted into Python objects implementing the
-[RawIOBase](http://docs.python.org/3/library/io.html#io.RawIOBase)
+[RawIOBase](https://docs.python.org/3/library/io.html#io.RawIOBase)
 interface, so they can be used for binary I/O in Python.  However,
 some Python code (notably unpickling) expects a stream implementing
 the
-[TextIOBase](http://docs.python.org/3/library/io.html#io.TextIOBase)
+[TextIOBase](https://docs.python.org/3/library/io.html#io.TextIOBase)
 interface, which differs from RawIOBase mainly in that `read` an
 `readall` functions return strings rather than byte arrays.  If you
 need to pass an `IO` stream as a text-IO object, just call
@@ -488,10 +489,12 @@ mouse clicks) as an asynchronous task within Julia, so that the GUI is
 responsive without blocking Julia's input prompt.  PyCall includes
 functions to implement these event loops for some of the most common
 cross-platform [GUI
-toolkits](http://en.wikipedia.org/wiki/Widget_toolkit):
-[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/) version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via [PyGObject](https://pygobject.readthedocs.io/en/latest/)),
-and [Qt](http://qt-project.org/) (via the [PyQt4](http://wiki.python.org/moin/PyQt4) or [PySide](http://qt-project.org/wiki/PySide)
-Python modules).
+toolkits](https://en.wikipedia.org/wiki/Widget_toolkit):
+[wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/)
+version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via
+[PyGObject](https://pygobject.readthedocs.io/en/latest/)), and
+[Qt](http://qt-project.org/) (via the [PyQt4](https://wiki.python.org/moin/PyQt4)
+or [PySide](http://qt-project.org/wiki/PySide) Python modules).
 
 You can set a GUI event loop via:
 
@@ -531,7 +534,8 @@ If you want to call low-level functions in the Python C API, you can
 do so using `ccall`.
 
 * Use `@pysym(func::Symbol)` to get a function pointer to pass to `ccall`
-  given a symbol `func` in the Python API.  e.g. you can call `int Py_IsInitialized()` by `ccall(@pysym(:Py_IsInitialized), Int32, ())`.
+  given a symbol `func` in the Python API.  e.g. you can call
+  `int Py_IsInitialized()` by `ccall(@pysym(:Py_IsInitialized), Int32, ())`.
 
 * PyCall defines the typealias `PyPtr` for `PythonObject*` argument types,
   and `PythonObject` (see above) arguments are correctly converted to this
@@ -571,7 +575,7 @@ do so using `ccall`.
 
 ### Using PyCall from Julia Modules
 
-You can use PyCall from any Julia code, including within Julia modules. However, some care is required when using PyCall from [precompiled Julia modules](http://docs.julialang.org/en/latest/manual/modules/#module-initialization-and-precompilation). The key thing to remember is that *all Python objects* (any `PyObject`) contain *pointers* to memory allocated by the Python runtime, and such pointers *cannot be saved* in precompiled constants.   (When a precompiled library is reloaded, these pointers will not contain valid memory addresses.)
+You can use PyCall from any Julia code, including within Julia modules. However, some care is required when using PyCall from [precompiled Julia modules](https://docs.julialang.org/en/latest/manual/modules/#module-initialization-and-precompilation). The key thing to remember is that *all Python objects* (any `PyObject`) contain *pointers* to memory allocated by the Python runtime, and such pointers *cannot be saved* in precompiled constants.   (When a precompiled library is reloaded, these pointers will not contain valid memory addresses.)
 
 The solution is fairly simple:
 
@@ -631,4 +635,4 @@ Similarly, the `PYTHONHOME` path can be changed by the environment variable
 
 ## Author
 
-This package was written by [Steven G. Johnson](http://math.mit.edu/~stevenj/).
+This package was written by [Steven G. Johnson](https://math.mit.edu/~stevenj/).
