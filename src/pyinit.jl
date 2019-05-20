@@ -131,6 +131,7 @@ function __init__()
     _finalized[] = false
     empty!(_namespaces)
     empty!(eventloops)
+    global npy_initialized = false
     empty!(npy_api)
     empty!(pycall_gc)
     empty!(pyexc)
