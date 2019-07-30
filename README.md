@@ -96,8 +96,7 @@ Windows, or using the Julia Conda package, in order to minimize headaches.
 
 ## Usage
 
-Here is a simple example to call Python's `math.sin` function and
-compare it to the built-in Julia `sin`:
+Here is a simple example to call Python's `math.sin` function:
 
     using PyCall
     math = pyimport("math")
