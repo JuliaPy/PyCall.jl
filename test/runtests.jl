@@ -345,6 +345,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test ispynull(PyNULL())
     @test !ispynull(PyObject(3))
     @test ispynull(pydecref(PyObject(3)))
+    @test isempty(propertynames(PyNULL()))
 
     ex = try
         pyimport("s p a m")
