@@ -3,9 +3,9 @@
 using VersionParsing
 import Conda, Libdl
 
-pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(read(pythonenv(`$python -c "import $mod; print($mod.$var)"`), String))
+pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(read(pythonenv(`$python -c "import $mod; print($mod.$(var))"`), String))
 
-pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$var')")
+pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$(var)')")
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end
