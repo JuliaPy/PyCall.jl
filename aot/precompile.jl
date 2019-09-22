@@ -1,3 +1,6 @@
+using Random
+Random.__init__()
+
 # Activate ./Project.toml.  Excluding `"@v#.#"` from `Base.LOAD_PATH`
 # to make compilation more reproducible.
 using Pkg
