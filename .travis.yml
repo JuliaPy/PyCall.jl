@@ -3,9 +3,9 @@ dist: trusty  # update "python3.4-venv" below when updating
 os:
     - linux
 julia:
-    - 0.7
     - 1.0
-    - 1.1
+    - 1.2
+    - 1.3
     - nightly
 addons:
   apt:
