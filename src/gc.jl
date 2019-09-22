@@ -29,7 +29,7 @@ const weakref_callback_meth = Ref{PyMethodDef}()
 function pyembed(po::PyObject, jo::Any)
     # If there's a need to support immutable embedding,
     # the API needs to be changed to return the pointer.
-    isimmutable(jo) && ArgumentError("pyembed: immutable argument not allowed")
+    isimmutable(jo) && throw(ArgumentError("pyembed: immutable argument not allowed"))
     if ispynull(weakref_callback_obj)
         cf = @cfunction(weakref_callback, PyPtr, (PyPtr,PyPtr))
         weakref_callback_meth[] = PyMethodDef("weakref_callback", cf, METH_O)
