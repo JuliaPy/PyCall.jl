@@ -42,6 +42,78 @@ function pyeval_(s::AbstractString, globals=pynamespace(Main), locals=pynamespac
     return PyObject(ptr)
 end
 
+# Originally defined in https://github.com/python/cpython/blob/master/Include/compile.h
+#define PyCF_DONT_IMPLY_DEDENT 0x0200
+#define PyCF_ONLY_AST 0x0400
+const PyCF_DONT_IMPLY_DEDENT = 0x0200
+const PyCF_ONLY_AST = 0x0400
+
+# We want to compile arbitrary python objects (e.g. `Module`) to code, but this isn't
+# exposed through the C API. So instead, we use the C API to compile and evoke a _python
+# call_ to the `compile` builtin (yeesh!).
+function py_compile_(source, globals, locals,
+                    py_input_type_str, fname, flags::Integer = 0)
+    localvar = "____pycall__compile_obj_source___"
+    locals[localvar] = source
+    s = "compile($localvar, '$fname', '$py_input_type_str', $flags, 1)"
+    pyeval_(s, globals, locals, Py_eval_input, fname)
+end
+
+#code_ast = compiler.ast_parse("2+2", filename="test.py")
+function ast_parse_(s::AbstractString, globals, locals, fname="PyCall")
+    # Use Py_file_input to create a Module
+    code_ast = py_compile_(s, globals, locals, "exec", fname, PyCF_DONT_IMPLY_DEDENT | PyCF_ONLY_AST)
+end
+
+function pyeval_interactive_(s::AbstractString, globals=pynamespace(Main),
+                             locals=pynamespace(Main), fname="PyCall")
+    py_ast = pyimport("ast")
+
+    code_ast = ast_parse_(s, globals, locals, fname)
+    if code_ast.body == []
+        return PyObject(nothing)
+    end
+
+    # Exec all but the last node, and eval the last node (if it's an Expr).
+    # NOTE: Whereas IPython compiles the last node as 'single', which _prints_ the final
+    # node _iff_ it's an Expr, we will be using 'eval' to _retrieve_ the value. However,
+    # 'eval' mode is more strict, and will _only work if the input is an `ast.Expr`, so we
+    # check for that here.
+    if code_ast.body[end].__class__ == py_ast.Expr
+        nodes_to_exec, nodes_to_eval = code_ast.body[1:end-1], code_ast.body[end].value
+    else
+        nodes_to_exec, nodes_to_eval = code_ast.body, nothing
+    end
+
+    function exec_node(node)
+        # Compile and exec the node ("exec" requires an `ast.Module` object)
+        mod = py_ast.Module([node])
+        code = py_compile_(mod, globals, locals, "exec", fname, PyCF_DONT_IMPLY_DEDENT)
+        eval_code(code)
+    end
+    function eval_node(node)
+        # Compile, run, and return the result of the final node ("eval" requires an
+        # `ast.Expression` object).
+        mod = py_ast.Expression(node)
+        code = py_compile_(mod, globals, locals, "eval", fname, PyCF_DONT_IMPLY_DEDENT)
+        eval_code(code)
+    end
+    eval_code(code) = disable_sigint() do
+        @pycheckn ccall((@pysym :PyEval_EvalCode),
+                        PyPtr, (PyPtr, PyPtr, PyPtr),
+                        code, globals, locals)
+    end
+
+    for n in nodes_to_exec
+        # TODO: why do we iterate through each node? Why not just create one module with all
+        # nodes? (This was copied from IPython...)
+        exec_node(n)
+    end
+    ptr = nodes_to_eval === nothing ? nothing : eval_node(nodes_to_eval)
+
+    return PyObject(ptr)
+end
+
 """
     pyeval(s::AbstractString, returntype::TypeTuple=PyAny, locals=PyDict{AbstractString, PyObject}(),
                                 input_type=Py_eval_input; kwargs...)
@@ -74,7 +146,7 @@ function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
     for (k, v) in kwargs
         locals[string(k)] = v
     end
-    return convert(returntype, pyeval_(s, pynamespace(Main), locals, input_type))
+    return convert(returntype, pyeval_interactive_(s, pynamespace(Main), locals, input_type))
 end
 
 # get filename from @__FILE__ macro, which returns nothing in the REPL
@@ -227,7 +299,7 @@ macro py_str(code, options...)
     quote
         m = pynamespace($__module__)
         $assignlocals
-        ret = $T(pyeval_($code_expr, m, m, $input_type, $fname))
+        ret = $T(pyeval_interactive_($code_expr, m, m, $fname))
         $removelocals
         ret
     end

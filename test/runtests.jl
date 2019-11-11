@@ -693,6 +693,15 @@ end
     @test anonymous.sys != PyNULL()
 end
 
+@testset "return last expression" begin
+    @test py"""
+        def foo(x):
+            return x+1
+        foo
+        """(1) == 2
+end
+
+
 struct Unprintable end
 Base.show(::IO, ::Unprintable) = error("show(::IO, ::Unprintable) called")
 Base.show(::IO, ::Type{Unprintable}) = error("show(::IO, ::Type{Unprintable}) called")
