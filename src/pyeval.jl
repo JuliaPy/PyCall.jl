@@ -26,50 +26,29 @@ pynamespace(m::Module) =
         end
     end
 
-# internal function evaluate a python string, returning PyObject, given
-# Python dictionaries of global and local variables to use in the expression,
-# and a current "file name" to use for stack traces
-function pyeval_(s::AbstractString, globals=pynamespace(Main), locals=pynamespace(Main),
-                 input_type=Py_eval_input, fname="PyCall")
-    o = PyObject(@pycheckn ccall((@pysym :Py_CompileString), PyPtr,
-                                 (Cstring, Cstring, Cint),
-                                 s, fname, input_type))
-    ptr = disable_sigint() do
-        @pycheckn ccall((@pysym :PyEval_EvalCode),
-                        PyPtr, (PyPtr, PyPtr, PyPtr),
-                        o, globals, locals)
-    end
-    return PyObject(ptr)
-end
-
 # Originally defined in https://github.com/python/cpython/blob/master/Include/compile.h
 #define PyCF_DONT_IMPLY_DEDENT 0x0200
 #define PyCF_ONLY_AST 0x0400
 const PyCF_DONT_IMPLY_DEDENT = 0x0200
 const PyCF_ONLY_AST = 0x0400
 
-# We want to compile arbitrary python objects (e.g. `Module`) to code, but this isn't
-# exposed through the C API. So instead, we use the C API to compile and evoke a _python
-# call_ to the `compile` builtin (yeesh!).
-function py_compile_(source, globals, locals,
-                    py_input_type_str, fname, flags::Integer = 0)
-    localvar = "____pycall__compile_obj_source___"
-    locals[localvar] = source
-    s = "compile($localvar, '$fname', '$py_input_type_str', $flags, 1)"
-    pyeval_(s, globals, locals, Py_eval_input, fname)
-end
+# The C API to compile and eval code only allows compiling from a string, but we need to
+# parse into an AST, then compile the AST nodes, which is only supported through python's
+# builtin compile function, so we use the python API instead of the C API.
 
-#code_ast = compiler.ast_parse("2+2", filename="test.py")
-function ast_parse_(s::AbstractString, globals, locals, fname="PyCall")
+# Pass flags to the `compile` builtin to parse an AST from a string.
+function ast_parse_(s::AbstractString, fname="PyCall")
     # Use Py_file_input to create a Module
-    code_ast = py_compile_(s, globals, locals, "exec", fname, PyCF_DONT_IMPLY_DEDENT | PyCF_ONLY_AST)
+    # TODO: I don't know if PyCF_DONT_IMPLY_DEDENT is needed. It is set by default in
+    # IPython; we should figure out what it does and whether we need it here.
+    code_ast = pybuiltin("compile")(s, fname, "exec", PyCF_DONT_IMPLY_DEDENT | PyCF_ONLY_AST, 1)
 end
 
 function pyeval_interactive_(s::AbstractString, globals=pynamespace(Main),
                              locals=pynamespace(Main), fname="PyCall")
     py_ast = pyimport("ast")
 
-    code_ast = ast_parse_(s, globals, locals, fname)
+    code_ast = ast_parse_(s, fname)
     if code_ast.body == []
         return PyObject(nothing)
     end
@@ -88,14 +67,14 @@ function pyeval_interactive_(s::AbstractString, globals=pynamespace(Main),
     function exec_node(node)
         # Compile and exec the node ("exec" requires an `ast.Module` object)
         mod = py_ast.Module([node])
-        code = py_compile_(mod, globals, locals, "exec", fname, PyCF_DONT_IMPLY_DEDENT)
+        code = pybuiltin("compile")(mod, fname, "exec", PyCF_DONT_IMPLY_DEDENT)
         eval_code(code)
     end
     function eval_node(node)
         # Compile, run, and return the result of the final node ("eval" requires an
         # `ast.Expression` object).
         mod = py_ast.Expression(node)
-        code = py_compile_(mod, globals, locals, "eval", fname, PyCF_DONT_IMPLY_DEDENT)
+        code = pybuiltin("compile")(mod, fname, "eval", PyCF_DONT_IMPLY_DEDENT)
         eval_code(code)
     end
     eval_code(code) = disable_sigint() do
@@ -288,6 +267,9 @@ macro py_str(code, options...)
         i0 = i
     end
     push!(code_expr.args, code[i0:lastindex(code)])
+    # TODO: I think we can delete all this logic about single-lines versus multiple lines
+    # but I am a little unsure if it's a breaking change to stop removing the new locals for
+    # single-line macrocalls.
     if input_type == Py_eval_input
         removelocals = Expr(:block, [:(delete!(m, $v)) for v in keys(locals)]...)
     else

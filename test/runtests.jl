@@ -693,12 +693,19 @@ end
     @test anonymous.sys != PyNULL()
 end
 
-@testset "return last expression" begin
+@testset "eval last expression only" begin
+    # Can both exec definitions and eval the last expression in the same call
     @test py"""
         def foo(x):
             return x+1
         foo
         """(1) == 2
+    # The defined `foo` still exists (was fully `exec`'d).
+    @test py"foo"(2) == 3
+
+    # Can exec definitions that are only a single line
+    py"def bar(): return 1"
+    @test py"bar()" == 1
 end
 
 
