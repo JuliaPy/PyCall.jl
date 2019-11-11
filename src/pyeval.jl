@@ -26,59 +26,68 @@ pynamespace(m::Module) =
         end
     end
 
-# Originally defined in https://github.com/python/cpython/blob/master/Include/compile.h
-#define PyCF_DONT_IMPLY_DEDENT 0x0200
-#define PyCF_ONLY_AST 0x0400
+# Originally defined in https://github.com/python/cpython/blob/master/Include/compile.h#L22
 const PyCF_DONT_IMPLY_DEDENT = 0x0200
 const PyCF_ONLY_AST = 0x0400
 
 # The C API to compile and eval code only allows compiling from a string, but we need to
 # parse into an AST, then compile the AST nodes, which is only supported through python's
-# builtin compile function, so we use the python API instead of the C API.
+# builtin compile function, so we use the python builtin instead of the C API.
 
 # Pass flags to the `compile` builtin to parse an AST from a string.
 function ast_parse_(s::AbstractString, fname="PyCall")
-    # Use Py_file_input to create a Module
+    # Use "exec" mode to create a Module
     # TODO: I don't know if PyCF_DONT_IMPLY_DEDENT is needed. It is set by default in
     # IPython; we should figure out what it does and whether we need it here.
     code_ast = pybuiltin("compile")(s, fname, "exec", PyCF_DONT_IMPLY_DEDENT | PyCF_ONLY_AST, 1)
 end
 
-function pyeval_interactive_(s::AbstractString, globals=pynamespace(Main),
-                             locals=pynamespace(Main), fname="PyCall",
-                             didexec_out::Union{Nothing,Ref{Bool}}=nothing)
-    py_ast = pyimport("ast")
+const _py_ast = PyNULL()
+py_ast() = ispynull(_py_ast) ? copy!(_py_ast, pyimport("ast")) : _py_ast
 
+
+# Compile and execute a block of code from a string, `s`.
+# Like IPython, this function will `exec` all statements in the code, and if the last
+# statement is an Expression, it will be `eval`'d instead, and the result returned.
+# This matches the julia behavior, in which evaling a block returns the last expression in
+# the block.
+function pyeval_block_(s::AbstractString, globals=pynamespace(Main),
+                       locals=pynamespace(Main), fname="PyCall",
+                       didexec_out::Union{Nothing,Ref{Bool}}=nothing)
     code_ast = ast_parse_(s, fname)
     if code_ast.body == []
         return PyObject(nothing)
     end
 
     # Exec all but the last node, and eval the last node (if it's an Expr).
+    # This logic adapted from IPython's logic, as explained in this comment:
+    # https://github.com/JuliaPy/PyCall.jl/issues/255#issuecomment-212842832
     # NOTE: Whereas IPython compiles the last node as 'single', which _prints_ the final
     # node _iff_ it's an Expr, we will be using 'eval' to _retrieve_ the value. However,
     # 'eval' mode is more strict, and will _only work if the input is an `ast.Expr`, so we
     # check for that here.
-    if code_ast.body[end].__class__ == py_ast.Expr
+    if code_ast.body[end].__class__ == py_ast().Expr
         nodes_to_exec, nodes_to_eval = code_ast.body[1:end-1], code_ast.body[end].value
     else
         nodes_to_exec, nodes_to_eval = code_ast.body, nothing
     end
 
+    # Report whether evaling this block executed any statements (used in py"" macro to
+    # remove local variable assignments from module if nothing was exec'd).
     if didexec_out !== nothing
         didexec_out[] = !isempty(nodes_to_exec)
     end
 
     function exec_node(node)
         # Compile and exec the node ("exec" requires an `ast.Module` object)
-        mod = py_ast.Module([node])
+        mod = py_ast().Module([node])
         code = pybuiltin("compile")(mod, fname, "exec", PyCF_DONT_IMPLY_DEDENT)
         eval_code(code)
     end
     function eval_node(node)
         # Compile, run, and return the result of the final node ("eval" requires an
         # `ast.Expression` object).
-        mod = py_ast.Expression(node)
+        mod = py_ast().Expression(node)
         code = pybuiltin("compile")(mod, fname, "eval", PyCF_DONT_IMPLY_DEDENT)
         eval_code(code)
     end
@@ -90,7 +99,7 @@ function pyeval_interactive_(s::AbstractString, globals=pynamespace(Main),
 
     for n in nodes_to_exec
         # TODO: why do we iterate through each node? Why not just create one module with all
-        # nodes? (This was copied from IPython...)
+        # nodes, i.e. `compile(Module(nodes_to_exec))`? (This was copied from IPython...)
         exec_node(n)
     end
     ptr = nodes_to_eval === nothing ? nothing : eval_node(nodes_to_eval)
@@ -130,7 +139,7 @@ function pyeval(s::AbstractString, returntype::TypeTuple=PyAny,
     for (k, v) in kwargs
         locals[string(k)] = v
     end
-    return convert(returntype, pyeval_interactive_(s, pynamespace(Main), locals, input_type))
+    return convert(returntype, pyeval_block_(s, pynamespace(Main), locals, input_type))
 end
 
 # get filename from @__FILE__ macro, which returns nothing in the REPL

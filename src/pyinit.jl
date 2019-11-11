@@ -229,7 +229,7 @@ function __init__()
     #    obj[:foo] = jlfun2pyfun(some_julia_function)
     # This is a bit of a kludge, obviously.
     copy!(jlfun2pyfun,
-          pyeval_interactive_("""lambda f: lambda *args, **kwargs: f(*args, **kwargs)"""))
+          pyeval_block_("""lambda f: lambda *args, **kwargs: f(*args, **kwargs)"""))
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
