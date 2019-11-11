@@ -706,6 +706,22 @@ end
     # Can exec definitions that are only a single line
     py"def bar(): return 1"
     @test py"bar()" == 1
+
+    @testset "interpolated locals only saved if execs" begin
+        # Interpolated locals are only saved if any statements are `eval`'d. (If exec only,
+        # nothing needs to be saved.)
+        beforelen = length(PyCall.pynamespace(@__MODULE__))
+        py"$2"
+        @test length(PyCall.pynamespace(@__MODULE__)) == beforelen
+        py"""
+        $2
+        """
+        @test length(PyCall.pynamespace(@__MODULE__)) == beforelen
+        # If the pycall contains definitions to be exec'd, the locals remain
+        py"""def foo(): return 1
+        $2"""
+        @test length(PyCall.pynamespace(@__MODULE__)) == beforelen + 1
+    end
 end
 
 
