@@ -40,20 +40,10 @@ current_python() = _current_python[]
 const _current_python = Ref(pyprogramname)
 
 #########################################################################
-
-# Mirror of C PyObject struct (for non-debugging Python builds).
-# We won't actually access these fields directly; we'll use the Python
-# C API for everything.  However, we need to define a unique Ptr type
-# for PyObject*, and we might as well define the actual struct layout
-# while we're at it.
-struct PyObject_struct
-    ob_refcnt::Int
-    ob_type::Ptr{Cvoid}
-end
-
-const PyPtr = Ptr{PyObject_struct} # type for PythonObject* in ccall
-
-const PyPtr_NULL = PyPtr(C_NULL)
+# interface to libpython
+include("libpython/types.jl")
+include("libpython/functions.jl")
+include("libpython/globals.jl")
 
 #########################################################################
 # Wrapper around Python's C PyObject* type, with hooks to Python reference
@@ -154,6 +144,20 @@ wrapping/converted from `x` is created.
 """
 pyreturn(x) = PyPtr(pyincref(PyObject(x)))
 
+macro pyreturn(x)
+    :(return pyreturn($(esc(x))))
+end
+
+macro pyreturn_NULL()
+    :(return PyPtr_NULL)
+end
+
+pyreturn_NotImplemented() = pyincref_(Py_NotImplemented[])
+
+macro pyreturn_NotImplemented()
+    :(return pyreturn_NotImplemented())
+end
+
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
     setfield!(dest, :o, PyPtr(pyincref(src)))
@@ -190,7 +194,8 @@ const TypeTuple = Union{Type,NTuple{N, Type}} where {N}
 include("pybuffer.jl")
 include("pyarray.jl")
 include("conversions.jl")
-include("pytype.jl")
+# include("pytype.jl")
+include("jlwrap.jl")
 include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
@@ -917,11 +922,11 @@ include("pyinit.jl")
 # Here, we precompile functions that are passed to cfunction by __init__,
 # for the reasons described in JuliaLang/julia#12256.
 
-precompile(pyjlwrap_call, (PyPtr,PyPtr,PyPtr))
-precompile(pyjlwrap_dealloc, (PyPtr,))
-precompile(pyjlwrap_repr, (PyPtr,))
-precompile(pyjlwrap_hash, (PyPtr,))
-precompile(pyjlwrap_hash32, (PyPtr,))
+precompile(_pyjlwrap_call, (PyPtr,PyPtr,PyPtr))
+precompile(_pyjlwrap_dealloc, (PyPtr,))
+precompile(_pyjlwrap_repr, (PyPtr,))
+precompile(_pyjlwrap_hash, (PyPtr,))
+precompile(_pyjlwrap_hash32, (PyPtr,))
 
 # TODO: precompilation of the io.jl functions
 

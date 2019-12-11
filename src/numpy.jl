@@ -186,13 +186,13 @@ function NpyArray(a::StridedArray{T}, revdims::Bool) where T<:PYARR_TYPES
     return PyObject(p, a)
 end
 
-function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
+#=function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
     try
         return NpyArray(a, false)
     catch
         return array2py(a) # fallback to non-NumPy version
     end
-end
+end=#
 
 function PyReverseDims(a::StridedArray{T,N}) where {T<:PYARR_TYPES,N}
     try
@@ -221,7 +221,7 @@ PyReverseDims(a::AbstractArray)
 #########################################################################
 
 # transposed arrays can be passed to NumPy without copying
-PyObject(a::Union{LinearAlgebra.Adjoint{<:Real},LinearAlgebra.Transpose}) =
-    PyReverseDims(a.parent)
+#=PyObject(a::Union{LinearAlgebra.Adjoint{<:Real},LinearAlgebra.Transpose}) =
+    PyReverseDims(a.parent)=#
 
-PyObject(a::LinearAlgebra.Adjoint) = PyObject(Matrix(a)) # non-real arrays require a copy
+#=PyObject(a::LinearAlgebra.Adjoint) = PyObject(Matrix(a))=# # non-real arrays require a copy

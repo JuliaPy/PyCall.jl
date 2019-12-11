@@ -108,7 +108,7 @@ convert(::Type{Symbol}, po::PyObject) = Symbol(convert(AbstractString, po))
 #########################################################################
 # ByteArray conversions
 
-function PyObject(a::DenseVector{UInt8})
+#=function PyObject(a::DenseVector{UInt8})
   if stride(a,1) != 1
     try
         return NpyArray(a, true)
@@ -118,7 +118,8 @@ function PyObject(a::DenseVector{UInt8})
   end
   PyObject(@pycheckn ccall((@pysym :PyByteArray_FromStringAndSize),
                            PyPtr, (Ptr{UInt8}, Int), a, length(a)))
-end
+end=#
+
 
 ispybytearray(po::PyObject) =
   pyisinstance(po, @pyglobalobj :PyByteArray_Type)
@@ -134,7 +135,7 @@ end
 #########################################################################
 # Pointer conversions, using ctypes or PyCapsule
 
-PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))
+#=PyObject(p::Ptr) = pycall(c_void_p_Type, PyObject, UInt(p))=#
 
 function convert(::Type{Ptr{Cvoid}}, po::PyObject)
     if pyisinstance(po, c_void_p_Type)
@@ -327,9 +328,9 @@ end
 
 array2py(A::AbstractArray) = array2py(A, 1, first(CartesianIndices(A)))
 
-PyObject(A::AbstractArray) =
+#=PyObject(A::AbstractArray) =
    ndims(A) <= 1 || hasmethod(stride, Tuple{typeof(A),Int}) ? array2py(A) :
-   pyjlwrap_new(A)
+   pyjlwrap_new(A)=#
 
 function py2array(T, A::Array{TA,N}, o::PyObject,
                   dim::Integer, i::Integer) where {TA,N}
@@ -418,7 +419,7 @@ convert(::Type{Vector{T}}, o::PyObject) where T = py2vector(T, o)
 convert(::Type{Array}, o::PyObject) = map(identity, py2array(PyAny, o))
 convert(::Type{Array{T}}, o::PyObject) where {T} = py2array(T, o)
 
-PyObject(a::BitArray) = PyObject(Array(a))
+#=PyObject(a::BitArray) = PyObject(Array(a))=#
 
 # NumPy conversions (multidimensional arrays)
 include("numpy.jl")
@@ -579,14 +580,14 @@ end
 #########################################################################
 # Dictionary conversions (copies)
 
-function PyObject(d::AbstractDict)
+#=function PyObject(d::AbstractDict)
     o = PyObject(@pycheckn ccall((@pysym :PyDict_New), PyPtr, ()))
     for k in keys(d)
         @pycheckz ccall((@pysym :PyDict_SetItem), Cint, (PyPtr,PyPtr,PyPtr),
                          o, PyObject(k), PyObject(d[k]))
     end
     return o
-end
+end=#
 
 function convert(::Type{Dict{K,V}}, o::PyObject) where {K,V}
     copy(PyDict{K,V}(o))
@@ -751,17 +752,17 @@ function pysequence_query(o::PyObject)
         return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
-    elseif ispybytearray(o)
-        return Vector{UInt8}
-    elseif !isbuftype(o)
-        # only handle PyList for now
-        return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
-    else
-        T, native_byteorder = array_format(o)
-        if T == PyPtr
-            T = PyObject
-        end
-        return Array{T}
+    # elseif ispybytearray(o)
+    #     return Vector{UInt8}
+    # elseif !isbuftype(o)
+    #     # only handle PyList for now
+    #     return pyisinstance(o, @pyglobalobj :PyList_Type) ? Array : Union{}
+    # else
+    #     T, native_byteorder = array_format(o)
+    #     if T == PyPtr
+    #         T = PyObject
+    #     end
+    #     return Array{T}
     end
 end
 
@@ -805,10 +806,10 @@ function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     @return_not_None pyfloat_query(o)
     @return_not_None pycomplex_query(o)
     @return_not_None pystring_query(o)
-    @return_not_None pyfunction_query(o)
+    # @return_not_None pyfunction_query(o)
     @return_not_None pydate_query(o)
-    @return_not_None pydict_query(o)
-    @return_not_None pyptr_query(o)
+    # @return_not_None pydict_query(o)
+    # @return_not_None pyptr_query(o)
     @return_not_None pysequence_query(o)
     @return_not_None pynothing_query(o)
     @return_not_None pymp_query(o)
@@ -835,3 +836,14 @@ function convert(::Type{PyAny}, o::PyObject)
         o
     end
 end
+
+convert(U::Union, o::PyObject) =
+    try
+        convert(U.a, o)
+    catch
+        try
+            convert(U.b, o)
+        catch
+            throw(MethodError(convert, (U,o)))
+        end
+    end

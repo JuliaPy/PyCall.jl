@@ -4,32 +4,12 @@
 #     (thanks to @jakebolewski for his work on this)
 
 #############################################################################
-# mirror of Py_buffer struct in Python Include/object.h
-
-struct Py_buffer
-    buf::Ptr{Cvoid}
-    obj::PyPtr
-    len::Cssize_t
-    itemsize::Cssize_t
-
-    readonly::Cint
-    ndim::Cint
-    format::Ptr{Cchar}
-    shape::Ptr{Cssize_t}
-    strides::Ptr{Cssize_t}
-    suboffsets::Ptr{Cssize_t}
-
-    # some opaque padding fields to account for differences between
-    # Python versions (the structure changed in Python 2.7 and 3.3)
-    internal0::Ptr{Cvoid}
-    internal1::Ptr{Cvoid}
-    internal2::Ptr{Cvoid}
-end
+# mirror of CPy_buffer struct in Python Include/object.h
 
 mutable struct PyBuffer
-    buf::Py_buffer
+    buf::CPy_buffer
     PyBuffer() = begin
-        b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
+        b = new(CPy_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
         finalizer(pydecref, b)
