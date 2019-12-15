@@ -3,8 +3,15 @@ import Serialization: serialize, deserialize
 import Serialization: serialize_type
 
 const _pickle = PyNULL()
+_pickle_libname = PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle"
 
-pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(PyCall.pyversion.major ≥ 3 ? "pickle" : "cPickle")) : _pickle
+pickle() = ispynull(_pickle) ? copy!(_pickle, pyimport(_pickle_libname)) : _pickle
+
+function setpicklelib(libname)
+    global _pickle_libname, _pickle
+    _pickle_libname = libname
+    copy!(_pickle, pyimport(_pickle_libname))
+end
 
 function serialize(s::AbstractSerializer, pyo::PyObject)
     serialize_type(s, PyObject)
