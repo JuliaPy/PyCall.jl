@@ -120,11 +120,11 @@ end
 
 ##########################################################################
 
-function PyObject(io::IO)
-    pyio_initialize()
-    # pyjlwrap_new is necessary to avoid PyIO(io) calling PyObject(::IO)
-    PyIO(pyjlwrap_new(io))
-end
+# function PyObject(io::IO)
+#     pyio_initialize()
+#     # pyjlwrap_new is necessary to avoid PyIO(io) calling PyObject(::IO)
+#     PyIO(pyjlwrap_new(io))
+# end
 
 """
     PyTextIO(io::IO)
