@@ -13,6 +13,13 @@ const PyPtr_NULL = PyPtr(C_NULL)
 
 const sizeof_CPyObject_HEAD = sizeof(Int) + sizeof(PyPtr)
 
+################################################################
+# complex
+
+struct CPy_complex
+	real :: Cdouble
+	imag :: Cdouble
+end
 
 ################################################################
 # buffer
@@ -328,3 +335,78 @@ struct CPyTypeObject
 end
 
 const CPyTypeObject_NULL = CPyTypeObject(0, C_NULL, 0, C_NULL, 0, 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, 0, C_NULL, C_NULL, C_NULL, C_NULL, 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, 0, 0, 0, 0, C_NULL, C_NULL)
+
+################################################################
+# datetime
+
+struct CPyDateTime_CAPI
+    # type objects:
+    DateType::PyPtr
+    DateTimeType::PyPtr
+    TimeType::PyPtr
+    DeltaType::PyPtr
+    TZInfoType::PyPtr
+
+    # singletons:
+    @static if pyversion >= v"3.7"
+        TimeZone_UTC::PyPtr
+    end
+
+    # function pointers:
+    Date_FromDate::Ptr{Cvoid}
+    DateTime_FromDateAndTime::Ptr{Cvoid}
+    Time_FromTime::Ptr{Cvoid}
+    Delta_FromDelta::Ptr{Cvoid}
+    @static if pyversion >= v"3.7"
+        TimeZone_FromTimeZone::Ptr{Cvoid}
+    end
+    DateTime_FromTimestamp::Ptr{Cvoid}
+    Date_FromTimestamp::Ptr{Cvoid}
+end
+
+struct CPyDateTime_Delta
+    # PyObject_HEAD (for non-Py_TRACE_REFS build):
+    ob_refcnt::Int
+    ob_type::PyPtr
+    hashcode::Py_hash_t
+    days::Cint
+    seconds::Cint
+    microseconds::Cint
+end
+
+struct CPyDateTime_Date
+	ob_refcnt::Int
+	ob_type::PyPtr
+	hashcode::Py_hash_t
+	hastzinfo::Cchar
+	data::NTuple{4,Cuchar}
+end
+
+struct CPyDateTime_Time
+	ob_refcnt::Int
+	ob_type::PyPtr
+	hashcode::Py_hash_t
+	hastzinfo::Cchar
+	data::NTuple{6,Cuchar}
+	fold::Cuchar
+	tzinfo::PyPtr
+end
+
+struct CPyDateTime_BaseDateTime
+	ob_refcnt::Int
+	ob_type::PyPtr
+	hashcode::Py_hash_t
+	hastzinfo::Cchar
+	data::NTuple{10,Cuchar}
+end
+
+struct CPyDateTime_DateTime
+	ob_refcnt::Int
+	ob_type::PyPtr
+	hashcode::Py_hash_t
+	hastzinfo::Cchar
+	data::NTuple{10,Cuchar}
+	fold::Cuchar
+	tzinfo::PyPtr
+end
+
