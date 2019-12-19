@@ -79,21 +79,6 @@ iscontiguous(b::PyBuffer) =
     1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
                (Ref{PyBuffer}, Cchar), b, 'A')
 
-#############################################################################
-# pybuffer constant values from Include/object.h
-const PyBUF_SIMPLE    = convert(Cint, 0)
-const PyBUF_WRITABLE  = convert(Cint, 0x0001)
-const PyBUF_FORMAT    = convert(Cint, 0x0004)
-const PyBUF_ND        = convert(Cint, 0x0008)
-const PyBUF_STRIDES        = convert(Cint, 0x0010) | PyBUF_ND
-const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
-const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
-const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
-const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
-const PyBUF_ND_STRIDED    = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND |
-                                 PyBUF_STRIDES)
-const PyBUF_ND_CONTIGUOUS = PyBUF_ND_STRIDED | PyBUF_ANY_CONTIGUOUS
-
 # construct a PyBuffer from a PyObject, if possible
 function PyBuffer(o::Union{PyObject,PyPtr}, flags=PyBUF_SIMPLE)
     return PyBuffer!(PyBuffer(), o, flags)

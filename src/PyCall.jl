@@ -44,6 +44,7 @@ const _current_python = Ref(pyprogramname)
 include("libpython/types.jl")
 include("libpython/functions.jl")
 include("libpython/globals.jl")
+include("libpython/extensions.jl")
 
 #########################################################################
 # Wrapper around Python's C PyObject* type, with hooks to Python reference
@@ -148,27 +149,21 @@ macro pyreturn(x)
     :(return pyreturn($(esc(x))))
 end
 
-macro pyreturn_NULL()
-    :(return PyPtr_NULL)
-end
-
-pyreturn_NotImplemented() = pyincref_(Py_NotImplemented[])
-
-macro pyreturn_NotImplemented()
-    :(return pyreturn_NotImplemented())
-end
-
 function Base.copy!(dest::PyObject, src::PyObject)
     pydecref(dest)
     setfield!(dest, :o, PyPtr(pyincref(src)))
     return dest
 end
 
-pyisinstance(o::PyObject, t::PyObject) =
-  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+pyissubclass(o, t) = GC.@preserve o t pyissubclass(PyPtr(o), PyPtr(t))
 
-pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
-  t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+pyissubclass(o::PyPtr, t::PyPtr) =
+    o != C_NULL && t != C_NULL && CPyObject_IsSubclass(o, t)==1
+
+pyisinstance(o, t) = GC.@preserve o t pyisinstance(PyPtr(o), PyPtr(t))
+
+pyisinstance(o::PyPtr, t::PyPtr) =
+    o != C_NULL && t != C_NULL && CPyObject_IsInstance(o, t)==1
 
 pyquery(q::Ptr{Cvoid}, o::PyObject) =
   ccall(q, Cint, (PyPtr,), o) == 1
@@ -191,15 +186,19 @@ pytypeof(o::PyObject) = ispynull(o) ? throw(ArgumentError("NULL PyObjects have n
 #########################################################################
 
 const TypeTuple = Union{Type,NTuple{N, Type}} where {N}
+include("conversions.jl")
 include("pybuffer.jl")
 include("pyarray.jl")
-include("conversions.jl")
+include("pydict.jl")
+include("pyvector.jl")
 # include("pytype.jl")
 include("jlwrap.jl")
 include("pyiterator.jl")
 include("pyclass.jl")
 include("callback.jl")
 include("io.jl")
+include("numpy.jl")
+include("pydates.jl")
 
 #########################################################################
 
@@ -217,18 +216,22 @@ PyObject(o::PyPtr, keep::Any) = pyembed(PyObject(o), keep)
 
 Return a string representation of `o` corresponding to `str(o)` in Python.
 """
-pystr(o::PyObject) = convert(AbstractString,
-                             PyObject(@pycheckn ccall((@pysym :PyObject_Str), PyPtr,
-                                                      (PyPtr,), o)))
+function pystr(o::PyObject)
+      r = CPyObject_Str(String, o)
+      r===nothing && _handle_error("pystr")
+      r
+end
 
 """
     pyrepr(o::PyObject)
 
 Return a string representation of `o` corresponding to `repr(o)` in Python.
 """
-pyrepr(o::PyObject) = convert(AbstractString,
-                              PyObject(@pycheckn ccall((@pysym :PyObject_Repr), PyPtr,
-                                                       (PyPtr,), o)))
+function pyrepr(o::PyObject)
+      r = CPyObject_Repr(String, o)
+      r===nothing && _handle_error("pyrepr")
+      r
+end
 
 """
     pystring(o::PyObject)
@@ -241,16 +244,13 @@ function pystring(o::PyObject)
     if ispynull(o)
         return "NULL"
     else
-        s = ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
-        if (s == C_NULL)
-            pyerr_clear()
-            s = ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
-            if (s == C_NULL)
-                pyerr_clear()
-                return string(PyPtr(o))
-            end
-        end
-        return convert(AbstractString, PyObject(s))
+        r = CPyObject_Repr(String, o)
+        r===nothing || (return r)
+        CPyErr_Clear()
+        r = CPyObject_Str(String, o)
+        r===nothing || (return r)
+        CPyErr_Clear()
+        return convert(String, string(PyPtr(o)))
     end
 end
 
@@ -280,7 +280,7 @@ function hash(o::PyObject)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(o))
+        hashsalt(unsafe_pyjlwrap_load_value(o))
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
@@ -310,7 +310,8 @@ end
 
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, String(s)))
 
-propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(x->Symbol(first(x)), pycall(inspect."getmembers", PyObject, o))
+propertynames(o::PyObject) =
+    ispynull(o) ? Symbol[] : map(Symbol∘pystr∘first∘PyIterator{PyObject}, PyIterator{PyObject}(pycall(inspect."getmembers", PyObject, o)))
 
 # avoiding method ambiguity
 setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)

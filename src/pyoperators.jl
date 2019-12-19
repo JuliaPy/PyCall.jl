@@ -59,7 +59,7 @@ for (op,py) in ((:<, Py_LT), (:<=, Py_LE), (:(==), Py_EQ), (:!=, Py_NE),
         if ispynull(o1) || ispynull(o2)
             return $(py==Py_EQ || py==Py_NE || op==:isless ? :($op(PyPtr(o1), PyPtr(o2))) : false)
         # elseif is_pyjlwrap(o1) && is_pyjlwrap(o2)
-        #     return $op(unsafe_pyjlwrap_to_objref(o1), unsafe_pyjlwrap_to_objref(o2))
+        #     return $op(unsafe_pyjlwrap_load_value(o1), unsafe_pyjlwrap_load_value(o2))
         else
             if $(op == :isless || op == :isequal)
                 return Bool(@pycheckz ccall((@pysym :PyObject_RichCompareBool), Cint,

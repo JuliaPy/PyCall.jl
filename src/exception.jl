@@ -63,10 +63,20 @@ end
 # Conversion of Python exceptions into Julia exceptions
 
 # whether a Python exception has occurred
-pyerr_occurred() = ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
+"""
+    pyerr_occurred([t])
+
+True if a Python exception has occurred and (optionally) is of type `t`.
+"""
+pyerr_occurred() = CPyErr_Occurred() != C_NULL
+
+function pyerr_occurred(t)
+    e = CPyErr_Occurred()
+    e == C_NULL ? false : pyissubclass(e, t)
+end
 
 # call to discard Python exceptions
-pyerr_clear() = ccall((@pysym :PyErr_Clear), Cvoid, ())
+pyerr_clear() = CPyErr_Clear()
 
 function pyerr_check(msg::AbstractString, val::Any)
     pyerr_occurred() && throw(PyError(msg))

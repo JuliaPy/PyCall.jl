@@ -46,6 +46,19 @@ end
 
 const CPy_buffer_NULL = CPy_buffer(C_NULL, C_NULL, 0, 0, 0, 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL)
 
+const PyBUF_SIMPLE    = convert(Cint, 0)
+const PyBUF_WRITABLE  = convert(Cint, 0x0001)
+const PyBUF_FORMAT    = convert(Cint, 0x0004)
+const PyBUF_ND        = convert(Cint, 0x0008)
+const PyBUF_STRIDES        = convert(Cint, 0x0010) | PyBUF_ND
+const PyBUF_C_CONTIGUOUS   = convert(Cint, 0x0020) | PyBUF_STRIDES
+const PyBUF_F_CONTIGUOUS   = convert(Cint, 0x0040) | PyBUF_STRIDES
+const PyBUF_ANY_CONTIGUOUS = convert(Cint, 0x0080) | PyBUF_STRIDES
+const PyBUF_INDIRECT       = convert(Cint, 0x0100) | PyBUF_STRIDES
+const PyBUF_ND_STRIDED    = Cint(PyBUF_WRITABLE | PyBUF_FORMAT | PyBUF_ND |
+                                 PyBUF_STRIDES)
+const PyBUF_ND_CONTIGUOUS = PyBUF_ND_STRIDED | PyBUF_ANY_CONTIGUOUS
+
 ################################################################
 # mirror of Python API types and constants from methodobject.h
 

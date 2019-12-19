@@ -9,6 +9,7 @@ CPYTHON_OBJECTS = [
 	:PyList_Type,       # builtin 'list'
 	:PyBool_Type,       # bulitin 'bool'
 	:PyFloat_Type,      # builtin 'float'
+	:PyComplex_Type,    # builtin 'complex'
 	:PyDict_Type,       # builtin 'dict'
 	:PySlice_Type,      # builtin 'slice'
 	:PyRange_Type,      # builtin 'range' ('xrange' in python 2)
@@ -65,11 +66,13 @@ end
 @eval function capi_init()
 	$([begin
 	    cname, jname = name isa Pair ? name : name=>name
+	    jname = Symbol(:C, jname)
 	    cnamesym = QuoteNode(cname)
 	    :($jname[] = @pyglobalobj($cnamesym))
 	end for name in CPYTHON_OBJECTS]...)
 	$([begin
 	    cname, jname = name isa Pair ? name : name=>name
+	    jname = Symbol(:C, jname)
 	    cnamesym = QuoteNode(cname)
 	    :($jname[] = @pyglobalobjptr($cnamesym))
 	end for name in CPYTHON_OBJECT_POINTERS]...)
