@@ -5,6 +5,9 @@ CPYTHON_FUNCTIONS = [
 	(:Py_InitializeEx, Cvoid, (Cint,)),
 	(:Py_SetPythonHome, Cvoid, (Cwstring,)),
 	(:Py_SetProgramName, Cvoid, (Cwstring,)),
+	(:Py_GetVersion, Cstring, ()),
+	(:Py_AtExit, Cint, (Ptr{Cvoid},)),
+	(:Py_Finalize, Cvoid, ()),
 	# refcount
 	(:Py_DecRef, Cvoid, (PyPtr,)),
 	(:Py_IncRef, Cvoid, (PyPtr,)),
@@ -19,6 +22,8 @@ CPYTHON_FUNCTIONS = [
 	(:PyImport_Import, PyPtr, (PyPtr,)),
 	# types
 	(:PyType_Ready, Cint, (Ptr{CPyTypeObject},)),
+	# sys
+	(:PySys_SetArgvEx, Cvoid, (Cint, Ptr{Ptr{Cvoid}}, Cint)),
 	# object
 	(:_PyObject_New=>:PyObject_New, PyPtr, (Ptr{CPyTypeObject},)),
 	(:PyObject_RichCompare, PyPtr, (PyPtr,PyPtr,Cint)),
@@ -128,21 +133,26 @@ CPYTHON_FUNCTIONS = [
 	(:PyFloat_FromString, PyPtr, (PyPtr,)),
 	(:PyFloat_FromDouble, PyPtr, (Cdouble,)),
 	(:PyFloat_AsDouble, Cdouble, (PyPtr,)),
+	# complex
+	(:PyComplex_FromCComplex, PyPtr, (CPy_complex,)),
+	(:PyComplex_FromDoubles, PyPtr, (Cdouble, Cdouble)),
+	(:PyComplex_AsCComplex, CPy_complex, (PyPtr,)),
 	# bytes
-	(:PyBytes_AsStringAndSize, Cint, (PyPtr, Ptr{Ptr{Cchar}}, Ptr{Cssize_t})),
+	(:PyBytes_FromStringAndSize, PyPtr, (Ptr{Cchar}, Cssize_t)),
+	(:PyBytes_AsStringAndSize, Cint, (PyPtr, Ptr{Ptr{UInt8}}, Ptr{Cssize_t})),
 	# str
 	(:PyUnicode_AsUTF8String, PyPtr, (PyPtr,)),
 	(:PyUnicode_DecodeUTF8, PyPtr, (Ptr{UInt8}, Cssize_t, Ptr{UInt8})),
 	# list
 	(:PyList_New, PyPtr, (Cssize_t,)),
-	(:PyList_SetItem, Cint, (PyPtr, Cssize_t, PyPtr)),
+	(:PyList_SetItem, Cint, (PyPtr, Cssize_t, PyPtr)), # steals
 	(:PyList_Insert, Cint, (PyPtr, Cssize_t, PyPtr)),
 	(:PyList_Append, Cint, (PyPtr, PyPtr)),
 	(:PyList_Reverse, Cint, (PyPtr,)),
 	# tuple
 	(:PyTuple_New, PyPtr, (Cssize_t,)),
 	(:PyTuple_Size, Cssize_t, (PyPtr,)),
-	(:PyTuple_SetItem, Cint, (PyPtr, Cssize_t, PyPtr)),
+	(:PyTuple_SetItem, Cint, (PyPtr, Cssize_t, PyPtr)), # steals
 	(:PyTuple_GetItem, PyPtr, (PyPtr, Cssize_t)),
 	# dict
 	(:PyDict_New, PyPtr, ()),
