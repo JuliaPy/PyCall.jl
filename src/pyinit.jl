@@ -181,6 +181,10 @@ function __init__()
             else
                 pyhome = pythonhome_of(current_python())
             end
+        elseif conda && Sys.iswindows()
+            # some Python modules on Windows need the PATH to include
+            # Anaconda's Library\bin directory in order to find their DLL files
+            ENV["PATH"] = Conda.bin_dir(Conda.ROOTENV) * ";" * get(ENV, "PATH", "")
         end
 
         Py_SetPythonHome(libpy_handle, pyversion, pyhome)
