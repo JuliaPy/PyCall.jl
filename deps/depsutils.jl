@@ -17,8 +17,8 @@ end
 
 # Static buffer to make sure the string passed to libpython persists
 # for the lifetime of the program, as CPython API requires:
-const __buf_programname = Vector{UInt8}(undef, 1024)
-const __buf_pythonhome = Vector{UInt8}(undef, 1024)
+const __buf_programname = UInt8[]
+const __buf_pythonhome = UInt8[]
 
 # Need to set PythonHome before calling GetVersion to avoid warning (#299).
 # Unfortunately, this poses something of a chicken-and-egg problem because
@@ -58,14 +58,14 @@ protected from GC.
 """
 function _preserveas!(dest::Vector{UInt8}, ::Type{Cstring}, x::AbstractString)
     s = transcode(UInt8, String(x))
-    copyto!(dest, s)
+    copyto!(resize!(dest, length(s) + 1), s)
     dest[length(s) + 1] = 0
     return pointer(dest)
 end
 
 function _preserveas!(dest::Vector{UInt8}, ::Type{Cwstring}, x::AbstractString)
-    s = Base.cconvert(Cwstring, x)
-    copyto!(dest, reinterpret(UInt8, s))
+    s = reinterpret(UInt8, Base.cconvert(Cwstring, x))
+    copyto!(resize!(dest, length(s)), s)
     return pointer(dest)
 end
 
