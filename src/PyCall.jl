@@ -884,7 +884,7 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
             if !ispynull(o) && hasproperty(o, $method)
-                r = pycall(o[$method], PyObject)
+                r = pycall(o.$method, PyObject)
                 !(r ≛ pynothing[]) && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
