@@ -182,8 +182,9 @@ def candidate_names(suffix=SHLIB_SUFFIX):
     sysdata = dict(
         v=sys.version_info,
         # VERSION is X.Y in Linux/macOS and XY in Windows:
-        VERSION=(sysconfig.get_config_var("VERSION") or
-                 "{v.major}.{v.minor}".format(v=sys.version_info)),
+        VERSION=(sysconfig.get_python_version() or
+                 "{v.major}.{v.minor}".format(v=sys.version_info) or
+                 sysconfig.get_config_var("VERSION")),
         ABIFLAGS=(sysconfig.get_config_var("ABIFLAGS") or
                   sysconfig.get_config_var("abiflags") or ""),
     )
