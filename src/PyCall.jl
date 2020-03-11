@@ -305,7 +305,7 @@ end
 
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, String(s)))
 
-propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(x->Symbol(first(x)), pycall(inspect."getmembers", PyObject, o))
+propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(x->Symbol(first(x)), PyIterator{PyObject}(pycall(inspect."getmembers", PyObject, o)))
 
 # avoiding method ambiguity
 setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
