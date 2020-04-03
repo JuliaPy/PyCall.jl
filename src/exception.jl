@@ -13,14 +13,11 @@ struct PyError <: Exception
     # PyErr_Occurred returns non-NULL, and clears the Python error
     # indicator.
     function PyError(msg::AbstractString)
-        exc = Array{PyPtr}(undef, 3)
-        pexc = convert(UInt, pointer(exc))
+        ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-        ccall((@pysym :PyErr_Fetch), Cvoid, (UInt,UInt,UInt),
-              pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
-        ccall((@pysym :PyErr_NormalizeException), Cvoid, (UInt,UInt,UInt),
-              pexc, pexc + sizeof(PyPtr), pexc + 2*sizeof(PyPtr))
-        new(msg, PyObject(exc[1]), PyObject(exc[2]), PyObject(exc[3]))
+        ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+        ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+        new(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
     end
 
     PyError(msg::AbstractString, e::PyError) = new(msg, e.T, e.val, e.traceback)
