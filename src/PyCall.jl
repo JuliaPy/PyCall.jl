@@ -495,7 +495,7 @@ function pyimport(name::AbstractString)
             if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
-The Python package $name could not be found by pyimport. Usually this means
+The Python package $name could not be imported by pyimport. Usually this means
 that you did not install $name in the Python version being used by PyCall.
 
 """
