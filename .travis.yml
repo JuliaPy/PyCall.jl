@@ -57,6 +57,7 @@ matrix:
       script:
         - julia --color=yes -e 'using Pkg; pkg"add PackageCompiler@1"'
         - julia --color=yes aot/compile.jl
+        - aot/assert_has_pycall.jl
         - aot/runtests.sh
       after_success: skip
     - {<<: *test-aot, name: "AOT (Julia: nightly)", julia: nightly}

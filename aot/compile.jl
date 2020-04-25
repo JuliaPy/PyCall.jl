@@ -15,6 +15,7 @@ Pkg.activate()
 
 sysimage_path = joinpath(@__DIR__, "sys.$(Libdl.dlext)")
 create_sysimage(
+    [:PyCall],
     sysimage_path = sysimage_path,
     project = @__DIR__(),
     precompile_execution_file = joinpath(@__DIR__, "precompile.jl"),
