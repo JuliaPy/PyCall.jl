@@ -49,13 +49,13 @@ matrix:
 # https://github.com/pytest-dev/pytest/pull/3893
 
     - &test-aot
-      name: "AOT (Julia: 1.0)"
+      name: "AOT (Julia: 1.4)"
       language: julia
       os: linux
       env: PYTHON=python3
-      julia: 1.0
+      julia: 1.4
       script:
-        - julia --color=yes -e 'using Pkg; Pkg.add("PackageCompiler")'
+        - julia --color=yes -e 'using Pkg; pkg"add PackageCompiler@1"'
         - julia --color=yes aot/compile.jl
         - aot/runtests.sh
       after_success: skip
