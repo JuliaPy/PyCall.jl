@@ -859,7 +859,7 @@ if pyversion >= v"3.3"
 else
     function empty!(o::PyObject)
         p = _getproperty(o, "clear")
-        if p != NULL # for dict, set, etc.
+        if p != C_NULL # for dict, set, etc.
             pydecref(pycall(PyObject(o)."clear", PyObject))
         else
             for i = length(o)-1:-1:0
