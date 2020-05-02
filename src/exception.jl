@@ -49,37 +49,6 @@ function show(io::IO, e::PyError)
     end
 end
 
-function pyerror(msg::AbstractString)
-        ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
-        # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-        ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-        ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-        pyerror(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
-end
-
-function pyerror(msg::AbstractString, e::PyError)
-    pyerror(msg, e.T, e.val, e.traceback)
-end
-
-function pyerror(msg::AbstractString, ptype::PyObject, pvalue::PyObject, ptraceback::PyObject)
-    pargs = _getproperty(pvalue, "args")
-
-    # If the value of the error is a PyJlError, it was generated in a pyjlwrap callback, and
-    # we forward it.
-    if pargs != C_NULL
-        args = PyObject(pargs)
-        if length(args) > 0
-            arg = PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), args, 0))
-            if is_pyjlwrap(arg)
-                jarg = unsafe_pyjlwrap_to_objref(arg)
-                jarg isa PyJlError && return jarg
-            end
-        end
-    end
-
-    return PyError(msg, ptype, pvalue, ptraceback)
-end
-
 #########################################################################
 # Conversion of Python exceptions into Julia exceptions
 
@@ -135,6 +104,37 @@ macro pycheckn(ex)
 end
 macro pycheckz(ex)
     :(@pycheckv $(esc(ex)) -1)
+end
+
+function pyerror(msg::AbstractString)
+    ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
+    # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
+    ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+    ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+    pyerror(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
+end
+
+function pyerror(msg::AbstractString, e::PyError)
+    pyerror(msg, e.T, e.val, e.traceback)
+end
+
+function pyerror(msg::AbstractString, ptype::PyObject, pvalue::PyObject, ptraceback::PyObject)
+    pargs = _getproperty(pvalue, "args")
+
+    # If the value of the error is a PyJlError, it was generated in a pyjlwrap callback, and
+    # we forward it.
+    if pargs != C_NULL
+        args = PyObject(pargs)
+        if length(args) > 0
+            arg = PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), args, 0))
+            if is_pyjlwrap(arg)
+                jarg = unsafe_pyjlwrap_to_objref(arg)
+                jarg isa PyJlError && return jarg
+            end
+        end
+    end
+
+    return PyError(msg, ptype, pvalue, ptraceback)
 end
 
 #########################################################################
