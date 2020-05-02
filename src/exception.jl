@@ -7,8 +7,8 @@ struct PyJlError <: Exception
 end
 
 function show(io::IO, e::PyJlError)
-    println(io, "An error occured in a Julia function called from Python:")
-    _showerror_string(io, e.err, e.trace)
+    print(io, "(in a Julia function called from Python)\nJULIA: ",
+          showerror_string(e.err, e.trace))
 end
 
 
