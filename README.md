@@ -4,8 +4,6 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
 [![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
 
-[![PyCall](http://pkg.julialang.org/badges/PyCall_0.7.svg)](http://pkg.julialang.org/?pkg=PyCall&ver=0.7)
-
 
 This package provides the ability to directly call and **fully
 interoperate with Python** from [the Julia
