@@ -295,11 +295,15 @@ end
 # with the former returning an raw PyObject and the latter giving the PyAny
 # conversion.
 
-function getproperty(o::PyObject, s::AbstractString)
+function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     if ispynull(o)
         throw(ArgumentError("ref of NULL PyObject"))
     end
-    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+    return ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+end
+
+function __getproperty(o::PyObject, s::Union{AbstractString,Symbol})
+    p = _getproperty(o, s)
     if p == C_NULL
         pyerr_clear()
         throw(KeyError(s))
@@ -307,7 +311,8 @@ function getproperty(o::PyObject, s::AbstractString)
     return PyObject(p)
 end
 
-getproperty(o::PyObject, s::Symbol) = convert(PyAny, getproperty(o, String(s)))
+getproperty(o::PyObject, s::AbstractString) = __getproperty(o, s)
+getproperty(o::PyObject, s::Symbol) = convert(PyAny, __getproperty(o, s))
 
 propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(x->Symbol(first(x)), PyIterator{PyObject}(pycall(inspect."getmembers", PyObject, o)))
 
@@ -856,8 +861,9 @@ if pyversion >= v"3.3"
     end
 else
     function empty!(o::PyObject)
-        if hasproperty(o, "clear") # for dict, set, etc.
-            pydecref(pycall(o."clear", PyObject))
+        p = _getproperty(o, "clear")
+        if p != NULL # for dict, set, etc.
+            pydecref(pycall(PyObject(o)."clear", PyObject))
         else
             for i = length(o)-1:-1:0
                 delete!(o, i)
