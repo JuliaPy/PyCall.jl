@@ -7,7 +7,7 @@ struct PyJlError{E<:Exception} <: Exception
 end
 
 function show(io::IO, e::PyJlError)
-    println(io, "An error occured in a Julia function called from Python")
+    println(io, "An error occured in a Julia function called from Python:")
     _showerror_string(io, e.err, e.trace)
 end
 
@@ -49,26 +49,35 @@ function show(io::IO, e::PyError)
     end
 end
 
-function pyerr_construct(msg::AbstractString)
+function pyerror(msg::AbstractString)
         ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
         # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
         ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
         ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-        pyerr_construct(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
+        pyerror(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
 end
 
-function pyerr_construct(msg::AbstractString, e::PyError)
-    pyerr_construct(msg, e.T, e.val, e.traceback)
+function pyerror(msg::AbstractString, e::PyError)
+    pyerror(msg, e.T, e.val, e.traceback)
 end
 
-function pyerr_construct(msg::AbstractString, ptype, pvalue, ptraceback)
-    args = pvalue.args
+function pyerror(msg::AbstractString, ptype::PyObject, pvalue::PyObject, ptraceback::PyObject)
+    pargs = _getproperty(pvalue, "args")
 
-    if !isempty(args) && first(args) isa PyJlError
-        return first(args)
-    else
-        return PyError(msg, ptype, pvalue, ptraceback)
+    # If the value of the error is a PyJlError, it was generated in a pyjlwrap callback, and
+    # we forward it.
+    if pargs != C_NULL
+        args = PyObject(pargs)
+        if length(args) > 0
+            arg = PyObject(@pycheckn ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), args, 0))
+            if is_pyjlwrap(arg)
+                jarg = unsafe_pyjlwrap_to_objref(arg)
+                jarg isa PyJlError && return jarg
+            end
+        end
     end
+
+    return PyError(msg, ptype, pvalue, ptraceback)
 end
 
 #########################################################################
@@ -81,7 +90,7 @@ pyerr_occurred() = ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
 pyerr_clear() = ccall((@pysym :PyErr_Clear), Cvoid, ())
 
 function pyerr_check(msg::AbstractString, val::Any)
-    pyerr_occurred() && throw(pyerr_construct(msg))
+    pyerr_occurred() && throw(pyerror(msg))
     val # the val argument is there just to pass through to the return value
 end
 
@@ -205,7 +214,6 @@ end
 function pyraise(e, bt = nothing)
     eT = typeof(e)
     pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
-
     err = PyJlError(e, bt)
     ccall((@pysym :PyErr_SetObject), Cvoid, (PyPtr, PyPtr),
           pyeT, PyObject(err))
