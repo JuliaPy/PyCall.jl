@@ -33,7 +33,7 @@ matrix:
         - brew update
         - brew upgrade python || echo "Ignoring errors..."
         - brew unlink python
-        - brew link python
+        - brew link --overwrite python
       env: PYTHON=python3
     - &test-macos-conda
       <<: *test-macos-py2
