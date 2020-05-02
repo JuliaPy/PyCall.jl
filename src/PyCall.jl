@@ -296,18 +296,15 @@ end
 # conversion.
 
 function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
-    if ispynull(o)
-        throw(ArgumentError("ref of NULL PyObject"))
-    end
-    return ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+    ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
+    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+    p == C_NULL && pyerr_clear()
+    return p
 end
 
 function __getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     p = _getproperty(o, s)
-    if p == C_NULL
-        pyerr_clear()
-        throw(KeyError(s))
-    end
+    p == C_NULL && throw(KeyError(s))
     return PyObject(p)
 end
 
@@ -862,7 +859,7 @@ if pyversion >= v"3.3"
 else
     function empty!(o::PyObject)
         p = _getproperty(o, "clear")
-        if p != PyNULL() # for dict, set, etc.
+        if p != NULL # for dict, set, etc.
             pydecref(pycall(PyObject(o)."clear", PyObject))
         else
             for i = length(o)-1:-1:0
