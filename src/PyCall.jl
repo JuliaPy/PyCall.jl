@@ -494,7 +494,7 @@ function pyimport(name::AbstractString)
     o = _pyimport(name)
     if ispynull(o)
         if pyerr_occurred()
-            e = PyError("PyImport_ImportModule")
+            e = pyerror("PyImport_ImportModule")
             if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
@@ -540,7 +540,7 @@ or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
                 end
-                e = PyError(string(e.msg, "\n\n", msg, "\n"), e)
+                e = pyerror(string(e.msg, "\n\n", msg, "\n"), e)
             end
             throw(e)
         else
@@ -862,7 +862,7 @@ if pyversion >= v"3.3"
 else
     function empty!(o::PyObject)
         p = _getproperty(o, "clear")
-        if p != NULL # for dict, set, etc.
+        if p != PyNULL() # for dict, set, etc.
             pydecref(pycall(PyObject(o)."clear", PyObject))
         else
             for i = length(o)-1:-1:0
