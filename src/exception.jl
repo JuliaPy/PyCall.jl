@@ -1,8 +1,8 @@
 #########################################################################
 # A wrapper around an error that happened in a Julia callback
 
-struct PyJlError{E<:Exception} <: Exception
-    err::E
+struct PyJlError <: Exception
+    err
     trace
 end
 
