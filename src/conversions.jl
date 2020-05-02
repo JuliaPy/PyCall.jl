@@ -214,7 +214,7 @@ isvatuple(T::DataType) = !isempty(T.parameters) && Base.isvarargtype(T.parameter
 
 function convert(tt::Type{T}, o::PyObject) where T<:Tuple
     isva = isvatuple(T)
-    len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    len = length(o)
     if !istuplen(tt, isva, len)
         throw(BoundsError())
     end
@@ -338,7 +338,7 @@ function py2array(T, A::Array{TA,N}, o::PyObject,
         A[i] = convert(T, o)
         return A
     elseif dim == N
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        len = length(o)
         if len != size(A, dim)
             error("dimension mismatch in py2array")
         end
@@ -349,7 +349,7 @@ function py2array(T, A::Array{TA,N}, o::PyObject,
         end
         return A
     else # dim < N: recursively extract list of lists into A
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        len = length(o)
         if len != size(A, dim)
             error("dimension mismatch in py2array")
         end
@@ -369,8 +369,7 @@ function pyarray_dims(o::PyObject, forcelist=true)
     if !(forcelist || pyisinstance(o, @pyglobalobj :PyList_Type))
         return () # too many non-List types can pretend to be sequences
     end
-    len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
-    len < 0 && error("not a PySequence object")
+    len = length(o)
     if len == 0
         return (0,)
     end
@@ -748,7 +747,7 @@ function pysequence_query(o::PyObject)
     # scipy define "fake" sequence types with intmax lengths and other
     # problems
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
-        len = @pycheckz ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+        len = length(o)
         return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
