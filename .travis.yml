@@ -61,7 +61,10 @@ matrix:
         - aot/runtests.sh
       after_success: skip
     - {<<: *test-aot, name: "AOT (Julia: nightly)", julia: nightly}
-
+    
+jobs:
+ allow_failures:
+    - julia: nightly
 after_success:
     - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 notifications:
