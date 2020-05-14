@@ -50,7 +50,6 @@ if !symbols_present
         if err isa ErrorException
             error(err.msg, ". Please run `Pkg.build(\"PyCall\")` if your Python build has changed")
         else
-            error("Please run `Pkg.build(\"PyCall\")` if your Python build has changed")
             rethrow(err)
         end
     end
