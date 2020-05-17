@@ -48,8 +48,8 @@ to the path of the `python` (or `python3` etc.) executable and then re-running `
 In Julia:
 
     ENV["PYTHON"] = "... path of the python executable ..."
-    # ENV["PYTHON"] = "C:\\Python37-x64\\python.exe" # example for Windows
-    # ENV["PYTHON"] = "/usr/bin/python3.7"           # example for *nix
+    # ENV["PYTHON"] = "C:\\Python38-x64\\python.exe" # example for Windows
+    # ENV["PYTHON"] = "/usr/bin/python3"             # example for *nix
     Pkg.build("PyCall")
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
@@ -144,10 +144,12 @@ which is automatically converted to a Julia type, you will have override this
 via `@pywith EXPR::PyObject ...`.
 
 If you are already familiar with Python, it perhaps is easier to use
-`py"..."` and `py"""..."""` which are equivalent to Python's
+`py"..."` and `py"""..."""` which are equivalent. But as show in example here
+equivalent to Python's
 [`eval`](https://docs.python.org/3/library/functions.html#eval) and
 [`exec`](https://docs.python.org/3/library/functions.html#exec),
-respectively:
+respectively, and note in the former case to not skip the newline, i.e.
+have """ on separate line:
 
 ```julia
 py"""
