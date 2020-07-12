@@ -800,6 +800,11 @@ native Julia type (defaulting to `default`) that we convert
 function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     # TODO: Use some kind of hashtable (e.g. based on PyObject_Type(o)).
     #       (A bit tricky to correctly handle Tuple and other containers.)
+    for (py,jl) in pytype_queries
+        if pyisinstance(o, py)
+            return jl
+        end
+    end
     @return_not_None pyint_query(o)
     pyisinstance(o, npy_bool) && return Bool
     @return_not_None pyfloat_query(o)
@@ -812,11 +817,6 @@ function pytype_query(o::PyObject, default::TypeTuple=PyObject)
     @return_not_None pysequence_query(o)
     @return_not_None pynothing_query(o)
     @return_not_None pymp_query(o)
-    for (py,jl) in pytype_queries
-        if pyisinstance(o, py)
-            return jl
-        end
-    end
     return default
 end
 
