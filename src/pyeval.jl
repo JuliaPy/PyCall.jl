@@ -188,7 +188,7 @@ If the input has multiple lines (contains a newline), then the Python
 code is compiled and evaluated in the `__main__` Python module
 and nothing is returned.
 
-If the `o` option is appended to the command, as in `py\\`...\\`o`, then the
+If the `o` option is appended to the command, as in ``` py`...`o ```, then the
 return value is an unconverted `PyObject`; otherwise, it is
 automatically converted to a native Julia type if possible.
 
