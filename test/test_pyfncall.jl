@@ -1,13 +1,13 @@
 using Test, PyCall
 
-py"""
+py```
 def mklist(*args, **kwargs):
     l = list(args)
     l.extend(kwargs.items())
     return l
-"""
+```
 @testset "pycall!" begin
-    pymklist = py"mklist"
+    pymklist = py`mklist`
     ret = PyNULL()
 
     function pycall_checks(res, pyf, RetType, args...; kwargs...)
