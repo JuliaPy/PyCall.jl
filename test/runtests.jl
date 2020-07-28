@@ -353,7 +353,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         ex
     end
     @test ex isa PyCall.PyError
-    @test occursin("could not be found by pyimport", ex.msg)
+    @test occursin("could not be imported by pyimport", ex.msg)
     # Make sure we are testing ModuleNotFoundError here:
     if PyCall.pyversion >= v"3.6"
         @test pyisinstance(ex.val, pybuiltin("ModuleNotFoundError"))
