@@ -52,6 +52,8 @@ In Julia:
 
     # ENV["PYTHON"] = "/usr/bin/python3.7"           # example for *nix
     Pkg.build("PyCall")
+    
+Julia needs to be re-launched for this change to take effect.
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
 `python` program changes significantly (e.g. you switch to a new
