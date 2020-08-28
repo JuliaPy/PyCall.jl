@@ -50,11 +50,11 @@ matrix:
 # https://github.com/pytest-dev/pytest/pull/3893
 
     - &test-aot
-      name: "AOT (Julia: 1.4)"
+      name: "AOT (Julia: 1.5)"
       language: julia
       os: linux
       env: PYTHON=python3
-      julia: 1.4
+      julia: 1.5
       script:
         - julia --color=yes -e 'using Pkg; pkg"add PackageCompiler@1"'
         - julia --color=yes aot/compile.jl
