@@ -170,6 +170,15 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # fixme: is there any nontrivial showable test we can do?
     @test !showable("text/html", PyObject(1))
+    @testset "showable on type (#816)" begin
+        py"""
+        class Issue816(object):
+            def _repr_html_(self):
+                return "<h1>Issue816</h1>"
+        """
+        @test showable("text/html", py"Issue816()")
+        @test !showable("text/html", py"Issue816")
+    end
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
     # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)

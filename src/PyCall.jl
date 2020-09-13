@@ -897,7 +897,10 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
             throw(MethodError(show, (io, mime, o)))
         end
         Base.showable(::$mime, o::PyObject) =
-            !ispynull(o) && hasproperty(o, $method) && let meth = o.$method
+            !ispynull(o) &&
+            !pyisinstance(o, @pyglobalobj :PyType_Type) &&  # issue 816
+            hasproperty(o, $method) &&
+            let meth = o.$method
                 !(meth ≛ pynothing[]) &&
                 !(pycall(meth, PyObject) ≛ pynothing[])
             end
