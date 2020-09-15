@@ -232,8 +232,10 @@ function __init__()
     # function (in particular, `self` won't be passed to it). The solution is:
     #    obj[:foo] = jlfun2pyfun(some_julia_function)
     # This is a bit of a kludge, obviously.
-    copy!(jlfun2pyfun,
-          pyeval_("""lambda f: lambda *args, **kwargs: f(*args, **kwargs)"""))
+    copy!(
+        jlfun2pyfun, 
+        pyeval_("lambda f: lambda *args, **kwargs: f(*args, **kwargs)", pynamespace(PyCall), pynamespace(PyCall))
+    )
 
     if !already_inited
         # some modules (e.g. IPython) expect sys.argv to be set
