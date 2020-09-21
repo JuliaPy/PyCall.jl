@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/JuliaPy/PyCall.jl.svg?branch=master)](https://travis-ci.org/JuliaPy/PyCall.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
+[![PkgEval](https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PyCall.named.svg)](https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PyCall.html)
 [![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
 
 
