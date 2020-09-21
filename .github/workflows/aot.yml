@@ -1,0 +1,49 @@
+name: AOT test
+
+on:
+  push:
+    branches:
+      - master
+    tags: '*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-aot:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        architecture: [x64]
+        python-version: ['3.8']
+        julia-version: ['1.5', 'nightly']
+      fail-fast: false
+    env:
+      PYTHON: python${{ matrix.python-version }}
+    name: Test AOT
+      Julia ${{ matrix.julia-version }}
+      Python ${{ matrix.python-version }}
+      ${{ matrix.os }} ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
+      - run: python --version
+      - name: Setup julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+          arch: ${{ matrix.architecture }}
+      - run: julia -e 'using Pkg; pkg"add PackageCompiler@1"'
+
+      # Workaround https://github.com/JuliaLang/julia/issues/37441.
+      # Once it's solved, we can remove the following line:
+      - run: julia -e 'using Pkg; pkg"dev PyCall"'
+
+      - run: aot/compile.jl
+      - run: aot/assert_has_pycall.jl
+      - run: aot/runtests.sh
