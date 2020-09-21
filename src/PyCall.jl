@@ -896,15 +896,96 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
             end
             throw(MethodError(show, (io, mime, o)))
         end
-        Base.showable(::$mime, o::PyObject) =
-            !ispynull(o) &&
-            !pyisinstance(o, @pyglobalobj :PyType_Type) &&  # issue 816
-            hasproperty(o, $method) &&
-            let meth = o.$method
-                !(meth ≛ pynothing[]) &&
-                !(pycall(meth, PyObject) ≛ pynothing[])
-            end
+        function Base.showable(::$mime, o::PyObject)
+            (ispynull(o) || !hasproperty(o, $method)) && return false
+            meth = o.$method
+            _pyapplicable(meth, 0) || return false
+            return !(pycall(meth, PyObject) ≛ pynothing[])
+        end
     end
+end
+
+"""
+    _pyapplicable(o::PyObject, nargs::Integer) :: Bool
+
+Check if Python object `o` is callable with `nargs` arguments.
+"""
+function _pyapplicable(o::PyObject, nargs::Integer)
+    ccall((@pysym :PyCallable_Check), Cint, (PyPtr,), o) == 1 || return false
+    ran = _posargs_range(o)
+    ran === nothing && return false
+    return nargs in ran
+end
+
+function _posargs_range_py3(o::PyObject)
+    # Using `inspect.signature` so that it can handle (some?) methods
+    # implemented in C such as `int.as_integer_ratio` vs
+    # `(1).as_integer_ratio`.
+    signature = try
+        pycall(inspect."signature", PyObject, o)
+    catch err
+        if err isa PyError && (
+            pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError) ||
+            pyisinstance(err.val, @pyglobalobjptr :PyExc_ValueError)
+        )
+            return nothing
+        end
+        throw()
+    end
+    POSITIONAL_ONLY = inspect."Parameter"."POSITIONAL_ONLY"
+    POSITIONAL_OR_KEYWORD = inspect."Parameter"."POSITIONAL_OR_KEYWORD"
+    VAR_POSITIONAL = inspect."Parameter"."VAR_POSITIONAL"
+    param_empty = inspect."Parameter"."empty"
+    params = pycall(signature."parameters"."values", PyObject)
+    amin = 0
+    amax = 0
+    has_varargs = false
+    for (i, x) in enumerate(PyIterator(params))
+        k = x."kind"
+        if k ≛ POSITIONAL_ONLY || k ≛ POSITIONAL_OR_KEYWORD
+            if x."default" ≛ param_empty
+                amin = amax = i
+            else
+                amax = i
+            end
+        elseif k ≛ VAR_POSITIONAL
+            has_varargs = true
+        end
+    end
+    amax = has_varargs ? typemax(Int) : amax
+    return amin:amax
+end
+
+function _posargs_range_py2(o::PyObject)
+    spec = try
+        pycall(inspect."getargspec", PyObject, o)
+    catch err
+        if err isa PyError && (
+            pyisinstance(err.val, @pyglobalobjptr :PyExc_TypeError) ||
+            pyisinstance(err.val, @pyglobalobjptr :PyExc_ValueError)
+        )
+            return nothing
+        end
+        throw()
+    end
+    args = get(spec, PyObject, 0, nothing)
+    varargs = get(spec, PyObject, 1, nothing)
+    defaults = get(spec, PyObject, 3, nothing)
+    (args === nothing || varargs === nothing || defaults === nothing) && return nothing
+    ndefaults = defaults ≛ pynothing[] ? 0 : length(defaults)
+    nargs = length(args)
+    if pycall(inspect."ismethod", Bool, o) && !pycall
+        nargs -= 1
+    end
+    amin = max(0, nargs - ndefaults)
+    amax = varargs ≛ pynothing[] ? nargs : typemax(Int)
+    return amin:amax
+end
+
+const _posargs_range = if pyversion < v"3.0.0"
+    _posargs_range_py2
+else
+    _posargs_range_py3
 end
 
 #########################################################################
