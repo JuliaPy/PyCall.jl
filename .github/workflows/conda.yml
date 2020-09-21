@@ -1,0 +1,47 @@
+name: Test with conda
+
+on:
+  push:
+    branches:
+      - master
+    tags: '*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-conda:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        architecture: [x64]
+        julia-version: ['1.5']
+        include:
+          - os: windows-latest
+            architecture: x86
+            julia-version: '1.5'
+      fail-fast: false
+    env:
+      PYTHON: ""
+    name: Test
+      Julia ${{ matrix.julia-version }}
+      Conda
+      ${{ matrix.os }} ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+          arch: ${{ matrix.architecture }}
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ./lcov.info
+          flags: unittests
+          name: codecov-umbrella
