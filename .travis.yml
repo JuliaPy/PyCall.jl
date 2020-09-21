@@ -60,7 +60,14 @@ matrix:
         - aot/assert_has_pycall.jl
         - aot/runtests.sh
       after_success: skip
-    - {<<: *test-aot, name: "AOT (Julia: nightly)", julia: nightly}
+    - <<: *test-aot
+      name: "AOT (Julia: nightly)"
+      julia: nightly
+      before_script:
+        # Workaround https://github.com/JuliaLang/julia/issues/37441.
+        # Once it's solved, we can remove the following line (and so
+        # entire `before_script`)
+        - julia --color=yes -e 'using Pkg; pkg"dev ."'
     
 jobs:
  allow_failures:
