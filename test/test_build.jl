@@ -7,6 +7,8 @@ using Test
 
 @testset "find_libpython" begin
     for python in ["python", "python2", "python3"]
+        # TODO: In Windows, word size should also be checked.
+        Sys.iswindows() && break
         if Sys.which(python) === nothing
             @info "$python not available; skipping test"
         else
