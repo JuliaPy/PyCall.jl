@@ -38,7 +38,10 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
-      - run: julia -e 'using Pkg; pkg"add PackageCompiler@1"'
+
+      # Revert to `@v1` after this PR is merged:
+      # https://github.com/JuliaLang/PackageCompiler.jl/pull/443
+      - run: julia -e 'using Pkg; pkg"add PackageCompiler#cb994c72e2087c57ffa4727ef93589e1b98d8a32"'
 
       # Workaround https://github.com/JuliaLang/julia/issues/37441.
       # Once it's solved, we can remove the following line:
