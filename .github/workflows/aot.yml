@@ -38,6 +38,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
+      - run: julia -e 'using InteractiveUtils; versioninfo()'
 
       # Revert to `@v1` after this PR is merged:
       # https://github.com/JuliaLang/PackageCompiler.jl/pull/443
