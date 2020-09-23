@@ -1,0 +1,68 @@
+name: Test with system Python
+
+on:
+  push:
+    branches:
+      - master
+    tags: '*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-system:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        architecture: [x64]
+        python-version: ['2.7', '3.8']
+        julia-version: ['1.0', '1.5', 'nightly']
+        include:
+          - os: windows-latest
+            architecture: x86
+            python-version: '3.8'
+            julia-version: '1.5'
+          - os: ubuntu-latest
+            architecture: x64
+            python-version: '3.7'
+            julia-version: '1.5'
+          - os: ubuntu-latest
+            architecture: x64
+            python-version: '3.8'
+            julia-version: '1.4'
+          - os: ubuntu-latest
+            architecture: x64
+            python-version: '3.8'
+            julia-version: '1.3'
+      fail-fast: false
+    name: Test
+      Julia ${{ matrix.julia-version }}
+      Python ${{ matrix.python-version }}
+      ${{ matrix.os }} ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
+      - name: Setup julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+          arch: ${{ matrix.architecture }}
+          show-versioninfo: true
+      - uses: julia-actions/julia-buildpkg@v1
+        env:
+          PYTHON: python
+      - run: julia test/check_deps_version.jl ${{ matrix.python-version }}
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ./lcov.info
+          flags: unittests
+          name: codecov-umbrella
