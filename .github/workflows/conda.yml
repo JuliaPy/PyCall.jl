@@ -37,7 +37,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
-      - run: julia -e 'using InteractiveUtils; versioninfo()'
+          show-versioninfo: true
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
