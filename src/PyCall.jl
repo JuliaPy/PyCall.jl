@@ -915,9 +915,15 @@ end
 
 This is a port of `IPython.utils.dir2.get_real_method`:
 https://github.com/ipython/ipython/blob/7.9.0/IPython/utils/dir2.py
+
+For Python 2-era
+https://github.com/ipython/ipython/blob/5.9.0/IPython/utils/dir2.py
 """
 function get_real_method(obj, name)
     ispynull(obj) && return nothing
+    @static if pyversion_build < v"3"
+        pyisinstance(obj, @pyglobalobj :PyType_Type) && return nothing
+    end
 
     canary = try
         trygetproperty(obj, "_ipython_canary_method_should_not_exist_", nothing)
