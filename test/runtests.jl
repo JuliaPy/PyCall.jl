@@ -2,6 +2,12 @@ using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
 
+@testset "CI setup" begin
+    if lowercase(get(ENV, "CI", "false")) == "true"
+        @test !ispynull(pyimport_e("numpy"))
+    end
+end
+
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
 
