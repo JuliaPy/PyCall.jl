@@ -311,6 +311,11 @@ end
 getproperty(o::PyObject, s::AbstractString) = __getproperty(o, s)
 getproperty(o::PyObject, s::Symbol) = convert(PyAny, __getproperty(o, s))
 
+function trygetproperty(o::PyObject, s::AbstractString, d)
+    p = _getproperty(o, s)
+    return p == C_NULL ? d : PyObject(p)
+end
+
 propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(x->Symbol(first(x)), PyIterator{PyObject}(pycall(inspect."getmembers", PyObject, o)))
 
 # avoiding method ambiguity
@@ -890,21 +895,56 @@ for (mime, method) in ((MIME"text/html", "_repr_html_"),
     T = istextmime(mime()) ? AbstractString : Vector{UInt8}
     @eval begin
         function show(io::IO, mime::$mime, o::PyObject)
-            if !ispynull(o) && hasproperty(o, $method)
-                r = pycall(o.$method, PyObject)
+            m = get_real_method(o, $method)
+            if m !== nothing
+                r = pycall(m, PyObject)
                 !(r ≛ pynothing[]) && return write(io, convert($T, r))
             end
             throw(MethodError(show, (io, mime, o)))
         end
-        Base.showable(::$mime, o::PyObject) =
-            !ispynull(o) &&
-            !pyisinstance(o, @pyglobalobj :PyType_Type) &&  # issue 816
-            hasproperty(o, $method) &&
-            let meth = o.$method
-                !(meth ≛ pynothing[]) &&
-                !(pycall(meth, PyObject) ≛ pynothing[])
-            end
+        function Base.showable(::$mime, o::PyObject)
+            m = get_real_method(o, $method)
+            m === nothing && return false
+            return !(pycall(m, PyObject) ≛ pynothing[])
+        end
     end
+end
+
+"""
+    get_real_method(obj::PyObject, name::String) -> method::Union{PyObject,Nothing}
+
+This is a port of `IPython.utils.dir2.get_real_method`:
+https://github.com/ipython/ipython/blob/7.9.0/IPython/utils/dir2.py
+"""
+function get_real_method(obj, name)
+    ispynull(obj) && return nothing
+
+    canary = try
+        trygetproperty(obj, "_ipython_canary_method_should_not_exist_", nothing)
+    catch
+        nothing
+    end
+
+    # It claimed to have an attribute it should never have
+    canary === nothing || return nothing
+
+    m = try
+        trygetproperty(obj, name, nothing)
+    catch
+        nothing
+    end
+    m === nothing && return nothing
+
+    if (
+        pyisinstance(obj, @pyglobalobj :PyType_Type) &&
+        !pyisinstance(m, @pyglobalobj :PyMethod_Type)
+    )
+        return nothing
+    end
+
+    ccall((@pysym :PyCallable_Check), Cint, (PyPtr,), m) == 1 && return m
+
+    return nothing
 end
 
 #########################################################################
