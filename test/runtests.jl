@@ -175,9 +175,18 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         class Issue816(object):
             def _repr_html_(self):
                 return "<h1>Issue816</h1>"
+
+        class CallableAsSpecialRepr(object):
+            _repr_html_ = Issue816()._repr_html_
         """
         @test showable("text/html", py"Issue816()")
         @test !showable("text/html", py"Issue816")
+        @test showable("text/html", py"CallableAsSpecialRepr()")
+        if PyCall.pyversion_build < v"3"
+            @test_broken showable("text/html", py"CallableAsSpecialRepr")
+        else
+            @test showable("text/html", py"CallableAsSpecialRepr")
+        end
     end
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
