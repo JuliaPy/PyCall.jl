@@ -731,33 +731,6 @@ def try_call(f):
                        pybuiltin("Exception"))
 end
 
-@testset "_posargs_range" begin
-    funcs = if PyCall.pyversion_build >= v"3"
-        [PyCall._posargs_range_py3, PyCall._posargs_range_py2]
-        else
-        [PyCall._posargs_range_py2]
-    end
-    @testset "$_posargs_range" for _posargs_range in funcs
-        @test _posargs_range(py"None"o) === nothing
-        @test _posargs_range(py"lambda x: None"o) == 1:1
-        @test _posargs_range(py"lambda x, y: None"o) == 2:2
-        @test _posargs_range(py"lambda x, y=1: None"o) == 1:2
-        @test _posargs_range(py"lambda x, *_: None"o) == 1:typemax(Int)
-        @test_broken _posargs_range(py"int"o) == 0:2
-    end
-    if PyCall.pyversion_build >= v"3"
-        io = pyimport("io")
-        @testset "Python 3" begin
-            # `io.BytesIO.fileno` is an example of method implemented in C
-            @test PyCall._posargs_range_py3(io."BytesIO"."fileno") == 1:1
-            @test PyCall._posargs_range_py2(io."BytesIO"."fileno") == 1:1
-            @test PyCall._posargs_range_py3(io."BytesIO"()."fileno") == 0:0
-            @test_broken PyCall._posargs_range_py2(io."BytesIO"()."fileno") == 0:0
-            @test_broken PyCall._posargs_range_py2(io."BytesIO"()."fileno") != 1:1
-        end
-    end
-end
-
 @testset "PyIterator" begin
     arr = [1,2]
     o = PyObject(arr)
