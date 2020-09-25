@@ -10,6 +10,12 @@ PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
 @info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
 
+@testset "CI setup" begin
+    if lowercase(get(ENV, "CI", "false")) == "true"
+        @test !ispynull(pyimport_e("numpy"))
+    end
+end
+
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
 roundtripeq(T, x) = roundtrip(T, x) == x
