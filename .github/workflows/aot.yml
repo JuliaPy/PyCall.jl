@@ -33,6 +33,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
       - run: python --version
+      - run: python -m pip install --user numpy
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
         with:
