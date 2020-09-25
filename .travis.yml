@@ -27,6 +27,8 @@ matrix:
       os: osx
       env: PYTHON=python
       julia: 1.0
+      before_install:
+        - python -m pip install --user numpy
     - &test-macos-py3
       <<: *test-macos-py2
       before_install:
@@ -34,10 +36,12 @@ matrix:
         - brew upgrade python || echo "Ignoring errors..."
         - brew unlink python
         - brew link --overwrite python
+        - python -m pip install --user numpy
       env: PYTHON=python3
     - &test-macos-conda
       <<: *test-macos-py2
       env: PYTHON=Conda
+      before_install: []
     - {<<: *test-macos-py2,   julia: 1.0}
     - {<<: *test-macos-py3,   julia: 1.0}
     - {<<: *test-macos-conda, julia: 1.0}
