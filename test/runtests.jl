@@ -176,6 +176,24 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # fixme: is there any nontrivial showable test we can do?
     @test !showable("text/html", PyObject(1))
+    @testset "showable on type (#816)" begin
+        py"""
+        class Issue816(object):
+            def _repr_html_(self):
+                return "<h1>Issue816</h1>"
+
+        class CallableAsSpecialRepr(object):
+            _repr_html_ = Issue816()._repr_html_
+        """
+        @test showable("text/html", py"Issue816()")
+        @test !showable("text/html", py"Issue816")
+        @test showable("text/html", py"CallableAsSpecialRepr()")
+        if PyCall.pyversion_build < v"3"
+            @test_broken showable("text/html", py"CallableAsSpecialRepr")
+        else
+            @test showable("text/html", py"CallableAsSpecialRepr")
+        end
+    end
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
     # (http://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface)
@@ -792,5 +810,7 @@ end
 
 include("test_pyfncall.jl")
 include("testpybuffer.jl")
-include("test_venv.jl")
-include("test_build.jl")
+if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
+    include("test_venv.jl")
+    include("test_build.jl")
+end
