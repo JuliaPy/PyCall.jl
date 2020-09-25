@@ -64,6 +64,11 @@ build_script:
     # https://www.appveyor.com/docs/build-environment/#python
   - echo "%PYTHON%"
   - echo "%JL_BUILD_SCRIPT%"
+  - ps: if ( -not ( $env:python_version -eq "Conda" )) {
+          & $env:PYTHON -m pip install --user --upgrade pip;
+          & $env:PYTHON -m pip install --user numpy;
+          $Error.Clear();
+        }
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"
 
 test_script:
