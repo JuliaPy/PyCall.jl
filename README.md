@@ -1,9 +1,9 @@
 # Calling Python functions from the Julia language
 
-[![Build Status](https://travis-ci.org/JuliaPy/PyCall.jl.svg?branch=master)](https://travis-ci.org/JuliaPy/PyCall.jl)
-[![Build status](https://ci.appveyor.com/api/projects/status/ycvukpk4ujq987pm?svg=true)](https://ci.appveyor.com/project/StevenGJohnson/pycall-jl-nu3aa)
-[![Coverage Status](https://coveralls.io/repos/JuliaPy/PyCall.jl/badge.svg?branch=master)](https://coveralls.io/r/JuliaPy/PyCall.jl?branch=master)
-
+[![Test with system Python](https://github.com/JuliaPy/PyCall.jl/workflows/Test%20with%20system%20Python/badge.svg)](https://github.com/JuliaPy/PyCall.jl/actions?query=workflow%3A%22Test+with+system+Python%22)
+[![Test with conda](https://github.com/JuliaPy/PyCall.jl/workflows/Test%20with%20conda/badge.svg)](https://github.com/JuliaPy/PyCall.jl/actions?query=workflow%3A%22Test+with+conda%22)
+[![PkgEval](https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PyCall.named.svg)](https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PyCall.html)
+[![Coverage](https://codecov.io/gh/JuliaPy/PyCall.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaPy/PyCall.jl)
 
 This package provides the ability to directly call and **fully
 interoperate with Python** from [the Julia
