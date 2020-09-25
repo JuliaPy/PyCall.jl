@@ -2,12 +2,6 @@ using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
 
-@testset "CI setup" begin
-    if lowercase(get(ENV, "CI", "false")) == "true"
-        @test !ispynull(pyimport_e("numpy"))
-    end
-end
-
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
 
@@ -15,6 +9,12 @@ PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
 @info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
+
+@testset "CI setup" begin
+    if lowercase(get(ENV, "CI", "false")) == "true"
+        @test !ispynull(pyimport_e("numpy"))
+    end
+end
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
