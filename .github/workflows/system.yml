@@ -50,6 +50,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
       - run: python -m pip install numpy virtualenv
+      - run: virtualenv --version
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
         with:
