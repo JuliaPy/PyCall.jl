@@ -50,6 +50,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
       - run: python -m pip install --user numpy
+      - run: python -m pip install virtualenv
+        # virtualenv test with Python 2.7 is failing for some reason.
+        # Skipping it for now.
+        if: ${{ matrix.python-version != '2.7' }}
+      - run: virtualenv --version
+        if: ${{ matrix.python-version != '2.7' }}
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
         with:
