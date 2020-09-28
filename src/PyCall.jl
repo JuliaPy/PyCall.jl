@@ -921,7 +921,7 @@ https://github.com/ipython/ipython/blob/5.9.0/IPython/utils/dir2.py
 """
 function get_real_method(obj, name)
     ispynull(obj) && return nothing
-    @static if pyversion_build < v"3"
+    @static if pyversion < v"3"
         pyisinstance(obj, @pyglobalobj :PyType_Type) && return nothing
     end
 
