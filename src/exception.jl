@@ -41,6 +41,18 @@ function pystr_nofail(o::PyObject)
     end
 end
 
+function Base.showerror(io::IO, e::PyError)
+    println(io, "PyError:\n", pystr_nofail(e.val))
+    if !ispynull(e.traceback)
+        o = pycall(format_traceback, PyObject, e.traceback)
+        if !ispynull(o)
+            for s in PyVector{AbstractString}(o)
+                print(io, s)
+            end
+        end
+    end
+end
+
 function show(io::IO, e::PyError)
     print(io, "PyError",
           isempty(e.msg) ? e.msg : string(" (",e.msg,")"),
@@ -48,7 +60,7 @@ function show(io::IO, e::PyError)
     if ispynull(e.T)
         println(io, "None")
     else
-        println(io, pystring(e.T), "\n", pystr_nofail(e.val))
+        println(io, pystring(e.T), "\n", pystring(e.val))
     end
 
     if !ispynull(e.traceback)
