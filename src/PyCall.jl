@@ -537,7 +537,7 @@ Python distribution), which has the advantage that packages can be installed
 and kept up-to-date via Julia.  As explained in the PyCall documentation,
 set ENV["PYTHON"]="", run Pkg.build("PyCall"), and re-launch Julia. Then,
 To install the $name module, you can use `pyimport_conda("$(escape_string(name))", PKG)`,
-where PKG is the Anaconda package the contains the module $name,
+where PKG is the Anaconda package that contains the module $name,
 or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
