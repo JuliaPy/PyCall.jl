@@ -29,12 +29,7 @@ function _pyjlwrap_call(f, args_::PyPtr, kw_::PyPtr)
         else
             kw = PyDict{Symbol,PyObject}(pyincref(kw_))
             kwargs = [ (k,julia_kwarg(f,k,v)) for (k,v) in kw ]
-
-            # 0.6 `invokelatest` doesn't support kwargs, instead
-            # use a closure over kwargs. see:
-            #   https://github.com/JuliaLang/julia/pull/22646
-            f_kw_closure() = f(jlargs...; kwargs...)
-            ret = Core._apply_latest(f_kw_closure)
+            ret = Base.invokelatest(f, jlargs...; kwargs...)
         end
 
         return pyreturn(ret)
