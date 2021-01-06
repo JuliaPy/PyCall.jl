@@ -20,6 +20,7 @@ const c_void_p_Type = PyNULL()
 # or are simply left as non-const values
 const pynothing = Ref{PyPtr}(0)
 const pyxrange = Ref{PyPtr}(0)
+const pyslice = Ref{PyPtr}(0)
 
 #########################################################################
 # initialize jlWrapType for pytype.jl
@@ -216,6 +217,9 @@ function __init__()
 
     # xrange type (or range in Python 3)
     pyxrange[] = @pyglobalobj(:PyRange_Type)
+
+    # slice type
+    pyslice[] = @pyglobalobj(:PySlice_Type)
 
     # ctypes.c_void_p for Ptr types
     copy!(c_void_p_Type, pyimport("ctypes")."c_void_p")

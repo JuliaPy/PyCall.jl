@@ -8,7 +8,7 @@ using VersionParsing
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion,
-       PyArray, PyArray_Info, PyBuffer,
+       PyArray, PyArray_Info, PyBuffer, PySlice,
        pyerr_check, pyerr_clear, pytype_query, PyAny, @pyimport, PyDict,
        pyisinstance, pywrap, pytypeof, pyeval, PyVector, pystring, pystr, pyrepr,
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
@@ -22,7 +22,8 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        filter!, hash, splice!, pop!, ==, isequal, push!,
        append!, insert!, prepend!, unsafe_convert,
        pushfirst!, popfirst!, firstindex, lastindex,
-       getproperty, setproperty!, propertynames
+       getproperty, setproperty!, propertynames,
+       first, last, step, SubArray
 
 if isdefined(Base, :hasproperty) # Julia 1.2
     import Base: hasproperty
