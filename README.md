@@ -145,45 +145,45 @@ which is automatically converted to a Julia type, you will have override this
 via `@pywith EXPR::PyObject ...`.
 
 If you are already familiar with Python, it perhaps is easier to use
-`py"..."` and `py"""..."""` which are equivalent to Python's
+`` py`...` `` and ` py```...``` ` which are equivalent to Python's
 [`eval`](https://docs.python.org/3/library/functions.html#eval) and
 [`exec`](https://docs.python.org/3/library/functions.html#exec),
 respectively:
 
-```julia
-py"""
+````julia
+py```
 import numpy as np
 
 def sinpi(x):
     return np.sin(np.pi * x)
-"""
-py"sinpi"(1)
 ```
+py`sinpi`(1)
+````
 
 When creating a Julia module, it is a useful pattern to define Python
 functions or classes in Julia's `__init__` and then use it in Julia
-function with `py"..."`.
+function with `` py`...` ``.
 
-```julia
+````julia
 module MyModule
 
 using PyCall
 
 function __init__()
-    py"""
+    py```
     import numpy as np
 
     def one(x):
         return np.sin(x) ** 2 + np.cos(x) ** 2
-    """
+    ```
 end
 
-two(x) = py"one"(x) + py"one"(x)
+two(x) = py`one`(x) + py`one`(x)
 
 end
-```
+````
 
-Note that Python code in `py"..."` of above example is evaluated in a
+Note that Python code in `` py`...` `` of above example is evaluated in a
 Python namespace dedicated to `MyModule`.  Thus, Python function `one`
 cannot be accessed outside `MyModule`.
 
@@ -355,38 +355,38 @@ and also by providing more type information to the Julia compiler.
   `@pycall function(args...)::returntype` into
   `pycall(function,returntype,args...)`.
 
-* `py"..."` evaluates `"..."` as Python code, equivalent to
+* `` py`...` `` evaluates `"..."` as Python code, equivalent to
   Python's [`eval`](https://docs.python.org/3/library/functions.html#eval) function, and returns the result
-  converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
+  converted to `PyAny`.  Alternatively, `` py`...`o `` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
   Julia variables and other expressions into the Python code with `$`,
   which interpolates the *value* (converted to `PyObject`) of the given
   expression---data is not passed as a string, so this is different from
-  ordinary Julia string interpolation.  e.g. `py"sum($([1,2,3]))"` calls the
+  ordinary Julia string interpolation.  e.g. `` py`sum($([1,2,3]))` `` calls the
   Python `sum` function on the Julia array `[1,2,3]`, returning `6`.
   In contrast, if you use `$$` before the interpolated expression, then
   the value of the expression is inserted as a string into the Python code,
   allowing you to generate Python code itself via Julia expressions.
-  For example, if `x="1+1"` in Julia, then `py"$x"` returns the string `"1+1"`,
-  but `py"$$x"` returns `2`.
-  If you use `py"""..."""` to pass a *multi-line* string, the string can
+  For example, if `x="1+1"` in Julia, then `` py`$x` `` returns the string `"1+1"`,
+  but `` py`$$x` `` returns `2`.
+  If you use ` py```...``` ` to pass a *multi-line* string, the string can
   contain arbitrary Python code (not just a single expression) to be evaluated,
   but the return value is `nothing`; this is useful e.g. to define pure-Python
   functions, and is equivalent to Python's
   [`exec`](https://docs.python.org/3/library/functions.html#exec) function.
-  (If you define a Python global `g` in a multiline `py"""..."""`
-  string, you can retrieve it in Julia by subsequently evaluating `py"g"`.)
+  (If you define a Python global `g` in a multiline ` py```...``` `
+  string, you can retrieve it in Julia by subsequently evaluating `` py`g` ``.)
 
-  When `py"..."` is used inside a Julia module, it uses a Python namespace
+  When `` py`...` `` is used inside a Julia module, it uses a Python namespace
   dedicated to this Julia module.  Thus, you can define Python function
-  using `py"""...."""` in your module without worrying about name clash
+  using ` py```....``` ` in your module without worrying about name clash
   with other Python code.  Note that Python functions _must_ be defined in
   `__init__`.  Side-effect in Python occurred at top-level Julia scope
   cannot be used at run-time for precompiled modules.
 
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
-  symbol it returns the builtin converted to `PyAny`.  (You can also use `py"s"`
+  symbol it returns the builtin converted to `PyAny`.  (You can also use `` py`s` ``
   to look up builtins or other Python globas.)
 
 Occasionally, you may need to pass a keyword argument to Python that

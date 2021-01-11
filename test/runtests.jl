@@ -161,7 +161,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # issue #92:
     let x = PyVector(PyAny[])
-        py"lambda x: x.append(\"bar\")"(x)
+        py`lambda x: x.append("bar")`(x)
         @test x == ["bar"]
     end
 
@@ -291,21 +291,21 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test convert(BigInt, PyObject(1234)) == 1234
 
     # hasproperty, getproperty, and propertynames
-    py"""
+    py```
     class A:
         class B:
             C = 1
-    """
-    A = py"A"
+    ```
+    A = py`A`
     @test hasproperty(A, "B")
-    @test getproperty(A, "B") == py"A.B"
+    @test getproperty(A, "B") == py`A.B`
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
         @test A.B.C == 1
         @test_throws KeyError A.X
     end
-    setproperty!(py"A.B", "C", 2)
-    @test py"A.B.C" == 2
+    setproperty!(py`A.B`, "C", 2)
+    @test py`A.B.C` == 2
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
@@ -397,23 +397,23 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     let x = 7
-        py"""
+        py```
         def myfun(x):
             return x + $x
-        """
-        @test py"1 + 2" == 3
-        @test py"1 + $x" == 8
-        @test py"1 + $(x^2)" == 50
-        @test py"myfun"(10) == 17
+        ```
+        @test py`1 + 2` == 3
+        @test py`1 + $x` == 8
+        @test py`1 + $(x^2)` == 50
+        @test py`myfun`(10) == 17
     end
 
     # issue #352
     let x = "1+1"
-        @test py"$x" == "1+1"
-        @test py"$$x" == py"$$(x)" == 2
-        @test py"7 - $$x - 7" == 0 # evaluates "7 - 1 + 1 - 7"
-        @test py"7 - ($$x) - 7" == -2 # evaluates "7 - (1 + 1) - 7"
-        @test py"1 + $$(x[1:2]) 3" == 5 # evals 1 + 1+ 3
+        @test py`$x` == "1+1"
+        @test py`$$x` == py`$$(x)` == 2
+        @test py`7 - $$x - 7` == 0 # evaluates "7 - 1 + 1 - 7"
+        @test py`7 - ($$x) - 7` == -2 # evaluates "7 - (1 + 1) - 7"
+        @test py`1 + $$(x[1:2]) 3` == 5 # evals 1 + 1+ 3
     end
 
     # Float16 support:
@@ -453,15 +453,15 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     # Expose python docs to Julia doc system
-    py"""
+    py```
     def foo():
         "foo docstring"
         return 0
     class bar:
         foo = foo
-    """
-    global foo354 = py"foo"
-    global barclass = py"bar"
+    ```
+    global foo354 = py`foo`
+    global barclass = py`bar`
     # use 'content' since `Text` objects test equality by object identity
     @test @doc(foo354).content == "foo docstring"
     @test @doc(barclass.foo).content == "foo docstring"
@@ -542,7 +542,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     @test occursin("integer", Base.Docs.doc(PyObject(1)).content)
-    @test occursin("no docstring", Base.Docs.doc(PyObject(py"lambda x: x+1")).content)
+    @test occursin("no docstring", Base.Docs.doc(PyObject(py`lambda x: x+1`)).content)
 
     let b = rand(UInt8, 1000)
         @test(convert(Vector{UInt8}, pybytes(b)) == b
@@ -579,9 +579,9 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test_throws KeyError PyObject(TestConstruct(1)).y
 
     # iterating over Julia objects in Python:
-    @test py"[x**2 for x in $(PyCall.pyjlwrap_new(1:4))]" ==
-          py"[x**2 for x in $(x for x in 1:4)]" ==
-          py"[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]" ==
+    @test py`[x**2 for x in $(PyCall.pyjlwrap_new(1:4))]` ==
+          py`[x**2 for x in $(x for x in 1:4)]` ==
+          py`[x**2 for x in $(PyCall.jlwrap_iterator(1:4))]` ==
           [1,4,9,16]
 
     let o = PyObject("foo")
@@ -604,7 +604,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
 
     # issue #533
-    @test py"lambda x,y,z: (x,y,z)"(3:6,4:10,5:11) === (PyInt(3):PyInt(6), PyInt(4):PyInt(10), PyInt(5):PyInt(11))
+    @test py`lambda x,y,z: (x,y,z)`(3:6,4:10,5:11) === (PyInt(3):PyInt(6), PyInt(4):PyInt(10), PyInt(5):PyInt(11))
 
     @test float(PyObject(1)) === 1.0
     @test float(PyObject(1+2im)) === 1.0 + 2.0im
@@ -674,12 +674,12 @@ end
             using PyCall
             obj = pyimport("sys")  # get some PyObject
         end)
-    py"""
+    py```
     ns = {}
     def set(name):
         ns[name] = $include_string($anonymous, name)
-    """
-    py"set"("obj")
+    ```
+    py`set`("obj")
     @test anonymous.obj != PyNULL()
 
     # Test above for pyjlwrap_getattr too:
@@ -692,12 +692,12 @@ end
             end
             obj = S(pyimport("sys"))
         end)
-    py"""
+    py```
     ns = {}
     def set(name):
         ns[name] = $include_string($anonymous, name).x
-    """
-    py"set"("obj")
+    ```
+    py`set`("obj")
     @test anonymous.obj.x != PyNULL()
 
     # Test above for pyjlwrap_iternext too:
@@ -708,12 +708,12 @@ end
             sys = pyimport("sys")
             obj = (sys for _ in 1:1)
         end)
-    py"""
+    py```
     ns = {}
     def set(name):
         ns[name] = list(iter($include_string($anonymous, name)))
-    """
-    py"set"("obj")
+    ```
+    py`set`("obj")
     @test anonymous.sys != PyNULL()
 end
 
@@ -721,28 +721,28 @@ struct Unprintable end
 Base.show(::IO, ::Unprintable) = error("show(::IO, ::Unprintable) called")
 Base.show(::IO, ::Type{Unprintable}) = error("show(::IO, ::Type{Unprintable}) called")
 
-py"""
+py```
 def try_repr(x):
     try:
         return repr(x)
     except Exception as err:
         return err
-"""
+```
 
-py"""
+py```
 def try_call(f):
     try:
         return f()
     except Exception as err:
         return err
-"""
+```
 
 @testset "throwing show" begin
     unp = Unprintable()
     @test_throws Exception show(unp)
-    @test py"try_repr"("printable") isa String
-    @test pyisinstance(py"try_repr"(unp), pybuiltin("Exception"))
-    @test pyisinstance(py"try_call"(() -> throw(Unprintable())),
+    @test py`try_repr`("printable") isa String
+    @test pyisinstance(py`try_repr`(unp), pybuiltin("Exception"))
+    @test pyisinstance(py`try_call`(() -> throw(Unprintable())),
                        pybuiltin("Exception"))
 end
 
@@ -773,25 +773,25 @@ end
     @test Base.IteratorSize(PyCall.PyIterator(PyObject([1]))) == Base.HasLength()
 
     # 594
-    @test collect(zip(py"iter([1, 2, 3])", 1:3)) ==
+    @test collect(zip(py`iter([1, 2, 3])`, 1:3)) ==
     [(1, 1), (2, 2), (3, 3)]
-    @test collect(zip(PyCall.PyIterator{Int}(py"iter([1, 2, 3])"), 1:3)) ==
+    @test collect(zip(PyCall.PyIterator{Int}(py`iter([1, 2, 3])`), 1:3)) ==
     [(1, 1), (2, 2), (3, 3)]
-    @test collect(zip(PyCall.PyIterator(py"[1, 2, 3]"o), 1:3)) ==
+    @test collect(zip(PyCall.PyIterator(py`[1, 2, 3]`o), 1:3)) ==
     [(1, 1), (2, 2), (3, 3)]
 end
 
-@test_throws PyCall.PyError py"__testing_pynamespace"
+@test_throws PyCall.PyError py`__testing_pynamespace`
 
 module __isolated_namespace
 using PyCall
-py"""
+py```
 __testing_pynamespace = True
-"""
-get_testing_pynamespace() = py"__testing_pynamespace"
+```
+get_testing_pynamespace() = py`__testing_pynamespace`
 end
 
-@test_throws PyCall.PyError py"__testing_pynamespace"
+@test_throws PyCall.PyError py`__testing_pynamespace`
 @test __isolated_namespace.get_testing_pynamespace()
 
 @testset "atexit" begin
