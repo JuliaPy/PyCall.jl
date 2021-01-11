@@ -43,3 +43,11 @@ function pyembed(po::PyObject, jo::Any)
     pycall_gc[wo] = jo
     return po
 end
+
+# "embed" a reference to jo.parent in po, using the weak-reference mechanism
+function pyembed(po::PyObject, jo::ReinterpretArray)
+    # When a ReinterpretArray is converted to a Ptr{T}, the Ptr is actually 
+    # to parent.
+    # See Base.unsafe_convert(::Type{Ptr{T}}, ::ReinterpretArray{T,N,S})
+    pyembed(po, jo.parent)
+end
