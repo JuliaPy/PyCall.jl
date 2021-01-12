@@ -50,12 +50,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test pyany_toany(PyAny) == Any
     @test pyany_toany(Tuple{Int,PyAny}) == Tuple{Int,Any}
     @test pyany_toany(Tuple{Int,Tuple{PyAny,Int8}}) == Tuple{Int,Tuple{Any,Int8}}
-    @info "Julia $VERSION"
-    if v"1.7.0-DEV.0" <= VERSION < v"1.7"
-        @test_skip pyany_toany(Tuple{PyAny,Int,Vararg{PyAny}}) == Tuple{Any,Int,Vararg{Any}}
-    else
-        @test pyany_toany(Tuple{PyAny,Int,Vararg{PyAny}}) == Tuple{Any,Int,Vararg{Any}}
-    end
+    @test pyany_toany(Tuple{PyAny,Int,Vararg{PyAny}}) == Tuple{Any,Int,Vararg{Any}} 
 
     @test roundtripeq(17)
     @test roundtripeq(0x39)
