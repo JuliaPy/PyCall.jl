@@ -23,7 +23,7 @@ import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        append!, insert!, prepend!, unsafe_convert,
        pushfirst!, popfirst!, firstindex, lastindex,
        getproperty, setproperty!, propertynames,
-       first, last, step, StridedSubArray, ReinterpretArray
+       first, last, step, StridedSubArray, ReinterpretArray, ReshapedArray
 
 if isdefined(Base, :hasproperty) # Julia 1.2
     import Base: hasproperty

@@ -172,7 +172,7 @@ const NPY_ARRAY_WRITEABLE = Int32(0x0400)
 # dimensions. For example, although NumPy works with both row-major and
 # column-major data, some Python libraries like OpenCV seem to require
 # row-major data (the default in NumPy). In such cases, use PyReverseDims(array)
-function NpyArray(a::StridedArray{T}, revdims::Bool) where T<:PYARR_TYPES
+function NpyArray(a::AbstractArray{T}, revdims::Bool) where T<:PYARR_TYPES
     @npyinitialize
     size_a = revdims ? reverse(size(a)) : size(a)
     strides_a = revdims ? reverse(strides(a)) : strides(a)
@@ -186,7 +186,7 @@ function NpyArray(a::StridedArray{T}, revdims::Bool) where T<:PYARR_TYPES
     return PyObject(p, a)
 end
 
-function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
+function PyObject(a::AbstractArray{T}) where T<:PYARR_TYPES
     try
         return NpyArray(a, false)
     catch
@@ -194,7 +194,7 @@ function PyObject(a::StridedArray{T}) where T<:PYARR_TYPES
     end
 end
 
-function PyReverseDims(a::StridedArray{T,N}) where {T<:PYARR_TYPES,N}
+function PyReverseDims(a::AbstractArray{T,N}) where {T<:PYARR_TYPES,N}
     try
         return NpyArray(a, true)
     catch
@@ -226,14 +226,17 @@ PyObject(a::Union{LinearAlgebra.Adjoint{<:Real},LinearAlgebra.Transpose}) =
 
 PyObject(a::LinearAlgebra.Adjoint) = PyObject(Matrix(a)) # non-real arrays require a copy
 
-function PyObject(pda::PermutedDimsArray{T,N,perm}) where {T,N,perm}
-    parent = PyObject(pda.parent)
+# Alternative conversion of array views mapping parent in Julia to base in Numpy
+PyObjectWithParent(a::AbstractArray) = PyObject(a)
+
+function PyObjectWithParent(pda::PermutedDimsArray{T,N,perm}) where {T,N,perm}
+    parent = PyObjectWithParent(pda.parent)
     # numpy.transpose is similar to PermutedDimsArray and creates a view of the data
     pycall(parent.transpose, PyObject, perm .- 1)
 end
 
-function PyObject(a::StridedSubArray{T,N}) where {T <: PYARR_TYPES,N}
-    parent = PyObject(a.parent)
+function PyObjectWithParent(a::StridedSubArray{T,N}) where {T <: PYARR_TYPES,N}
+    parent = PyObjectWithParent(a.parent)
     inds = a.indices
     # hasstep(T) = Val( hasmethod( step, Tuple{ typeof(T) } ) )
     slices = map( ind->PySlice(ind .- 1) , inds )
