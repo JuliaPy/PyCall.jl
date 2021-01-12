@@ -232,6 +232,10 @@ end
 
 #########################################################################
 # PySlice: no-copy wrapping of a Julia object around a Python slice
+
+slice(start, stop, step) = pycall(pyslice[], PyObject,
+                                  start, stop, step)
+
 struct PySlice{T} <: AbstractRange{T}
     o::PyObject
     function PySlice{T}(o::PyObject) where T
@@ -254,6 +258,7 @@ step(s::PySlice{T}) where T = (pystep = s.o.step; isnothing( pystep ) ? 1 : pyst
 length(s::PySlice{T}) where T = length( first(s):step(s):last(s) )
 
 convert(::Type{PyObject}, S::PySlice) = S.o
+convert(::Type{PySlice}, o::PyObject) = PySlice{Int}(o)
 PyObject(S::PySlice) = S.o
 
 
@@ -626,9 +631,6 @@ end
 xrange(start, stop, step) = pycall(pyxrange[], PyObject,
                                    start, stop, step)
 
-slice(start, stop, step) = pycall(pyslice[], PyObject,
-                                  start, stop, step)
-
 function PyObject(r::AbstractRange{T}) where T<:Integer
     s = step(r)
     f = first(r)
@@ -784,6 +786,8 @@ function pysequence_query(o::PyObject)
         return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
+    elseif pyisinstance(o, pyslice[])
+        return PySlice
     elseif ispybytearray(o)
         return Vector{UInt8}
     elseif !isbuftype(o)
