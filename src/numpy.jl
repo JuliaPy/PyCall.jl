@@ -239,6 +239,9 @@ function PyObjectWithParent(a::StridedSubArray{T,N}) where {T <: PYARR_TYPES,N}
     parent = PyObjectWithParent(a.parent)
     inds = a.indices
     # hasstep(T) = Val( hasmethod( step, Tuple{ typeof(T) } ) )
-    slices = map( ind->PySlice(ind .- 1) , inds )
+    ind2slice(ind) = isa(ind,AbstractRange) ? 
+                        PySlice(ind .- 1) :
+                        PySlice(ind-1:ind-1)
+    slices = map( ind2slice , inds )
     pycall( parent.__getitem__, PyObject, slices )
 end
