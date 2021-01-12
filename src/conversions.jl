@@ -171,7 +171,7 @@ end
 pyany_toany(::Type{PyAny}) = Any
 pyany_toany(t::Type{T}) where {T<:Tuple} = Tuple{map(pyany_toany, t.types)...}
 @static if VERSION >= v"1.7.0-DEV.255"
-    pyany_toany(::Core.TypeofVararg{PyAny}) = Vararg{Any}
+    pyany_toany(T::Core.TypeofVararg) = T === Vararg{PyAny} ? Vararg{Any} : T
 end
 # PyAny acts like Any for conversions, except for converting PyObject (below)
 convert(::Type{PyAny}, x) = x
@@ -254,9 +254,9 @@ PySlice(start, stop, step) = PySlice{promote_type(typeof(start),typeof(stop),typ
 PySlice(r::AbstractRange{T}) where T = PySlice{T}( slice(first(r), last(r)+1, step(r)) )
 PySlice(S::PySlice{T}) where T = S
 
-first(s::PySlice{T}) where T = (pystart = s.o.start; isnothing( pystart ) ? 0 : pystart)
+first(s::PySlice{T}) where T = (pystart = s.o.start; pystart === nothing ? 0 : pystart)
 last(s::PySlice{T}) where T = s.o.stop-1
-step(s::PySlice{T}) where T = (pystep = s.o.step; isnothing( pystep ) ? 1 : pystep)
+step(s::PySlice{T}) where T = (pystep = s.o.step; pystep === nothing ? 1 : pystep)
 length(s::PySlice{T}) where T = length( first(s):step(s):last(s) )
 
 convert(::Type{PyObject}, S::PySlice) = S.o
