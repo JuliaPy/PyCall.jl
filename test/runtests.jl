@@ -72,6 +72,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test roundtripeq(Int32)
     @test roundtripeq(Dict(1 => "hello", 2 => "goodbye")) && roundtripeq(Dict())
     @test roundtripeq(UInt8[1,3,4,5])
+    @test roundtirpeq(1:5)
+    @test roundtirpeq(5:2:10)
     @test roundtrip(3 => 4) == (3,4)
     @test roundtrip(Pair{Int,Int}, 3 => 4) == Pair(3,4)
     @test eltype(roundtrip([Ref(1), Ref(2)])) == typeof(Ref(1))
@@ -86,6 +88,48 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test pycall(PyObject(testkw), PyAny, 314157, y=1) == 314159
     @test roundtrip(testkw)(314157) == 314157
     @test roundtrip(testkw)(314157, y=1) == 314159
+
+    let s = PyCall.slice(nothing, 10, nothing)
+        @test s.start === nothing
+        @test s.stop == 10
+        @test s.step === nothing
+        @test PySlice{Int}(s) == 0:9
+        @test convert(PySlice, s) == 0:9
+        @test PyObject( PySlice{Int}(s) ) === s
+    end
+
+    let s = PyCall.slice(1, 5, nothing)
+        @test s.start == 1
+        @test s.stop == 5
+        @test s.step === nothing
+        @test PySlice{Int}(s) == 1:4
+        @test convert(PySlice, s) == 1:4
+        @test PyObject( PySlice{Int}(s) ) === s
+    end
+
+    let s = PyCall.slice(3, 9, 2)
+        @test s.start == 3
+        @test s.stop == 9
+        @test s.step == 2
+        @test PySlice{Int}(s) == 3:2:7
+        @test convert(PySlice, s) == 3:2:7
+        @test PyObject( PySlice{Int}(s) ) === s
+    end
+
+    let s = PySlice(4, 5)
+        @test first(s) == 4
+        @test last(s) == 4
+        @test step(s) == 1
+        @test length(s) == 1
+        @test PySlice(s) === s
+        @test s == pybuiltin("slice")(4, 5)
+    end
+
+    @test PySlice(5) == 0:4
+    @test PySlice(1,5) == 1:4
+    @test PySlice(1,6,2) == 1:2:5
+    @test PySlice(1:5) == 1:5
+    @test PySlice(2:2:6) == 2:2:6
 
     # check type stability of pycall with an explicit return type
     @inferred pycall(PyObject(1).__add__, Int, 2)
@@ -108,11 +152,28 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             end
         end
         let A = Float64[1 2; 3 4]
+            # Normal array
+            B = copy(A)
+            C = PyArray( PyObject(B) )
+            @test C == B
+            B[1] = 3
+            @test C == B && C[1] == B[1]
+
+            C = PyArray( PyCall.PyObjectWithParent(B) )
+            @test C == B
+            B[1] = 2
+            @test C == B && C[1] == B[1]
+
             # SubArray
-            B = view(A, 1:2, 2)
+            B = view(A, 1:2, 2:2)
             C = PyArray( PyObject(B) )
             @test C == B
             A[3] = 5
+            @test C == B && C[1] == A[3]
+
+            C = PyArray( PyCall.PyObjectWithParent(B) )
+            @test C == B
+            A[3] = 4
             @test C == B && C[1] == A[3]
             
             # ReshapedArray
@@ -127,6 +188,11 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             C = PyArray( PyObject(B) )
             @test C == B
             A[1] == 7
+            @test C == B && C[1] == A[1]
+
+            C = PyArray( PyCall.PyObjectWithParent(B) )
+            @test C == B
+            A[1] == 8
             @test C == B && C[1] == A[1]
 
             # ReinterpretArray
