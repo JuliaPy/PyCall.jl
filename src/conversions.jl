@@ -170,7 +170,8 @@ function pyany_toany(T::Type)
 end
 pyany_toany(::Type{PyAny}) = Any
 pyany_toany(t::Type{T}) where {T<:Tuple} = Tuple{map(pyany_toany, t.types)...}
-if VERSION >= v"1.7.0-DEV.0"
+@static if isdefined(Core, :TypeofVararg) # VERSION >= v"1.7.0-DEV.77"
+    # Core.TypeofVararg introduced in https://github.com/JuliaLang/julia/pull/38136
     pyany_toany(T::Core.TypeofVararg) = T === Vararg{PyAny} ? Vararg{Any} : T
 end
 # PyAny acts like Any for conversions, except for converting PyObject (below)
