@@ -789,8 +789,6 @@ function pysequence_query(o::PyObject)
         return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
-    elseif pyisinstance(o, pyslice[])
-        return PySlice
     elseif ispybytearray(o)
         return Vector{UInt8}
     elseif !isbuftype(o)
