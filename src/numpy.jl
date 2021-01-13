@@ -225,23 +225,3 @@ PyObject(a::Union{LinearAlgebra.Adjoint{<:Real},LinearAlgebra.Transpose}) =
     PyReverseDims(a.parent)
 
 PyObject(a::LinearAlgebra.Adjoint) = PyObject(Matrix(a)) # non-real arrays require a copy
-
-# Alternative conversion of array views mapping parent in Julia to base in Numpy
-PyObjectWithParent(a::AbstractArray) = PyObject(a)
-
-function PyObjectWithParent(pda::PermutedDimsArray{T,N,perm}) where {T,N,perm}
-    parent = PyObjectWithParent(pda.parent)
-    # numpy.transpose is similar to PermutedDimsArray and creates a view of the data
-    pycall(parent.transpose, PyObject, perm .- 1)
-end
-
-function PyObjectWithParent(a::StridedSubArray{T,N}) where {T <: PYARR_TYPES,N}
-    parent = PyObjectWithParent(a.parent)
-    inds = a.indices
-    # hasstep(T) = Val( hasmethod( step, Tuple{ typeof(T) } ) )
-    ind2slice(ind) = isa(ind,AbstractRange) ? 
-                        PySlice(ind .- 1) :
-                        PySlice(ind-1:ind-1)
-    slices = map( ind2slice , inds )
-    pycall( parent.__getitem__, PyObject, slices )
-end
