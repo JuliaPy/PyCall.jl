@@ -159,11 +159,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             B[1] = 3
             @test C == B && C[1] == B[1]
 
-            C = PyArray( PyCall.PyObjectWithParent(B) )
-            @test C == B
-            B[1] = 2
-            @test C == B && C[1] == B[1]
-
             # SubArray
             B = view(A, 1:2, 2:2)
             C = PyArray( PyObject(B) )
@@ -171,11 +166,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             A[3] = 5
             @test C == B && C[1] == A[3]
 
-            C = PyArray( PyCall.PyObjectWithParent(B) )
-            @test C == B
-            A[3] = 4
-            @test C == B && C[1] == A[3]
-            
             # ReshapedArray
             B = Base.ReshapedArray( A, (1,4), () )
             C = PyArray( PyObject(B) )
@@ -188,11 +178,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
             C = PyArray( PyObject(B) )
             @test C == B
             A[1] == 7
-            @test C == B && C[1] == A[1]
-
-            C = PyArray( PyCall.PyObjectWithParent(B) )
-            @test C == B
-            A[1] == 8
             @test C == B && C[1] == A[1]
 
             # ReinterpretArray
