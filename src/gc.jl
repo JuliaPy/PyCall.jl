@@ -30,7 +30,7 @@ function pyembed(po::PyObject, jo::Any)
     # If there's a need to support immutable embedding,
     # the API needs to be changed to return the pointer.
     if isimmutable(jo)
-        if hasmethod(parent, ( typeof(jo), ) )
+        if applicable(parent, jo)
             return pyembed(po, parent(jo) )
         else
             throw(ArgumentError("pyembed: immutable argument not allowed"))
