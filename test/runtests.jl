@@ -310,6 +310,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
+    @test_deprecated keys(A)
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
@@ -321,7 +322,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     let o = PyObject(1+2im)
         @test PyCall.hasproperty(o, :real) # replace by Base.hasproperty in the future
-        @test :real in keys(o)
+        @test :real in propertynames(o)
         @test o.real == 1
     end
 
