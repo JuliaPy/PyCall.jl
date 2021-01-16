@@ -316,7 +316,10 @@ function trygetproperty(o::PyObject, s::AbstractString, d)
     return p == C_NULL ? d : PyObject(p)
 end
 
-propertynames(o::PyObject) = ispynull(o) ? Symbol[] : map(Symbol, PyIterator{PyObject}(pycall(py"dir", PyObject, o)))
+function propertynames(o::PyObject)
+    ispynull(o) && return Symbol[]
+    return convert(Vector{Symbol}, ccall((@pysym :PyObject_Dir), PyObject, (PyPtr,), o))
+end
 
 # avoiding method ambiguity
 setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
@@ -366,7 +369,7 @@ hasproperty(o::PyObject, s::AbstractString) = pyhasproperty(o, s)
 
 #########################################################################
 
-keys(o::PyObject) = map(Symbol, pycall(py"dir", PyVector{Tuple{Symbol,PyObject}}, o))
+keys(o::PyObject) = convert(Vector{Symbol}, ccall((@pysym :PyObject_Dir), PyObject, (PyPtr,), o))
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
