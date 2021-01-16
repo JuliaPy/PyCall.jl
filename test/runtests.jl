@@ -295,17 +295,34 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     class A:
         class B:
             C = 1
+            D_ = 2
+            @property
+            def D(self):
+                return self.D_
+            @D.setter
+            def D(self, Dnew):
+                self.D_ = Dnew
+            @property
+            def E(self):
+                raise NotImplementedError
     """
     A = py"A"
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
+        @test :C in propertynames(A.B)
+        @test :D in propertynames(A.B)
+        @test :E in propertynames(A.B)
         @test A.B.C == 1
+        @test A.B.D == 2
+        @test_throws PyCall.PyError A.B.E
         @test_throws KeyError A.X
     end
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
+    setproperty!(py"A.B", "D", 3)
+    @test py"A.B.D" == 3
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
