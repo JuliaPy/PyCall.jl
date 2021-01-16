@@ -318,7 +318,8 @@ end
 
 function propertynames(o::PyObject)
     ispynull(o) && return Symbol[]
-    return convert(Vector{Symbol}, ccall((@pysym :PyObject_Dir), PyObject, (PyPtr,), o))
+    names = @pycheckn ccall((@pysym :PyObject_Dir), PyObject, (PyPtr,), o)
+    return convert(Vector{Symbol}, names)
 end
 
 # avoiding method ambiguity
