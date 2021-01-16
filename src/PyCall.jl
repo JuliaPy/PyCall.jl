@@ -370,7 +370,7 @@ hasproperty(o::PyObject, s::AbstractString) = pyhasproperty(o, s)
 
 #########################################################################
 
-keys(o::PyObject) = convert(Vector{Symbol}, ccall((@pysym :PyObject_Dir), PyObject, (PyPtr,), o))
+@deprecate keys(o::PyObject) propertynames(o)
 
 #########################################################################
 # Create anonymous composite w = pywrap(o) wrapping the object o
