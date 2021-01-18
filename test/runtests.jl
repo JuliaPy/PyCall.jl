@@ -295,17 +295,22 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     class A:
         class B:
             C = 1
+            @property
+            def D(self):
+                raise NotImplementedError
     """
     A = py"A"
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
+        @test :D in propertynames(A.B)
         @test A.B.C == 1
         @test_throws KeyError A.X
     end
     setproperty!(py"A.B", "C", 2)
     @test py"A.B.C" == 2
+    @test_deprecated keys(A)
 
     # buffers
     let b = PyCall.PyBuffer(pyutf8("test string"))
@@ -317,7 +322,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     let o = PyObject(1+2im)
         @test PyCall.hasproperty(o, :real) # replace by Base.hasproperty in the future
-        @test :real in keys(o)
+        @test :real in propertynames(o)
         @test o.real == 1
     end
 
