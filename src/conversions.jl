@@ -234,38 +234,6 @@ function convert(::Type{Pair{K,V}}, o::PyObject) where {K,V}
 end
 
 #########################################################################
-# PySlice: no-copy wrapping of a Julia object around a Python slice
-
-slice(start, stop, step) = pycall(pyslice[], PyObject,
-                                  start, stop, step)
-
-struct PySlice{T} <: AbstractRange{T}
-    o::PyObject
-    function PySlice{T}(o::PyObject) where T
-        if !pyisinstance(o, pyslice[])
-            throw(ArgumentError("Argument must be a slice"))
-        end
-        new{T}(o)
-    end
-end
-
-PySlice(stop) = PySlice{typeof(stop)}( slice(nothing, stop, nothing) )
-PySlice(start, stop) = PySlice{promote_type(typeof(start),typeof(stop))}( slice(start, stop, nothing) )
-PySlice(start, stop, step) = PySlice{promote_type(typeof(start),typeof(stop),typeof(step))}( slice(start, stop, step) )
-PySlice(r::AbstractRange{T}) where T = PySlice{T}( slice(first(r), last(r)+1, step(r)) )
-PySlice(S::PySlice{T}) where T = S
-
-first(s::PySlice{T}) where T = (pystart = s.o.start; pystart === nothing ? 0 : pystart)
-last(s::PySlice{T}) where T = s.o.stop-1
-step(s::PySlice{T}) where T = (pystep = s.o.step; pystep === nothing ? 1 : pystep)
-length(s::PySlice{T}) where T = length( first(s):step(s):last(s) )
-
-convert(::Type{PyObject}, S::PySlice) = S.o
-convert(::Type{PySlice}, o::PyObject) = PySlice{Int}(o)
-PyObject(S::PySlice) = S.o
-
-
-#########################################################################
 # PyVector: no-copy wrapping of a Julia object around a Python sequence
 
 """
@@ -647,9 +615,6 @@ function PyObject(r::AbstractRange{T}) where T<:Integer
 end
 
 function convert(::Type{T}, o::PyObject) where T<:AbstractRange
-    if pyisinstance(o, pyslice[])
-        return o.start:o.step:o.stop-1
-    end
     v = PyVector(o)
     len = length(v)
     if len == 0
