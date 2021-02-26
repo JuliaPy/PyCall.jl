@@ -85,11 +85,11 @@ end
 # queue to try again later when we'll eventually be on the main thread.
 function _pydecref_eventually(po)
     if Threads.threadid()==1
-        return pydecref(po)
+        pydecref(po)
     else
         finalizer(_pydecref_eventually, po)
-        return nothing
     end
+    return nothing
 end
 
 PyPtr(o::PyObject) = getfield(o, :o)
