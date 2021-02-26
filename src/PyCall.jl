@@ -76,8 +76,19 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(pydecref, po)
-        return po
+        finalizer(_pydecref_eventually, po)
+    end
+end
+
+# we can only call pydecref from the main thread. if we happen to hit
+# GC from a different thread, add the finalizer back to the finalization
+# queue to try again later when we'll eventually be on the main thread.
+function _pydecref_eventually(po)
+    if Threads.threadid()==1
+        return pydecref(po)
+    else
+        finalizer(_pydecref_eventually, po)
+        return nothing
     end
 end
 
