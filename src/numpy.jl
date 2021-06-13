@@ -64,8 +64,8 @@ function npyinitialize()
     numpy = pyimport("numpy")
 
     # emit a warning if both Julia and NumPy are linked with MKL (#433)
-    if isless(VERSION,v"1.1")
-        julia_compiled_with_mkl = occursin("MKL", LinearAlgebra.BLAS.openblas_get_config() )
+    if VERSION < v"1.7"
+        julia_compiled_with_mkl = LinearAlgebra.BLAS.vendor() === :mkl
     else
         julia_compiled_with_mkl = :mkl in LinearAlgebra.BLAS.get_config().build_flags
     end
