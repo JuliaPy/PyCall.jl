@@ -15,5 +15,5 @@ end
 
 function convert(::Type{SparseMatrixCSC}, o::PyObject)
     I, J, V = scipysparse().find(o)
-    return sparse(I .+ 1, J .+ 1, V)
+    return sparse(I .+ 1, J .+ 1, V, o.shape...)
 end
