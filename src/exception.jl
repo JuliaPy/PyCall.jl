@@ -140,7 +140,7 @@ end
 #########################################################################
 # Mapping of Julia Exception types to Python exceptions
 
-const pyexc = Dict{DataType, PyPtr}()
+const pyexc = IdDict{DataType, PyPtr}()
 mutable struct PyIOError <: Exception end
 
 function pyexc_initialize()
