@@ -11,7 +11,7 @@
 function ioraise(e, bt = nothing)
     if isa(e, MethodError) || isa(e, ErrorException)
         ccall((@pysym :PyErr_SetString), Cvoid, (PyPtr, Cstring),
-              (pyexc::Dict)[PyIOError],
+              pyexc[PyIOError],
               showerror_string(e, bt))
     else
         pyraise(e, bt)

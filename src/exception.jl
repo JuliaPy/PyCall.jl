@@ -213,7 +213,7 @@ end
 
 function pyraise(e, bt = nothing)
     eT = typeof(e)
-    pyeT = haskey(pyexc::Dict, eT) ? pyexc[eT] : pyexc[Exception]
+    pyeT = haskey(pyexc, eT) ? pyexc[eT] : pyexc[Exception]
     err = PyJlError(e, bt)
     ccall((@pysym :PyErr_SetObject), Cvoid, (PyPtr, PyPtr),
           pyeT, PyObject(err))
