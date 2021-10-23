@@ -17,7 +17,10 @@ jobs:
           - ubuntu-latest
         architecture: [x64]
         python-version: ['3.8']
-        julia-version: ['1.5', 'nightly']
+        julia-version:
+          - '1.5'
+          - '~1.7.0-rc1'
+          # - 'nightly'  # TODO: reenable
       fail-fast: false
     env:
       PYTHON: python${{ matrix.python-version }}
