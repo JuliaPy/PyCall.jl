@@ -67,6 +67,9 @@ jobs:
         if: ${{ matrix.python-version != '2.7' }}
       - run: virtualenv --version
         if: ${{ matrix.python-version != '2.7' }}
+      - name: Install libpython2.7 for `find_libpython` test
+        run: sudo apt-get install python2.7-dev
+        if: ${{ matrix.python-version != '2.7' && matrix.os == 'ubuntu-latest' }}
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
         with:
