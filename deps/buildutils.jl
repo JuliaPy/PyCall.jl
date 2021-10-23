@@ -15,7 +15,7 @@ pysys(python::AbstractString, var::AbstractString) = pyvar(python, "sys", var)
 #########################################################################
 
 # print out extra info to help with remote debugging
-PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
+const PYCALL_DEBUG_BUILD = "yes" == get(ENV, "PYCALL_DEBUG_BUILD", "no")
 
 function exec_find_libpython(python::AbstractString, options)
     # Do not inline `@__DIR__` into the backticks to expand correctly.

@@ -6,18 +6,15 @@ include(joinpath(dirname(@__FILE__), "..", "deps", "buildutils.jl"))
 using Test
 
 @testset "find_libpython" begin
-    global PYCALL_DEBUG_BUILD = true
     for python in ["python", "python2", "python3"]
         # TODO: In Windows, word size should also be checked.
         Sys.iswindows() && break
         if Sys.which(python) === nothing
             @info "$python not available; skipping test"
         else
-            @info "Testing `find_libpython(python)`" python Sys.which(python)
             @test isfile(find_libpython(python)[2])
         end
     end
-    global PYCALL_DEBUG_BUILD = false
 
     # Test the case `find_libpython.py` does not print anything.  We
     # use the command `true` to mimic this case.
