@@ -2,7 +2,7 @@ const scipysparse_ = PyNULL()
 
 function scipysparse()
     if ispynull(scipysparse_)
-        copy!(scipysparse_, pyimport_conda("scipy.sparse", "scipy"))
+        copy!(scipysparse_, pyimport("scipy.sparse"))
     end
     return scipysparse_
 end
