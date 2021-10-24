@@ -39,7 +39,8 @@ jobs:
             architecture: x64
             python-version: '3.8'
             julia-version: '1.3'
-          # Test Python 2.7 only a small subset (TODO: drop 2.7):
+          # Test Python 2.7 only with a few combinations (TODO: drop 2.7).
+          # Note that it does not work in macOS:
           - os: ubuntu-latest
             architecture: x64
             python-version: '2.7'
