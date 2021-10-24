@@ -1,7 +1,6 @@
 using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
-import Conda
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -14,8 +13,9 @@ PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
 @testset "CI setup" begin
     if lowercase(get(ENV, "CI", "false")) == "true"
         @test !ispynull(pyimport_e("numpy"))
-        if PyCall.conda && ispynull(pyimport_e("scipy.sparse"))
-            Conda.add("scipy")
+        try
+            pyimport_conda("scipy.sparse", "scipy")
+        catch
         end
         @test !ispynull(pyimport_e("scipy.sparse"))
     end
