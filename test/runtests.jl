@@ -1,6 +1,7 @@
 using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
+using SparseArrays: SparseMatrixCSC, sparse, sprand
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -622,7 +623,6 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test_throws ArgumentError float(pybuiltin("type"))
 
     # sparse array conversion
-    import SparseArrays: SparseMatrixCSC, sparse, sprand
     S = sprand(10, 10, 0.2)
     PyS = PyObject(S)
     @test convert(SparseMatrixCSC, PyS) == S
