@@ -1,3 +1,5 @@
+using SparseArrays
+
 const scipysparse_ = PyNULL()
 
 function scipysparse()
@@ -6,8 +8,6 @@ function scipysparse()
     end
     return scipysparse_
 end
-
-using SparseArrays
 
 function PyObject(S::SparseMatrixCSC)
     scipysparse()["csc_matrix"]((S.nzval, S.rowval .- 1, S.colptr .- 1), shape=size(S))
