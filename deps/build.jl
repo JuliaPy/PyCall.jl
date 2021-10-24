@@ -68,7 +68,7 @@ try # make sure deps.jl file is removed on error
             @info string("Using the Python distribution in the Conda package by default.\n",
                  "To use a different Python version, set ENV[\"PYTHON\"]=\"pythoncommand\" and re-run Pkg.build(\"PyCall\").")
         else
-            @info string( "No system-wide Python was found; got the following error:\n",
+            @info string("No system-wide Python was found; got the following error:\n",
                   "$e1\nusing the Python distribution in the Conda package")
         end
         abspath(Conda.PYTHONDIR, "python" * (Sys.iswindows() ? ".exe" : ""))
