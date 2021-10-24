@@ -16,9 +16,9 @@ jobs:
         os:
           - ubuntu-latest
         architecture: [x64]
-        python-version: ['3.8']
+        python-version: ['3.10']
         julia-version:
-          - '1.5'
+          - '1'
           - '~1.7.0-rc1'
           # - 'nightly'  # TODO: reenable
       fail-fast: false
