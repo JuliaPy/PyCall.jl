@@ -18,11 +18,11 @@ jobs:
           - macos-latest
           - windows-latest
         architecture: [x64]
-        julia-version: ['1.5']
+        julia-version: ['1']
         include:
           - os: windows-latest
             architecture: x86
-            julia-version: '1.5'
+            julia-version: '1'
       fail-fast: false
     env:
       PYTHON: ""
@@ -32,6 +32,9 @@ jobs:
       ${{ matrix.os }} ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v1
+      - name: Install libpython2.7 for `find_libpython` test
+        run: sudo apt-get install python2.7-dev
+        if: ${{ matrix.python-version != '2.7' && matrix.os == 'ubuntu-latest' }}
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
         with:
