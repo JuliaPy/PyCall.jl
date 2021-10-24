@@ -10,7 +10,7 @@ function scipysparse()
 end
 
 function PyObject(S::SparseMatrixCSC)
-    scipysparse()["csc_matrix"]((S.nzval, S.rowval .- 1, S.colptr .- 1), shape=size(S))
+    scipysparse().csc_matrix((S.nzval, S.rowval .- 1, S.colptr .- 1), shape = size(S))
 end
 
 function convert(::Type{SparseMatrixCSC}, o::PyObject)
