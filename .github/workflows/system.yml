@@ -27,7 +27,7 @@ jobs:
           # 32 bit Windows:
           - os: windows-latest
             architecture: x86
-            python-version: '3.9'  # 3.10 not available yet?
+            python-version: '3.x'
             julia-version: '1.5'
           # Sweep python-version and julia-version only on Ubuntu:
           - os: ubuntu-latest
