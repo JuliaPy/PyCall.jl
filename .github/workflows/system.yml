@@ -28,7 +28,7 @@ jobs:
           - os: windows-latest
             architecture: x86
             python-version: '3.x'
-            julia-version: '1.5'
+            julia-version: '1'
           # Sweep python-version and julia-version only on Ubuntu:
           - os: ubuntu-latest
             architecture: x64
