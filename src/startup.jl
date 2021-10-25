@@ -73,7 +73,7 @@ else
         libpy_handle = proc_handle
         # Now determine the name of the python library that these symbols are from
         some_address_in_libpython = Libdl.dlsym(libpy_handle, :Py_GetVersion)
-        some_address_in_main_exe = Libdl.dlsym(proc_handle, Sys.isapple() ? :_mh_execute_header : :main)
+        some_address_in_main_exe = Libdl.dlsym(proc_handle, Sys.isapple() ? :_mh_execute_header : :_start)
         dlinfo1 = Ref{Dl_info}()
         dlinfo2 = Ref{Dl_info}()
         ccall(:dladdr, Cint, (Ptr{Cvoid}, Ptr{Dl_info}), some_address_in_libpython,
