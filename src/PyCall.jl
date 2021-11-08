@@ -31,6 +31,7 @@ end
 import Conda
 import MacroTools   # because of issue #270
 import Base.Iterators: filter
+import Libdl
 
 #########################################################################
 
@@ -472,7 +473,11 @@ end
 function _pyimport(name::AbstractString)
     cookie = ActivatePyActCtx()
     try
-        return PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
+        pyobject = PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
+        # From version 1.8 it is possible to detect when two versions 
+        # of the same shared library is loaded
+        VERSION > v"1.7.999" && Libdl.check_dllist()
+        return pyobject
     finally
         DeactivatePyActCtx(cookie)
     end
