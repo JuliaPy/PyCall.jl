@@ -475,8 +475,8 @@ function _pyimport(name::AbstractString)
     try
         pyobject = PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
         # From version 1.8 it is possible to detect when two versions 
-        # of the same shared library is loaded
-        VERSION > v"1.7.999" && Libdl.check_dllist()
+        # of the same shared library is loaded\
+        VERSION > v"1.7.999" && Libdl.dlopen("")
         return pyobject
     finally
         DeactivatePyActCtx(cookie)
