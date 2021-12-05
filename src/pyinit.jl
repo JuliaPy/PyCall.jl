@@ -201,7 +201,7 @@ function __init__()
 
     if new_pyversion.major != pyversion.major
         error("PyCall precompiled with Python $pyversion, but now using Python $new_pyversion; ",
-              "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
+              "you need to relaunch Julia and run `using PyPrefernces; PyPreferences.recompile()")
     end
 
     copy!(inspect, pyimport("inspect"))
