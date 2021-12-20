@@ -197,7 +197,7 @@ cannot be accessed outside `MyModule`.
 
 Here are solutions to some common problems:
 
-* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")."path"), "")`.
+* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(pyimport("sys")."path", "")`.
 
 ## Python object interfaces
 
