@@ -14,7 +14,7 @@ export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
        pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
-       pywrapfn, pysetarg!, pysetargs!
+       pywrapfn, pysetarg!, pysetargs!, @pyinclude
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,

@@ -232,3 +232,24 @@ macro py_str(code, options...)
         ret
     end
 end
+
+"""
+    @pyinclude(filename)
+
+Execute the Python script in the file `filename` as if
+it were in a `py\"\"\" ... \"\"\"` block, e.g. so that
+any globals defined in `filename` are available to
+subsequent `py"..."` evaluations.
+
+(Unlike `py"..."`, however, `@pyinclude` does not
+interpolate Julia variables into `\$var` expressions —
+the `filename` script must be pure Python.)
+"""
+macro pyinclude(fname)
+    quote
+        m = pynamespace($__module__)
+        fname = $(esc(fname))
+        pyeval_(read(fname, String), m, m, Py_file_input, fname)
+        nothing
+    end
+end
