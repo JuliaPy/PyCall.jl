@@ -819,3 +819,13 @@ if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
     include("test_venv.jl")
     include("test_build.jl")
 end
+
+@testset "@pyinclude" begin
+    mktemp() do path, io
+        print(io, "foo1 = 1\nbar2 = 2\n")
+        close(io)
+        @pyinclude(path)
+        @test py"foo1" == 1
+        @test py"bar2" == 2
+    end
+end
