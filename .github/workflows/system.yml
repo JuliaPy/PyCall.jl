@@ -87,3 +87,6 @@ jobs:
           file: ./lcov.info
           flags: unittests
           name: codecov-umbrella
+      - name: tmate session if tests fail
+        if: failure() && ${{ matrix.os == windows-latest }}
+        uses: mxschmitt/action-tmate@v3
