@@ -27,14 +27,14 @@ Locate libpython associated with this Python executable.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from __future__ import print_function, absolute_import
+from __future__ import absolute_import, print_function
 
-from logging import getLogger
 import ctypes.util
 import functools
 import os
 import sys
 import sysconfig
+from logging import getLogger  # see `julia.core.logger`
 
 logger = getLogger("find_libpython")
 
@@ -76,6 +76,9 @@ class Dl_info(ctypes.Structure):
     ]
 
 
+# fmt: off
+
+
 def _linked_libpython_unix():
     libdl = ctypes.CDLL(ctypes.util.find_library("dl"))
     libdl.dladdr.argtypes = [ctypes.c_void_p, ctypes.POINTER(Dl_info)]
@@ -88,6 +91,8 @@ def _linked_libpython_unix():
     if retcode == 0:  # means error
         return None
     path = os.path.realpath(dlinfo.dli_fname.decode())
+    if not os.path.exists(path):
+        return None
     if path == os.path.realpath(sys.executable):
         return None
     return path
@@ -182,9 +187,8 @@ def candidate_names(suffix=SHLIB_SUFFIX):
     sysdata = dict(
         v=sys.version_info,
         # VERSION is X.Y in Linux/macOS and XY in Windows:
-        VERSION=(sysconfig.get_python_version() or
-                 "{v.major}.{v.minor}".format(v=sys.version_info) or
-                 sysconfig.get_config_var("VERSION")),
+        VERSION=(sysconfig.get_config_var("VERSION") or
+                 "{v.major}.{v.minor}".format(v=sys.version_info)),
         ABIFLAGS=(sysconfig.get_config_var("ABIFLAGS") or
                   sysconfig.get_config_var("abiflags") or ""),
     )
@@ -264,8 +268,13 @@ def normalize_path(path, suffix=SHLIB_SUFFIX, is_apple=is_apple):
 
     Parameters
     ----------
-    path : str ot None
+    path : str or None
         A candidate path to a shared library.
+
+    Returns
+    -------
+    path : str or None
+        Normalized existing path or `None`.
     """
     if not path:
         return None

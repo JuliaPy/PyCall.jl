@@ -1,5 +1,17 @@
+using Preferences
+pypref_py = lowercase(get(ENV, "PYPREFERENCES_PYTHON", ""))
+if pypref_py == "conda"
+    PyPrefs_UUID = Base.UUID("cc9521c6-0242-4dda-8d66-c47a9d9eec02")
+    delete_preferences!(PyPrefs_UUID, "python3", force=true)
+    set_preferences!(PyPrefs_UUID, "conda"=>true)
+
+    using PyPreferences
+    PyPreferences.use_conda()
+end
+
 using PyCall
 using PyCall: hasproperty
+using PyPreferences
 using Test, Dates, Serialization
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
@@ -8,6 +20,9 @@ filter(f, d::AbstractDict) = Base.filter(f, d)
 PYTHONPATH=get(ENV,"PYTHONPATH","")
 PYTHONHOME=get(ENV,"PYTHONHOME","")
 PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
+
+PyPreferences.status()
+
 @info "Python version $pyversion from $(PyCall.libpython), PYTHONHOME=$(PyCall.PYTHONHOME)\nENV[PYTHONPATH]=$PYTHONPATH\nENV[PYTHONHOME]=$PYTHONHOME\nENV[PYTHONEXECUTABLE]=$PYTHONEXECUTABLE"
 
 @testset "CI setup" begin
@@ -15,6 +30,8 @@ PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
         @test !ispynull(pyimport_e("numpy"))
     end
 end
+
+include("test_venv.jl")
 
 roundtrip(T, x) = convert(T, PyObject(x))
 roundtrip(x) = roundtrip(PyAny, x)
@@ -817,7 +834,6 @@ include("test_pyfncall.jl")
 include("testpybuffer.jl")
 if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
     include("test_venv.jl")
-    include("test_build.jl")
 end
 
 @testset "@pyinclude" begin

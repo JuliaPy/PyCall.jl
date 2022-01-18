@@ -18,14 +18,14 @@ jobs:
           - macos-latest
           - windows-latest
         architecture: [x64]
-        julia-version: ['1']
+        julia-version: ['1.6', '1']
         include:
           - os: windows-latest
             architecture: x86
             julia-version: '1'
       fail-fast: false
     env:
-      PYTHON: ""
+      PYPREFERENCES_PYTHON: "conda"
     name: Test
       Julia ${{ matrix.julia-version }}
       Conda
@@ -41,7 +41,13 @@ jobs:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
-      - uses: julia-actions/julia-buildpkg@v1
+      - name: Install PyPreferences
+        shell: julia --project=@. {0}
+        run: |
+          using Pkg;
+          pkg"dev ./PyPreferences.jl";
+          using PyPreferences;
+          PyPreferences.use_conda();
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v1

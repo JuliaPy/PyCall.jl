@@ -20,7 +20,7 @@ jobs:
         architecture: [x64]
         python-version: ['3.x']
         julia-version:
-          - '1.0'
+          - '1.6'
           - '1'
           - 'nightly'
         include:
@@ -34,14 +34,6 @@ jobs:
             architecture: x64
             python-version: '3.9'
             julia-version: '1'
-          - os: ubuntu-latest
-            architecture: x64
-            python-version: '3.x'
-            julia-version: '1.5'
-          - os: ubuntu-latest
-            architecture: x64
-            python-version: '3.x'
-            julia-version: '1.4'
           # Test Python 2.7 only with a few combinations (TODO: drop 2.7).
           # Note that it does not work in macOS:
           - os: ubuntu-latest
@@ -80,10 +72,14 @@ jobs:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
-      - uses: julia-actions/julia-buildpkg@v1
-        env:
-          PYTHON: python
-      - run: julia test/check_deps_version.jl ${{ matrix.python-version }}
+      - name: Set PYTHON Env variable
+        run: echo "PYTHON=python" >> $GITHUB_ENV
+        if: ${{ matrix.python-version == '2.7' }}
+      - name: Install PyPreferences
+        shell: julia --project=@. {0}
+        run: |
+          using Pkg;
+          pkg"dev ./PyPreferences.jl"
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v1

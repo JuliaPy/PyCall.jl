@@ -5,7 +5,7 @@ if isdefined(Base, :Experimental) && isdefined(Base.Experimental, Symbol("@optle
 end
 
 using PyPreferences
-using VersionParsing
+using VersionParsing: vparse
 
 export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims,
        PyPtr, pyincref, pydecref, pyversion,
@@ -35,7 +35,7 @@ import Base.Iterators: filter
 
 #########################################################################
 
-include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
+include("startup_helpers.jl")
 include("startup.jl")
 
 """
