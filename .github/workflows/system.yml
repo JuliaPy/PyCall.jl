@@ -88,5 +88,5 @@ jobs:
           flags: unittests
           name: codecov-umbrella
       - name: tmate session if tests fail
-        if: failure() && ${{ matrix.os == windows-latest }}
+        if: failure()
         uses: mxschmitt/action-tmate@v3
