@@ -24,7 +24,7 @@ this after installing the package, run:
 
 ```julia
 Pkg.add(PackageSpec(name="PyCall", rev="master"))
-Pkg.build("PyCall")`
+Pkg.build("PyCall")
 ```
 
 By default on Mac and Windows systems, `Pkg.add("PyCall")`
