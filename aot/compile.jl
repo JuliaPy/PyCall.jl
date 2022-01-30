@@ -9,8 +9,8 @@ using PackageCompiler
 using Pkg
 
 Pkg.activate(@__DIR__)
+Pkg.develop(PackageSpec(name="PyPreferences", path=joinpath(dirname(@__DIR__), "PyPreferences.jl")))
 Pkg.develop(PackageSpec(name="PyCall", path=dirname(@__DIR__)))
-Pkg.build("PyCall")
 Pkg.activate()
 
 sysimage_path = joinpath(@__DIR__, "sys.$(Libdl.dlext)")

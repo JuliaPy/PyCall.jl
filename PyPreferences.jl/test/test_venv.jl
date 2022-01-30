@@ -18,14 +18,8 @@ function test_venv_activation(path)
     newpython = PyCall.python_cmd(venv=path).exec[1]
 
     # Run a fresh Julia process with new Python environment
-    # must manually set the preferences before loading PyPreferences
-    # in order not to have to run again the julia process 
     code = """
     $(Base.load_path_setup_code())
-    using Preferences
-    PyPrefs_UUID = Base.UUID("cc9521c6-0242-4dda-8d66-c47a9d9eec02")
-    delete_preferences!(PyPrefs_UUID, "conda", force=true)
-    set_preferences!(PyPrefs_UUID, "python"=>"$newpython", force=true)
     using PyCall
     println(PyCall.pyimport("sys").executable)
     println(PyCall.pyimport("sys").exec_prefix)
@@ -35,6 +29,7 @@ function test_venv_activation(path)
     # library.  Using standard library like `os` does not work
     # because those files are not created.
     env = copy(ENV)
+    env["PYCALL_JL_RUNTIME_PYTHON"] = newpython
     jlcmd = setenv(`$(Base.julia_cmd()) --startup-file=no -e $code`, env)
     if Sys.iswindows()
         # Marking the test broken in Windows.  It seems that

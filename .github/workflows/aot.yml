@@ -16,10 +16,11 @@ jobs:
         os:
           - ubuntu-latest
         architecture: [x64]
-        python-version: ['3.x']
+        python-version: ['3.9']
         julia-version:
+          - '1.6'
           - '1'
-          - '~1.7.0-rc1'
+          - '~1.7'
           # - 'nightly'  # TODO: reenable
       fail-fast: false
     env:
@@ -46,7 +47,6 @@ jobs:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
-
       - run: julia -e 'using Pkg; pkg"add PackageCompiler@v1"'
 
       - run: aot/compile.jl

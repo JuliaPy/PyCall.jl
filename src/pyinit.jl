@@ -98,7 +98,7 @@ function python_cmd(args::Cmd = ``;
 end
 
 function find_libpython(python::AbstractString)
-    script = joinpath(@__DIR__, "..", "deps", "find_libpython.py")
+    script = joinpath(@__DIR__, "..", "PyPreferences.jl", "src", "find_libpython.py")
     cmd = python_cmd(`$script`; python = python)
     try
         return read(cmd, String)
@@ -154,34 +154,7 @@ function __init__()
     if !already_inited
         pyhome = PYTHONHOME
 
-        if isfile(get(ENV, "PYCALL_JL_RUNTIME_PYTHON", ""))
-            _current_python[] = ENV["PYCALL_JL_RUNTIME_PYTHON"]
-
-            # Check libpython compatibility.
-            venv_libpython = find_libpython(current_python())
-            if venv_libpython === nothing
-                error("""
-                `libpython` for $(current_python()) cannot be found.
-                PyCall.jl cannot initialize Python safely.
-                """)
-            elseif venv_libpython != libpython
-                error("""
-                Incompatible `libpython` detected.
-                `libpython` for $(current_python()) is:
-                    $venv_libpython
-                `libpython` for $pyprogramname is:
-                    $libpython
-                PyCall.jl only supports loading Python environment using
-                the same `libpython`.
-                """)
-            end
-
-            if haskey(ENV, "PYCALL_JL_RUNTIME_PYTHONHOME")
-                pyhome = ENV["PYCALL_JL_RUNTIME_PYTHONHOME"]
-            else
-                pyhome = pythonhome_of(current_python())
-            end
-        elseif conda && Sys.iswindows()
+        if conda && Sys.iswindows()
             # some Python modules on Windows need the PATH to include
             # Anaconda's Library\bin directory in order to find their DLL files
             ENV["PATH"] = Conda.bin_dir(Conda.ROOTENV) * ";" * get(ENV, "PATH", "")
@@ -201,7 +174,7 @@ function __init__()
 
     if new_pyversion.major != pyversion.major
         error("PyCall precompiled with Python $pyversion, but now using Python $new_pyversion; ",
-              "you need to relaunch Julia and re-run Pkg.build(\"PyCall\")")
+              "you need to relaunch Julia and run `using PyPreferences; PyPreferences.recompile()")
     end
 
     copy!(inspect, pyimport("inspect"))
