@@ -67,7 +67,7 @@ function npyinitialize()
     julia_mkl = @static if VERSION < v"1.7"
         LinearAlgebra.BLAS.vendor() === :mkl
     else
-        any(contains("mkl"), getfield.(BLAS.get_config().loaded_libs, :libname))
+        any(contains("mkl"), getfield.(LinearAlgebra.BLAS.get_config().loaded_libs, :libname))
     end
     if julia_mkl && LinearAlgebra.BLAS.BlasInt === Int64 && hasproperty(numpy, "__config__")
         config = numpy."__config__"
