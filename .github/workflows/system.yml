@@ -48,7 +48,7 @@ jobs:
             architecture: x64
             python-version: '2.7'
             julia-version: '1'
-          - os: windows-latest
+          - os: windows-2019
             architecture: x64
             python-version: '2.7'
             julia-version: '1'
