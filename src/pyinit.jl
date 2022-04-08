@@ -256,6 +256,15 @@ function __init__()
         end
     end
 
+    # ensure Jupyter/IJulia flushes I/O streams (issue #912)
+    if isdefined(Main, :IJulia) && IJulia.inited
+        Main.IJulia.push_postexecute_hook() do
+            sys = pyimport("sys")
+            sys."stdout"."flush"()
+            sys."stderr"."flush"()
+        end
+    end
+
     # Configure finalization steps.
     #
     # * In julia/PyCall, `julia` needs to call `Py_Finalize` to
