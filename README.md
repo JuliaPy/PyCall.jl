@@ -53,9 +53,9 @@ to the path of the `python` (or `python3` etc.) executable and then re-running `
 In Julia:
 
     ENV["PYTHON"] = "... path of the python executable ..."
-    # ENV["PYTHON"] = raw"C:\Python37-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python37-x64\\python.exe"
+    # ENV["PYTHON"] = raw"C:\Python310-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python310-x64\\python.exe"
 
-    # ENV["PYTHON"] = "/usr/bin/python3.7"           # example for *nix
+    # ENV["PYTHON"] = "/usr/bin/python3.10"           # example for *nix
     Pkg.build("PyCall")
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
