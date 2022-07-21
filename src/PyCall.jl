@@ -542,7 +542,7 @@ set ENV["PYTHON"]="", run Pkg.build("PyCall"), and re-launch Julia. Then,
 To install the $name module, you can use `pyimport_conda("$(escape_string(name))", PKG)`,
 where PKG is the Anaconda package that contains the module $name,
 or alternatively you can use the Conda package directly (via
-`using Conda` followed by `Conda.add` etcetera).
+`using Conda` followed by `Conda.add("$(escape_string(name))")`).
 """
                 end
                 e = pyerror(string(e.msg, "\n\n", msg, "\n"), e)
