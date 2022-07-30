@@ -298,7 +298,13 @@ end
 function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
-    p == C_NULL && pyerr_clear()
+    if p == C_NULL && pyerr_occurred()
+        e = pyerror("")
+        if e.T.__name__ != "AttributeError"
+            throw(e)
+        end
+        pyerr_clear()
+    end
     return p
 end
 
