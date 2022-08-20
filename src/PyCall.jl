@@ -333,15 +333,17 @@ setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
 setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
 
 function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
-    if ispynull(o)
-        throw(ArgumentError("assign of NULL PyObject"))
-    end
-    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    ispynull(o) && throw(ArgumentError("assign of NULL PyObject"))
+    p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    if p == -1 && pyerr_occurred()
+        e = pyerror("PyObject_SetAttrString")
+        if e.T.__name__ != "AttributeError"
+            throw(e)
+        end
         pyerr_clear()
         throw(KeyError(s))
     end
-    o
+    return o
 end
 
 function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}
