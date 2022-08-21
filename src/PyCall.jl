@@ -337,7 +337,7 @@ function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
     if p == -1 && pyerr_occurred()
         e = pyerror("PyObject_SetAttrString")
-        if e.T != @pyglobalobjptr(:PyExc_AttributeError)
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
             throw(e)
         end
         pyerr_clear()
