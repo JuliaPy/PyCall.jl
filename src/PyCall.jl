@@ -300,7 +300,7 @@ function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL && pyerr_occurred()
         e = pyerror("PyObject_GetAttrString")
-        if e.T != @pyglobalobjptr(:PyExc_AttributeError)
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
             throw(e)
         end
         pyerr_clear()
