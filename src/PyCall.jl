@@ -298,7 +298,13 @@ end
 function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
-    p == C_NULL && pyerr_clear()
+    if p == C_NULL && pyerr_occurred()
+        e = pyerror("PyObject_GetAttrString")
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
+            throw(e)
+        end
+        pyerr_clear()
+    end
     return p
 end
 
@@ -327,15 +333,17 @@ setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
 setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
 
 function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
-    if ispynull(o)
-        throw(ArgumentError("assign of NULL PyObject"))
-    end
-    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    ispynull(o) && throw(ArgumentError("assign of NULL PyObject"))
+    p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    if p == -1 && pyerr_occurred()
+        e = pyerror("PyObject_SetAttrString")
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
+            throw(e)
+        end
         pyerr_clear()
         throw(KeyError(s))
     end
-    o
+    return o
 end
 
 function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}

@@ -829,3 +829,26 @@ end
         @test py"bar2" == 2
     end
 end
+
+@testset "proper exception raised" begin
+    py"""
+    class A:
+        def __getattr__(self, name):
+            if name == "a":
+                raise ValueError(name)
+            else:
+                raise AttributeError()
+
+        def __setattr__(self, name, value):
+            if value == 0:
+                raise ValueError(value)
+            else:
+                raise AttributeError()
+    """
+    a = py"A"()
+    @test_throws PyCall.PyError a.a
+    @test_throws KeyError a.b
+
+    @test_throws PyCall.PyError a.a = 0
+    @test_throws KeyError a.a = 1
+end
