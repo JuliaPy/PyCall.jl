@@ -257,7 +257,7 @@ function __init__()
     end
 
     # ensure Jupyter/IJulia flushes I/O streams (issue #912)
-    if isdefined(Main, :IJulia) && IJulia.inited
+    if isdefined(Main, :IJulia) && Main.IJulia.inited
         Main.IJulia.push_postexecute_hook() do
             sys = pyimport("sys")
             sys."stdout"."flush"()
