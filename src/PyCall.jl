@@ -1,4 +1,9 @@
 module PyCall
+# const python = "C:\\Users\\TR\\.julia\\conda\\3\\python.exe"
+# const libpython = "C:\\Users\\TR\\.julia\\conda\\3\\python39.dll"
+# const pyprogramname = "C:\\Users\\TR\\.julia\\conda\\3\\python.exe"
+# const pyversion_build = v"3.9.10"
+# const PYTHONHOME = "C:\\Users\\TR\\.julia\\conda\\3"
 
 if isdefined(Base, :Experimental) && isdefined(Base.Experimental, Symbol("@optlevel"))
     @eval Base.Experimental.@optlevel 1
@@ -35,13 +40,51 @@ import Base.Iterators: filter
 #########################################################################
 
 include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
+module BuildTimeUtils
+    if isdefined(Base, :Experimental)
+        # Julia 1.2
+        if isdefined(Base.Experimental, Symbol("@optlevel"))
+            @eval Base.Experimental.@optlevel 1
+        end
+
+        if isdefined(Base.Experimental, Symbol("@compiler_options"))
+            @eval Base.Experimental.@compiler_options infer=no compile=min optimize=0
+        end
+    end
+    include(joinpath(dirname(@__FILE__), "..", "deps","buildutils.jl"))
+    include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
+end
+
+function _SetupPythonEnv()
+    local libpy_handle
+    if ( strip(string(InProcessProcID)) != string(getpid())
+       || isempty(string(InProcessLibPyHandle)))
+
+       libpy_handle = Libdl.dlopen(abspath(string(libpython)), Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+       setenvstring(InProcessProcID, string(getpid()))
+       setenvstring(InProcessLibPyHandle, string(UInt(libpy_handle)))
+       _start_python_from_julia[] = true
+    else
+        libpy_handle = Ptr{Cvoid}(parse(UInt, string(InProcessLibPyHandle)))
+        _start_python_from_julia[] = false
+    end
+
+    pyversion = vparse(split(Py_GetVersion(libpy_handle))[1])
+    # TODO: CHECK VERSION
+    if !Py_IsInitialized(libpy_handle)
+        Py_SetPythonHome(libpy_handle, pyversion, string(PYTHONHOME))
+        Py_SetProgramName(libpy_handle, pyversion, string(pyprogramname))
+        Py_InitializeEx(libpy_handle)
+    end
+    libpy_handle
+end
+
 include("startup.jl")
 
 """
 Python executable used by PyCall in the current process.
 """
-current_python() = _current_python[]
-const _current_python = Ref(pyprogramname)
+current_python() = String(pyprogramname)
 
 #########################################################################
 
@@ -688,7 +731,7 @@ function anaconda_conda()
     if conda || !occursin("conda", unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())))
         return ""
     end
-    aconda = joinpath(dirname(pyprogramname), "conda")
+    aconda = joinpath(dirname(pyprogramname[]), "conda")
     return isfile(aconda) ? aconda : ""
 end
 

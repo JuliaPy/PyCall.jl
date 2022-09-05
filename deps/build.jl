@@ -100,14 +100,37 @@ try # make sure deps.jl file is removed on error
     end
 
     writeifchanged("deps.jl", """
-    const python = "$(escape_string(python))"
-    const libpython = "$(escape_string(libpy_name))"
-    const pyprogramname = "$(escape_string(programname))"
+    include("envstring.jl")
+    const python = EnvString("PYCALL_PYEXE", "$(escape_string(python))")
     const pyversion_build = $(repr(pyversion))
-    const PYTHONHOME = "$(escape_string(PYTHONHOME))"
+
+    const libpython = EnvString("PYCALL_LIBPYTHON") do
+        if "$(escape_string(python))" == python
+            "$(escape_string(libpy_name))"
+        else
+            BuildTimeUtils.find_libpython(python)[2]
+        end
+    end
+
+    const pyprogramname = EnvString("PYCALL_PYPROGRAM") do
+        if "$(escape_string(libpy_name))" == libpython
+            "$(escape_string(programname))"
+        else
+            BuildTimeUtils.pysys(python, "executable")
+        end
+    end
+
+    const PYTHONHOME = EnvString("PYCALL_PYHOME") do
+        if "$(escape_string(libpy_name))" == libpython
+            "$(escape_string(PYTHONHOME))"
+        else
+            BuildTimeUtils.pythonhome_of(python)
+        end
+    end
 
     "True if we are using the Python distribution in the Conda package."
-    const conda = $use_conda
+    const _env_conda = EnvString("PYCALL_USECONDA", "$use_conda")
+    conda = parse(Bool, String(_env_conda))
     """)
 
     # Make subsequent builds (e.g. Pkg.update) use the same Python by default:

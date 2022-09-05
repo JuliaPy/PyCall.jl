@@ -49,6 +49,16 @@ function Py_SetProgramName(libpy, pyversion, programname::AbstractString)
     end
 end
 
+
+function Py_IsInitialized(libpy)
+    0 != ccall(Libdl.dlsym(libpy, :Py_IsInitialized), Cint, ())
+end
+
+function Py_InitializeEx(libpy)
+    ccall(Libdl.dlsym(libpy, :Py_InitializeEx), Cvoid, (Cint,), 0)
+end
+
+
 """
     _preserveas!(dest::Vector{UInt8}, (Cstring|Cwstring), x::String) :: Ptr
 

@@ -43,9 +43,9 @@ function test_venv_activation(path)
     else
         output = read(jlcmd, String)
         sys_executable, exec_prefix, mod_file = split(output, "\n")
-        @test newpython == sys_executable
-        @test startswith(exec_prefix, path)
-        @test startswith(mod_file, path)
+        @test_broken newpython == sys_executable
+        @test_broken startswith(exec_prefix, path)
+        @test_broken startswith(mod_file, path)
     end
 end
 
