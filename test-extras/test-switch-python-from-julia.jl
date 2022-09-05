@@ -1,3 +1,3 @@
 # change it to any Python compatibile with the last build.
-ENV["PYCALL_PYEXE"] = Sys.which("python")
+ENV["PYTHON"] = Sys.which("python")
 using PyCall

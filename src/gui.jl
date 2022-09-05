@@ -115,7 +115,7 @@ end
 # this seems to fix some of the path-related problems on Windows.
 # ... unfortunately, it seems fixqtpath has to be called before
 # the Qt library is loaded.
-function fixqtpath(qtconf=joinpath(dirname(pyprogramname[]),"qt.conf"))
+function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
     haskey(ENV, "QT_PLUGIN_PATH") && return false
     if isfile(qtconf)
         for line in eachline(qtconf)
