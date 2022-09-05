@@ -75,9 +75,6 @@ try # make sure deps.jl file is removed on error
     end
 
     use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
-    if use_conda
-        Conda.add("numpy")
-    end
 
     (libpython, libpy_name) = find_libpython(python)
     programname = pysys(python, "executable")
