@@ -290,7 +290,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
-    # hasproperty, getproperty, and propertynames
+    # hasproperty, getproperty, trygetproperty, and propertynames
     py"""
     class A:
         class B:
@@ -302,6 +302,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     A = py"A"
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
+    @test PyCall.trygetproperty(A, "C", nothing) === py"None"
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
         @test :D in propertynames(A.B)
