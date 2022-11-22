@@ -99,8 +99,10 @@ macro pycall(ex)
     end
     func = ex.args[1].args[1]
     args, kwargs = ex.args[1].args[2:end], []
-    if isexpr(args[1],:parameters)
-        kwargs, args = args[1], args[2:end]
+    if length(args) > 0
+        if isexpr(args[1],:parameters)
+            kwargs, args = args[1], args[2:end]
+        end
     end
     T = ex.args[2]
     :(pycall($(map(esc,[kwargs; func; T; args])...)))
