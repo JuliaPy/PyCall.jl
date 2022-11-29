@@ -980,16 +980,8 @@ include("serialize.jl")
 include("pyinit.jl")
 
 #########################################################################
-# Precompilation: just an optimization to speed up initialization.
-# Here, we precompile functions that are passed to cfunction by __init__,
-# for the reasons described in JuliaLang/julia#12256.
 
-precompile(pyjlwrap_call, (PyPtr,PyPtr,PyPtr))
-precompile(pyjlwrap_dealloc, (PyPtr,))
-precompile(pyjlwrap_repr, (PyPtr,))
-precompile(pyjlwrap_hash, (PyPtr,))
-precompile(pyjlwrap_hash32, (PyPtr,))
+include("precompile.jl")
 
-# TODO: precompilation of the io.jl functions
-
+#########################################################################
 end # module PyCall
