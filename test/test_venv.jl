@@ -46,7 +46,7 @@ function test_venv_activation(path)
         # Marking the test broken in Windows.  It seems that
         # venv copies .dll on Windows and libpython check in
         # PyCall.__init__ detects that.
-        @test_broken begin
+        @test begin
             output = read(jlcmd, String)
             sys_executable, exec_prefix, mod_file = split(output, "\n")
             newpython == sys_executable
