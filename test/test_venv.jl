@@ -1,14 +1,14 @@
 using PyCall, Test
 
 """Gets temp directory, possibly with user-set environment variable"""
-function _mktempdir(parent=nothing; kwargs...)
+function _mktempdir(f::Function, parent=nothing; kwargs...)
     if parent === nothing && haskey(ENV, "_TMP_DIR")
-        return mktempdir(ENV["_TMP_DIR"]; kwargs...)
+        return mktempdir(f, ENV["_TMP_DIR"]; kwargs...)
     end
     if parent === nothing
         parent = tempdir()
     end
-    return mktempdir(parent; kwargs...)
+    return mktempdir(f, parent; kwargs...)
 end
 
 
