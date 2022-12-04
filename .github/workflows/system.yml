@@ -84,6 +84,12 @@ jobs:
           PYTHON: python
       - run: julia test/check_deps_version.jl ${{ matrix.python-version }}
       - uses: julia-actions/julia-runtest@v1
+        env:
+          # Windows temp directories break the CI:
+          #  https://github.com/actions/runner-images/issues/712
+          #  so, we use
+          #  https://docs.github.com/en/actions/learn-github-actions/contexts#runner-context
+          _TMP_DIR: ${{ runner.temp }}
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v1
         with:
