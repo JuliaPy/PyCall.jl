@@ -1,5 +1,16 @@
 using PyCall, Test
 
+"""Gets temp directory, possibly with user-set environment variable"""
+function _mktempdir(f::Function, parent=nothing; kwargs...)
+    if parent === nothing && haskey(ENV, "_TMP_DIR")
+        return mktempdir(f, ENV["_TMP_DIR"]; kwargs...)
+    end
+    if parent === nothing
+        parent = tempdir()
+    end
+    return mktempdir(f, parent; kwargs...)
+end
+
 
 function test_venv_has_python(path)
     newpython = PyCall.python_cmd(venv=path).exec[1]
@@ -35,7 +46,7 @@ function test_venv_activation(path)
         # Marking the test broken in Windows.  It seems that
         # venv copies .dll on Windows and libpython check in
         # PyCall.__init__ detects that.
-        @test_broken begin
+        @test begin
             output = read(jlcmd, String)
             sys_executable, exec_prefix, mod_file = split(output, "\n")
             newpython == sys_executable
@@ -57,7 +68,7 @@ end
     elseif Sys.which(pyname) === nothing
         @info "No $pyname command. Skipping the test..."
     else
-        mktempdir() do tmppath
+        _mktempdir() do tmppath
             if PyCall.pyversion.major == 2
                 path = joinpath(tmppath, "kind")
             else
@@ -108,7 +119,7 @@ end
     elseif !success(PyCall.python_cmd(`-c "import venv"`, python=python))
         @info "Skip venv test since venv package is missing."
     else
-        mktempdir() do tmppath
+        _mktempdir() do tmppath
             if PyCall.pyversion.major == 2
                 path = joinpath(tmppath, "kind")
             else
