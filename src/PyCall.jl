@@ -299,7 +299,7 @@ function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL && pyerr_occurred()
-        e = pyerror("PyObject_GetAttrString")
+        e = PyError("PyObject_GetAttrString")
         if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
             throw(e)
         end
@@ -336,7 +336,7 @@ function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     ispynull(o) && throw(ArgumentError("assign of NULL PyObject"))
     p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
     if p == -1 && pyerr_occurred()
-        e = pyerror("PyObject_SetAttrString")
+        e = PyError("PyObject_SetAttrString")
         if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
             throw(e)
         end
@@ -507,7 +507,7 @@ function pyimport(name::AbstractString)
     o = _pyimport(name)
     if ispynull(o)
         if pyerr_occurred()
-            e = pyerror("PyImport_ImportModule")
+            e = PyError("PyImport_ImportModule")
             if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
@@ -553,7 +553,7 @@ or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
                 end
-                e = pyerror(string(e.msg, "\n\n", msg, "\n"), e)
+                e = PyError(string(e.msg, "\n\n", msg, "\n"), e)
             end
             throw(e)
         else
