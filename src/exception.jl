@@ -49,6 +49,19 @@ function show(io::IO, e::PyError)
     end
 end
 
+# like pyerror(msg) but type-stable: always returns PyError
+function PyError(msg::AbstractString)
+    ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
+    # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
+    ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+    ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+    return PyError(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
+end
+
+# replace the message from another error
+PyError(msg::AbstractString, e::PyError) =
+    PyError(msg, e.T, e.val, e.traceback)
+
 #########################################################################
 # Conversion of Python exceptions into Julia exceptions
 
@@ -106,17 +119,12 @@ macro pycheckz(ex)
     :(@pycheckv $(esc(ex)) -1)
 end
 
-function pyerror(msg::AbstractString)
-    ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
-    # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-    ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-    ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-    pyerror(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
-end
+# like PyError(...) but type-unstable: may unwrap a PyJlError
+# if one was thrown by a nested pyjlwrap function.
 
-function pyerror(msg::AbstractString, e::PyError)
+pyerror(msg::AbstractString) = pyerror(msg, PyError(msg))
+pyerror(msg::AbstractString, e::PyError) =
     pyerror(msg, e.T, e.val, e.traceback)
-end
 
 function pyerror(msg::AbstractString, ptype::PyObject, pvalue::PyObject, ptraceback::PyObject)
     pargs = _getproperty(pvalue, "args")
