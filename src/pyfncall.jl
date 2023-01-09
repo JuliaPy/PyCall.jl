@@ -102,7 +102,6 @@ macro pycall(ex)
     if !isempty(args) && isexpr(args[1],:parameters)
         kwargs, args = args[1], args[2:end]
     end
-    end
     T = ex.args[2]
     :(pycall($(map(esc,[kwargs; func; T; args])...)))
 end
