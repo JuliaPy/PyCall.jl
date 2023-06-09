@@ -620,6 +620,18 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test_throws ArgumentError float(pybuiltin("type"))
 end
 
+@testset "deepcopy #757" begin
+    struct S757; a; b; end
+    obj = py"[1,2,3]"o
+    @test obj isa PyObject
+    @test_throws ErrorException deepcopy(obj)
+    @test_throws ErrorException deepcopy([obj])
+    @test_throws ErrorException deepcopy(S757([obj], 2))
+    GC.gc()
+    pyimport("gc").collect()
+    @test collect(obj) == [1,2,3]
+end
+
 ######################################################################
 #@pydef tests: type declarations need to happen at top level
 
@@ -855,3 +867,4 @@ end
     @test_throws PyCall.PyError a.a = 0
     @test_throws KeyError a.a = 1
 end
+

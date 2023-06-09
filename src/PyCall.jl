@@ -979,6 +979,14 @@ include("serialize.jl")
 
 include("pyinit.jl")
 
+function Base.deepcopy_internal(obj::PyObject, stackdict::Base.IdDict)
+    msg = """
+    Deepcopy is disabled on PyObject. See
+    https://github.com/JuliaPy/PyCall.jl/issues/757
+    """
+    error(msg)
+end
+
 #########################################################################
 
 include("precompile.jl")
