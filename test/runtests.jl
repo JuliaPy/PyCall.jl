@@ -621,6 +621,14 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 end
 
 @testset "deepcopy #757" begin
+    l = py"[1,2,3]"o
+    l2 = deepcopy(l)
+    @test l == l2
+    l2.append(4)
+    @test l != l2
+    @test collect(l2) == [1,2,3,4]
+    @test collect(l) == [1,2,3]
+
     obj = py"""
     class C757:
         def __init__(self, a, b):
