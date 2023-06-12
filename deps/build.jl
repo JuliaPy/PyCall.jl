@@ -75,7 +75,8 @@ try # make sure deps.jl file is removed on error
     end
 
     use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
-    if use_conda
+    enable_numpy_install = parse(Bool, get(ENV, "PYCALL_INSTALL_NUMPY", "true"))
+    if use_conda && enable_numpy_install
         Conda.add("numpy")
     end
 
