@@ -637,6 +637,7 @@ end
     """
     obj = py"C757(C757(1,2), C757(3,4))"o
     obj2 = deepcopy(obj)
+    @test PyPtr(obj) != PyPtr(obj2) # make sure a new Python object is created
     @test obj.a.a == obj2.a.a
     @test obj.a.b == obj2.a.b
     @test obj.b.a == obj2.b.a
