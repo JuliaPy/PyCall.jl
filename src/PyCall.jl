@@ -979,6 +979,16 @@ include("serialize.jl")
 
 include("pyinit.jl")
 
+const _deepcopy = PyNULL()
+
+function Base.deepcopy_internal(obj::PyObject, stackdict::Base.IdDict)
+    haskey(stackdict, obj) && return stackdict[obj]
+    ispynull(_deepcopy) && copy!(_deepcopy, pyimport("copy")["deepcopy"])
+    ret =  pycall(_deepcopy, PyObject, obj)
+    stackdict[obj] = ret
+    ret
+end
+
 #########################################################################
 
 include("precompile.jl")

@@ -620,6 +620,45 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test_throws ArgumentError float(pybuiltin("type"))
 end
 
+@testset "deepcopy #757" begin
+    l = py"[1,2,3]"o
+    l2 = deepcopy(l)
+    @test l == l2
+    l2.append(4)
+    @test l != l2
+    @test collect(l2) == [1,2,3,4]
+    @test collect(l) == [1,2,3]
+
+    obj = py"""
+    class C757:
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+    """
+    obj = py"C757(C757(1,2), C757(3,4))"o
+    obj2 = deepcopy(obj)
+    @test PyPtr(obj) != PyPtr(obj2) # make sure a new Python object is created
+    @test obj.a.a == obj2.a.a
+    @test obj.a.b == obj2.a.b
+    @test obj.b.a == obj2.b.a
+    @test obj.b.b == obj2.b.b
+    obj.a = 3
+    @test obj.a == 3
+    @test obj2.a.a == 1
+    @test obj2.a.b == 2
+
+    struct S;a;b;end
+
+    c = py"C757(1,2)"
+    obj = S(c, c)
+    obj2 = deepcopy(obj)
+    @test obj.a === obj.b
+    @test obj2.a === obj2.b
+    obj.a.a = 4
+    @test obj.a.a == 4
+    @test obj2.a.a == 1
+end
+
 ######################################################################
 #@pydef tests: type declarations need to happen at top level
 
@@ -855,3 +894,4 @@ end
     @test_throws PyCall.PyError a.a = 0
     @test_throws KeyError a.a = 1
 end
+
