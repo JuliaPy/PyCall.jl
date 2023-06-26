@@ -622,7 +622,7 @@ end
 
 @testset "deepcopy #757" begin
     l = py"[1,2,3]"o
-    l2 = deepcopy(l)
+    l2 = @test_nowarn deepcopy(l)
     @test l == l2
     l2.append(4)
     @test l != l2
@@ -636,7 +636,7 @@ end
             self.b = b
     """
     obj = py"C757(C757(1,2), C757(3,4))"o
-    obj2 = deepcopy(obj)
+    obj2 = @test_nowarn deepcopy(obj)
     @test PyPtr(obj) != PyPtr(obj2) # make sure a new Python object is created
     @test obj.a.a == obj2.a.a
     @test obj.a.b == obj2.a.b
@@ -651,7 +651,7 @@ end
 
     c = py"C757(1,2)"
     obj = S(c, c)
-    obj2 = deepcopy(obj)
+    obj2 = @test_nowarn deepcopy(obj)
     @test obj.a === obj.b
     @test obj2.a === obj2.b
     obj.a.a = 4
