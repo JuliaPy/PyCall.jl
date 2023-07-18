@@ -426,6 +426,9 @@ PyObject(a::BitArray) = PyObject(Array(a))
 # NumPy conversions (multidimensional arrays)
 include("numpy.jl")
 
+# SciPy conversions
+include("scipy.jl")
+
 #########################################################################
 # PyDict: no-copy wrapping of a Julia object around a Python dictionary
 

@@ -36,7 +36,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
       - run: python --version
-      - run: python -m pip install --user numpy
+      - run: python -m pip install --user numpy scipy
       - name: Install libpython2.7 for `find_libpython` test
         run: sudo apt-get install python2.7-dev
         if: ${{ matrix.python-version != '2.7' && matrix.os == 'ubuntu-latest' }}

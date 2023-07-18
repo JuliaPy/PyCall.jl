@@ -1,6 +1,7 @@
 using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
+using SparseArrays: SparseMatrixCSC, sparse, sprand
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -13,6 +14,11 @@ PYTHONEXECUTABLE=get(ENV,"PYTHONEXECUTABLE","")
 @testset "CI setup" begin
     if lowercase(get(ENV, "CI", "false")) == "true"
         @test !ispynull(pyimport_e("numpy"))
+        try
+            pyimport_conda("scipy.sparse", "scipy")
+        catch
+        end
+        @test !ispynull(pyimport_e("scipy.sparse"))
     end
 end
 
@@ -618,6 +624,11 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test float(PyObject(1+2im)) === 1.0 + 2.0im
     @test float(PyObject([1,2,3]))[2] === 2.0
     @test_throws ArgumentError float(pybuiltin("type"))
+
+    # sparse array conversion
+    S = sprand(10, 10, 0.2)
+    PyS = PyObject(S)
+    @test convert(SparseMatrixCSC, PyS) == S
 end
 
 @testset "deepcopy #757" begin
