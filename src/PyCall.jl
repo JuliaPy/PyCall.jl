@@ -273,20 +273,20 @@ end
 const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
 hashsalt(x) = hash(x, pysalt)
 
-function hash(o::PyObject)
+function hash(o::PyObject, salt::UInt64=pysalt)
     if ispynull(o)
-        hashsalt(C_NULL)
+        hash(C_NULL, salt)
     elseif is_pyjlwrap(o)
         # call native Julia hash directly on wrapped Julia objects,
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
-        hashsalt(unsafe_pyjlwrap_to_objref(o))
+        hash(unsafe_pyjlwrap_to_objref(o), salt)
     else
         h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
-            return hashsalt(PyPtr(o))
+            return hash(PyPtr(o), salt)
         end
-        hashsalt(h)
+        hash(h, salt)
     end
 end
 
