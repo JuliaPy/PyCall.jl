@@ -271,9 +271,9 @@ end
 # computing hashes of PyObjects
 
 const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
-hashsalt(x) = hash(x, pysalt)
 
-function hash(o::PyObject, salt::UInt64=pysalt)
+function hash(o::PyObject, salt::UInt=zero(UInt))
+    salt ⊻= pysalt
     if ispynull(o)
         hash(C_NULL, salt)
     elseif is_pyjlwrap(o)
