@@ -20,6 +20,7 @@ julia = "1.4"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [targets]
-test = ["Test"]
+test = ["Test", "REPL"]
