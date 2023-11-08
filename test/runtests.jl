@@ -395,7 +395,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     if PyCall.conda
         # import six to test PR #294
         let already_installed = "six" ∈ Conda._installed_packages()
-            @test !ispynull(pyimport_conda("six"))
+            @test !ispynull(pyimport_conda("six", "six"))
             @test "six" ∈ Conda._installed_packages()
             if !already_installed
                 Conda.rm("six")
