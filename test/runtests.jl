@@ -168,6 +168,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     @test roundtripeq(Dates.Date(2012,3,4))
     @test roundtripeq(Dates.DateTime(2012,3,4, 7,8,9,11))
+    @test roundtripeq(Dates.Time(7,8,9,11))
     @test roundtripeq(Dates.Millisecond(typemax(Int32)))
     @test roundtripeq(Dates.Millisecond(typemin(Int32)))
     @test roundtripeq(Dates.Second, Dates.Second(typemax(Int32)))
