@@ -5,7 +5,15 @@ import Conda, Libdl
 
 pyvar(python::AbstractString, mod::AbstractString, var::AbstractString) = chomp(read(pythonenv(`$python -c "import $mod; print($mod.$(var))"`), String))
 
-pyconfigvar(python::AbstractString, var::AbstractString) = pyvar(python, "distutils.sysconfig", "get_config_var('$(var)')")
+function pyconfigvar(python::AbstractString, var::AbstractString)
+    try
+       pyvar(python, "sysconfig", "get_config_var('$(var)')")
+    catch e
+        emsg = sprint(showerror, e)
+        @warn "Encountered error on using `sysconfig`: $emsg. Falling back to `distutils.sysconfig`."
+        pyvar(python, "distutils.sysconfig", "get_config_var('$(var)')")
+    end
+end
 pyconfigvar(python, var, default) = let v = pyconfigvar(python, var)
     v == "None" ? default : v
 end

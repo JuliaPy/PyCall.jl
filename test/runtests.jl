@@ -1,6 +1,7 @@
 using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
+using REPL # for Docs.doc methods
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -392,12 +393,12 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test !ispynull(pyimport_conda("inspect", "not a conda package"))
     import Conda
     if PyCall.conda
-        # import pyzmq to test PR #294
-        let already_installed = "pyzmq" ∈ Conda._installed_packages()
-            @test !ispynull(pyimport_conda("zmq", "pyzmq"))
-            @test "pyzmq" ∈ Conda._installed_packages()
+        # import six to test PR #294
+        let already_installed = "six" ∈ Conda._installed_packages()
+            @test !ispynull(pyimport_conda("six", "six"))
+            @test "six" ∈ Conda._installed_packages()
             if !already_installed
-                Conda.rm("pyzmq")
+                Conda.rm("six")
             end
         end
     end
