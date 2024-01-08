@@ -76,21 +76,21 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(_pydecref_locked, po)
+        finalizer(pydecref_safe_, po)
         return po
     end
 end
 
 const PYDECREF_LOCK = ReentrantLock()
 
-function _pydecref_locked(po::PyObject)
+function pydecref_safe_(po::PyObject)
     # If available, we lock and decref
     !islocked(PYDECREF_LOCK) &&
-        trylock(() -> (pydecref_(po); true), PYDECREF_LOCK) &&
+        trylock(() -> (pydecref_unsafe_(po); true), PYDECREF_LOCK) &&
         return nothing
 
     # Add back to queue to be decref'd later
-    finalizer(_pydecref_locked, po)
+    finalizer(pydecref_safe_, po)
     return nothing
 end
 
@@ -127,13 +127,13 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o ≛ PyPtr_NULL
 
-function pydecref_(o::Union{PyPtr,PyObject})
+function pydecref_unsafe_(o::Union{PyPtr,PyObject})
     _finalized[] || ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
     return o
 end
 
 function pydecref(o::PyObject)
-    pydecref_(o)
+    pydecref_unsafe_(o)
     setfield!(o, :o, PyPtr_NULL)
     return o
 end
