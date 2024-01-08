@@ -84,15 +84,13 @@ end
 const PYDECREF_LOCK = ReentrantLock()
 
 function _pydecref_locked(po::PyObject)
-    if !islocked(PYDECREF_LOCK)
-        # If available, we lock and decref
-        lock(PYDECREF_LOCK) do
-            pydecref_(po)
-        end
-    else
-        # Add back to queue to be decref'd later
-        finalizer(_pydecref_locked, po)
-    end
+    # If available, we lock and decref
+    !islocked(PYDECREF_LOCK) &&
+        trylock(() -> pydecref_(po), PYDECREF_LOCK) &&
+        return nothing
+
+    # Add back to queue to be decref'd later
+    finalizer(_pydecref_locked, po)
     return nothing
 end
 
