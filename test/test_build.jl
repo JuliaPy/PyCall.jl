@@ -4,11 +4,11 @@ include(joinpath(dirname(@__FILE__), "..", "deps", "depsutils.jl"))
 include(joinpath(dirname(@__FILE__), "..", "deps", "buildutils.jl"))
 
 using Test
+using PyCall: python
 
 @testset "find_libpython" begin
-    for python in ["python", "python2", "python3"]
-        # TODO: In Windows, word size should also be checked.
-        Sys.iswindows() && break
+    # TODO: In Windows, word size should also be checked.
+    if !Sys.iswindows()
         if Sys.which(python) === nothing
             @info "$python not available; skipping test"
         else
@@ -37,7 +37,7 @@ using Test
     # Test the case `dlopen` failed to open the library.
     let err, msg
         @test try
-            find_libpython("python"; _dlopen = (_...) -> error("dummy"))
+            find_libpython(python; _dlopen = (_...) -> error("dummy"))
             false
         catch err
             err isa ErrorException

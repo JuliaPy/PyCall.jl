@@ -14,7 +14,7 @@ export pycall, pycall!, pyimport, pyimport_e, pybuiltin, PyObject, PyReverseDims
        pyraise, pytype_mapping, pygui, pygui_start, pygui_stop,
        pygui_stop_all, @pylab, set!, PyTextIO, @pysym, PyNULL, ispynull, @pydef,
        pyimport_conda, @py_str, @pywith, @pycall, pybytes, pyfunction, pyfunctionret,
-       pywrapfn, pysetarg!, pysetargs!
+       pywrapfn, pysetarg!, pysetargs!, @pyinclude
 
 import Base: size, ndims, similar, copy, getindex, setindex!, stride,
        convert, pointer, summary, convert, show, haskey, keys, values,
@@ -309,7 +309,13 @@ end
 function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
     p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
-    p == C_NULL && pyerr_clear()
+    if p == C_NULL && pyerr_occurred()
+        e = PyError("PyObject_GetAttrString")
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
+            throw(e)
+        end
+        pyerr_clear()
+    end
     return p
 end
 
@@ -338,15 +344,17 @@ setproperty!(o::PyObject, s::Symbol, v) = _setproperty!(o,s,v)
 setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
 
 function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
-    if ispynull(o)
-        throw(ArgumentError("assign of NULL PyObject"))
-    end
-    if -1 == ccall((@pysym :PyObject_SetAttrString), Cint,
-                   (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    ispynull(o) && throw(ArgumentError("assign of NULL PyObject"))
+    p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    if p == -1 && pyerr_occurred()
+        e = PyError("PyObject_SetAttrString")
+        if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
+            throw(e)
+        end
         pyerr_clear()
         throw(KeyError(s))
     end
-    o
+    return o
 end
 
 function getindex(o::PyObject, s::T) where T<:Union{Symbol, AbstractString}
@@ -510,7 +518,7 @@ function pyimport(name::AbstractString)
     o = _pyimport(name)
     if ispynull(o)
         if pyerr_occurred()
-            e = pyerror("PyImport_ImportModule")
+            e = PyError("PyImport_ImportModule")
             if pyisinstance(e.val, @pyglobalobjptr(:PyExc_ImportError))
                 # Expand message to help with common user confusions.
                 msg = """
@@ -523,7 +531,7 @@ that you did not install $name in the Python version being used by PyCall.
 PyCall is currently configured to use the Julia-specific Python distribution
 installed by the Conda.jl package.  To install the $name module, you can
 use `pyimport_conda("$(escape_string(name))", PKG)`, where PKG is the Anaconda
-package the contains the module $name, or alternatively you can use the
+package that contains the module $name, or alternatively you can use the
 Conda package directly (via `using Conda` followed by `Conda.add` etcetera).
 
 Alternatively, if you want to use a different Python distribution on your
@@ -556,7 +564,7 @@ or alternatively you can use the Conda package directly (via
 `using Conda` followed by `Conda.add` etcetera).
 """
                 end
-                e = pyerror(string(e.msg, "\n\n", msg, "\n"), e)
+                e = PyError(string(e.msg, "\n\n", msg, "\n"), e)
             end
             throw(e)
         else
@@ -982,17 +990,19 @@ include("serialize.jl")
 
 include("pyinit.jl")
 
+const _deepcopy = PyNULL()
+
+function Base.deepcopy_internal(obj::PyObject, stackdict::Base.IdDict)
+    haskey(stackdict, obj) && return stackdict[obj]
+    ispynull(_deepcopy) && copy!(_deepcopy, pyimport("copy")."deepcopy")
+    ret =  pycall(_deepcopy, PyObject, obj)
+    stackdict[obj] = ret
+    ret
+end
+
 #########################################################################
-# Precompilation: just an optimization to speed up initialization.
-# Here, we precompile functions that are passed to cfunction by __init__,
-# for the reasons described in JuliaLang/julia#12256.
 
-precompile(pyjlwrap_call, (PyPtr,PyPtr,PyPtr))
-precompile(pyjlwrap_dealloc, (PyPtr,))
-precompile(pyjlwrap_repr, (PyPtr,))
-precompile(pyjlwrap_hash, (PyPtr,))
-precompile(pyjlwrap_hash32, (PyPtr,))
+include("precompile.jl")
 
-# TODO: precompilation of the io.jl functions
-
+#########################################################################
 end # module PyCall

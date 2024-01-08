@@ -1,6 +1,7 @@
 using PyCall
 using PyCall: hasproperty
 using Test, Dates, Serialization
+using REPL # for Docs.doc methods
 
 filter(f, itr) = collect(Iterators.filter(f, itr))
 filter(f, d::AbstractDict) = Base.filter(f, d)
@@ -290,7 +291,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     end
     @test convert(BigInt, PyObject(1234)) == 1234
 
-    # hasproperty, getproperty, and propertynames
+    # hasproperty, getproperty, trygetproperty, and propertynames
     py"""
     class A:
         class B:
@@ -302,6 +303,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     A = py"A"
     @test hasproperty(A, "B")
     @test getproperty(A, "B") == py"A.B"
+    @test PyCall.trygetproperty(A, "C", nothing) === py"None"
     @test :B in propertynames(A)
     @static if VERSION >= v"0.7-"
         @test :D in propertynames(A.B)
@@ -391,12 +393,12 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test !ispynull(pyimport_conda("inspect", "not a conda package"))
     import Conda
     if PyCall.conda
-        # import pyzmq to test PR #294
-        let already_installed = "pyzmq" ∈ Conda._installed_packages()
-            @test !ispynull(pyimport_conda("zmq", "pyzmq"))
-            @test "pyzmq" ∈ Conda._installed_packages()
+        # import six to test PR #294
+        let already_installed = "six" ∈ Conda._installed_packages()
+            @test !ispynull(pyimport_conda("six", "six"))
+            @test "six" ∈ Conda._installed_packages()
             if !already_installed
-                Conda.rm("pyzmq")
+                Conda.rm("six")
             end
         end
     end
@@ -529,6 +531,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
 
     # @pycall macro expands correctly
     _pycall = GlobalRef(PyCall,:pycall)
+    @test macroexpand(@__MODULE__, :(@pycall foo()::T)) == :($(_pycall)(foo, T))
+    @test macroexpand(@__MODULE__, :(@pycall foo(; kwargs...)::T)) == :($(_pycall)(foo, T; kwargs...))
     @test macroexpand(@__MODULE__, :(@pycall foo(bar)::T)) == :($(_pycall)(foo, T, bar))
     @test macroexpand(@__MODULE__, :(@pycall foo(bar, args...)::T)) == :($(_pycall)(foo, T, bar, args...))
     @test macroexpand(@__MODULE__, :(@pycall foo(bar; kwargs...)::T)) == :($(_pycall)(foo, T, bar; kwargs...))
@@ -615,6 +619,45 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     @test float(PyObject(1+2im)) === 1.0 + 2.0im
     @test float(PyObject([1,2,3]))[2] === 2.0
     @test_throws ArgumentError float(pybuiltin("type"))
+end
+
+@testset "deepcopy #757" begin
+    l = py"[1,2,3]"o
+    l2 = @test_nowarn deepcopy(l)
+    @test l == l2
+    l2.append(4)
+    @test l != l2
+    @test collect(l2) == [1,2,3,4]
+    @test collect(l) == [1,2,3]
+
+    obj = py"""
+    class C757:
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+    """
+    obj = py"C757(C757(1,2), C757(3,4))"o
+    obj2 = @test_nowarn deepcopy(obj)
+    @test PyPtr(obj) != PyPtr(obj2) # make sure a new Python object is created
+    @test obj.a.a == obj2.a.a
+    @test obj.a.b == obj2.a.b
+    @test obj.b.a == obj2.b.a
+    @test obj.b.b == obj2.b.b
+    obj.a = 3
+    @test obj.a == 3
+    @test obj2.a.a == 1
+    @test obj2.a.b == 2
+
+    struct S;a;b;end
+
+    c = py"C757(1,2)"
+    obj = S(c, c)
+    obj2 = @test_nowarn deepcopy(obj)
+    @test obj.a === obj.b
+    @test obj2.a === obj2.b
+    obj.a.a = 4
+    @test obj.a.a == 4
+    @test obj2.a.a == 1
 end
 
 ######################################################################
@@ -819,3 +862,37 @@ if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
     include("test_venv.jl")
     include("test_build.jl")
 end
+
+@testset "@pyinclude" begin
+    mktemp() do path, io
+        print(io, "foo1 = 1\nbar2 = 2\n")
+        close(io)
+        @pyinclude(path)
+        @test py"foo1" == 1
+        @test py"bar2" == 2
+    end
+end
+
+@testset "proper exception raised" begin
+    py"""
+    class A:
+        def __getattr__(self, name):
+            if name == "a":
+                raise ValueError(name)
+            else:
+                raise AttributeError()
+
+        def __setattr__(self, name, value):
+            if value == 0:
+                raise ValueError(value)
+            else:
+                raise AttributeError()
+    """
+    a = py"A"()
+    @test_throws PyCall.PyError a.a
+    @test_throws KeyError a.b
+
+    @test_throws PyCall.PyError a.a = 0
+    @test_throws KeyError a.a = 1
+end
+

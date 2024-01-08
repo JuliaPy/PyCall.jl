@@ -20,7 +20,12 @@ install the files. Julia 0.7 or later is required.
 
 The latest development version of PyCall is available from
 <https://github.com/JuliaPy/PyCall.jl>.  If you want to switch to
-this after installing the package, run `Pkg.checkout("PyCall"); Pkg.build("PyCall")`.
+this after installing the package, run:
+
+```julia
+Pkg.add(PackageSpec(name="PyCall", rev="master"))
+Pkg.build("PyCall")
+```
 
 By default on Mac and Windows systems, `Pkg.add("PyCall")`
 or `Pkg.build("PyCall")` will use the
@@ -48,9 +53,9 @@ to the path of the `python` (or `python3` etc.) executable and then re-running `
 In Julia:
 
     ENV["PYTHON"] = "... path of the python executable ..."
-    # ENV["PYTHON"] = raw"C:\Python37-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python37-x64\\python.exe"
+    # ENV["PYTHON"] = raw"C:\Python310-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python310-x64\\python.exe"
 
-    # ENV["PYTHON"] = "/usr/bin/python3.7"           # example for *nix
+    # ENV["PYTHON"] = "/usr/bin/python3.10"           # example for *nix
     Pkg.build("PyCall")
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
@@ -160,6 +165,8 @@ def sinpi(x):
 py"sinpi"(1)
 ```
 
+You can also execute a whole script `"foo.py"` via `@pyinclude("foo.py")` as if you had pasted it into a `py"""..."""` string.
+
 When creating a Julia module, it is a useful pattern to define Python
 functions or classes in Julia's `__init__` and then use it in Julia
 function with `py"..."`.
@@ -192,7 +199,7 @@ cannot be accessed outside `MyModule`.
 
 Here are solutions to some common problems:
 
-* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(PyVector(pyimport("sys")."path"), "")`.
+* By default, PyCall [doesn't include the current directory in the Python search path](https://github.com/JuliaPy/PyCall.jl/issues/48).   If you want to do that (in order to load a Python module from the current directory), just run `pushfirst!(pyimport("sys")."path", "")`.
 
 ## Python object interfaces
 
@@ -298,7 +305,7 @@ use `PyDict` as the return type of a `pycall` returning a dictionary,
 or call `PyDict(o::PyObject)` on a dictionary object `o`.  By
 default, a `PyDict` is an `Any => Any` dictionary (or actually `PyAny
 => PyAny`) that performs runtime type inference, but if your Python
-dictionary has known, fixed types you can insteady use `PyDict{K,V}` given
+dictionary has known, fixed types you can instead use `PyDict{K,V}` given
 the key and value types `K` and `V` respectively.
 
 Currently, passing Julia dictionaries to Python makes a copy of the Julia
@@ -359,7 +366,8 @@ and also by providing more type information to the Julia compiler.
   Python's [`eval`](https://docs.python.org/3/library/functions.html#eval) function, and returns the result
   converted to `PyAny`.  Alternatively, `py"..."o` returns the raw `PyObject`
   (which can then be manually converted if desired).   You can interpolate
-  Julia variables and other expressions into the Python code with `$`,
+  Julia variables and other expressions into the Python code (except for into
+  Python strings contained in Python code), with `$`,
   which interpolates the *value* (converted to `PyObject`) of the given
   expression---data is not passed as a string, so this is different from
   ordinary Julia string interpolation.  e.g. `py"sum($([1,2,3]))"` calls the
@@ -384,10 +392,15 @@ and also by providing more type information to the Julia compiler.
   `__init__`.  Side-effect in Python occurred at top-level Julia scope
   cannot be used at run-time for precompiled modules.
 
+  You can also execute a Python script file `"foo.py"` by running `@pyinclude("foo.py")`, and it will be as if you had pasted the
+  script into a `py"..."` string.  (`@pyinclude` does not support
+  interpolating Julia variables with `$var`, however — the script
+  must be pure Python.)
+
 * `pybuiltin(s)`: Look up `s` (a string or symbol) among the global Python
   builtins.  If `s` is a string it returns a `PyObject`, while if `s` is a
   symbol it returns the builtin converted to `PyAny`.  (You can also use `py"s"`
-  to look up builtins or other Python globas.)
+  to look up builtins or other Python globals.)
 
 Occasionally, you may need to pass a keyword argument to Python that
 is a [reserved word](https://en.wikipedia.org/wiki/Reserved_word) in Julia.

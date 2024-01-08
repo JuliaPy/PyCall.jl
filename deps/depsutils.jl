@@ -64,8 +64,10 @@ function _preserveas!(dest::Vector{UInt8}, ::Type{Cstring}, x::AbstractString)
 end
 
 function _preserveas!(dest::Vector{UInt8}, ::Type{Cwstring}, x::AbstractString)
-    s = reinterpret(UInt8, Base.cconvert(Cwstring, x))
-    copyto!(resize!(dest, length(s)), s)
+    s = reinterpret(UInt8, transcode(Cwchar_t, String(x)))
+    len = length(s)
+    copyto!(resize!(dest, len + sizeof(Cwchar_t)), s)
+    dest[len + 1:len + sizeof(Cwchar_t)] .= 0
     return pointer(dest)
 end
 

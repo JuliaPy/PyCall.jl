@@ -1,6 +1,6 @@
 # GUI event loops and toolkit integration for Python, most importantly
 # to support plotting in a window without blocking.  Currently, we
-# support wxWidgets, Qt5, Qt4, and GTK+.
+# support wxWidgets, Qt4, Qt5, Qt6, and GTK+.
 
 ############################################################################
 
@@ -26,11 +26,14 @@ pygui_works(gui::Symbol) = gui == :default ||
      (gui == :tk && pyexists(tkinter_name())) ||
      (gui == :qt_pyqt4 && pyexists("PyQt4")) ||
      (gui == :qt_pyqt5 && pyexists("PyQt5")) ||
+     (gui == :qt_pyqt6 && pyexists("PyQt6")) ||
      (gui == :qt_pyside && pyexists("PySide")) ||
      (gui == :qt_pyside2 && pyexists("PySide2")) ||
+     (gui == :qt_pyside6 && pyexists("PySide6")) ||
      (gui == :qt4 && (pyexists("PyQt4") || pyexists("PySide"))) ||
      (gui == :qt5 && (pyexists("PyQt5") || pyexists("PySide2"))) ||
-     (gui == :qt && (pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide") || pyexists("PySide2"))))
+     (gui == :qt6 && (pyexists("PyQt6") || pyexists("PySide6"))) ||
+     (gui == :qt && (pyexists("PyQt6") || pyexists("PyQt5") || pyexists("PyQt4") || pyexists("PySide") || pyexists("PySide2") || pyexists("PySide6"))))
 
 # get or set the default GUI; doesn't affect running GUI
 """
@@ -55,7 +58,7 @@ end
 function pygui(g::Symbol)
     global gui
     if g != gui::Symbol
-        if !(g in (:wx,:gtk,:gtk3,:tk,:qt,:qt4,:qt5,:qt_pyqt5,:qt_pyqt4,:qt_pyside,:qt_pyside2,:default))
+        if !(g in (:wx,:gtk,:gtk3,:tk,:qt,:qt4,:qt5,:qt6,:qt_pyqt4,:qt_pyqt5,:qt_pyqt6,:qt_pyside,:qt_pyside2,:qt_pyside6,:default))
             throw(ArgumentError("invalid gui $g"))
         elseif !pygui_works(g)
             error("Python GUI toolkit for $g is not installed.")
@@ -136,7 +139,7 @@ function fixqtpath(qtconf=joinpath(dirname(pyprogramname),"qt.conf"))
     return false
 end
 
-# Qt: (PyQt5, PyQt4, or PySide module)
+# Qt: (PyQt6, PyQt5, PyQt4, or PySide module)
 function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     fixqtpath()
     instance = QtCore."QCoreApplication"."instance"
@@ -157,7 +160,7 @@ qt_eventloop(QtModule::AbstractString, sec::Real=50e-3) =
     qt_eventloop(pyimport("$QtModule.QtCore"), sec)
 
 function qt_eventloop(sec::Real=50e-3)
-    for QtModule in ("PyQt5", "PyQt4", "PySide", "PySide2")
+    for QtModule in ("PyQt6", "PyQt5", "PyQt4", "PySide", "PySide2", "PySide6")
         try
             return qt_eventloop(QtModule, sec)
         catch
@@ -232,11 +235,15 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
         elseif gui == :qt_pyqt4
             eventloops[gui] = qt_eventloop("PyQt4", sec)
         elseif gui == :qt_pyqt5
-            eventloops[gui] = qt_eventloop("PyQt5", sec) 
+            eventloops[gui] = qt_eventloop("PyQt5", sec)
+        elseif gui == :qt_pyqt6
+            eventloops[gui] = qt_eventloop("PyQt6", sec)
         elseif gui == :qt_pyside
             eventloops[gui] = qt_eventloop("PySide", sec)
         elseif gui == :qt_pyside2
             eventloops[gui] = qt_eventloop("PySide2", sec)
+        elseif gui == :qt_pyside6
+            eventloops[gui] = qt_eventloop("PySide6", sec)
         elseif gui == :qt4
             try
                 eventloops[gui] = qt_eventloop("PyQt4", sec)
@@ -248,6 +255,12 @@ function pygui_start(gui::Symbol=pygui(), sec::Real=50e-3)
                 eventloops[gui] = qt_eventloop("PyQt5", sec)
             catch
                 eventloops[gui] = qt_eventloop("PySide2", sec)
+            end
+        elseif gui == :qt6
+            try
+                eventloops[gui] = qt_eventloop("PyQt6", sec)
+            catch
+                eventloops[gui] = qt_eventloop("PySide6", sec)
             end
         elseif gui == :qt
             eventloops[gui] = qt_eventloop(sec)
