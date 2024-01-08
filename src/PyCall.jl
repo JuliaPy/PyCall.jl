@@ -76,9 +76,24 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(pydecref, po)
+        finalizer(_pydecref_locked, po)
         return po
     end
+end
+
+const PYDECREF_LOCK = ReentrantLock()
+
+function _pydecref_locked(po::PyObject)
+    if !islocked(PYDECREF_LOCK)
+        # If available, we lock and decref
+        lock(PYDECREF_LOCK) do
+            pydecref_(po)
+        end
+    else
+        # Add back to queue to be decref'd later
+        finalizer(_pydecref_locked, po)
+    end
+    return nothing
 end
 
 PyPtr(o::PyObject) = getfield(o, :o)
