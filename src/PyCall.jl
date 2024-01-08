@@ -272,7 +272,7 @@ end
 
 const pysalt = hash("PyCall.PyObject") # "salt" to mix in to PyObject hashes
 
-function hash(o::PyObject, salt::UInt=zero(UInt))
+function hash(o::PyObject, salt::UInt)
     salt ⊻= pysalt
     if ispynull(o)
         hash(C_NULL, salt)
