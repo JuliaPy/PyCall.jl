@@ -81,12 +81,12 @@ mutable struct PyObject
     end
 end
 
-const PYDECREF_LOCK = ReentrantLock()
+const PYDECREF_PYOBJECT_LOCK = ReentrantLock()
 
 function pydecref_safe_(po::PyObject)
     # If available, we lock and decref
-    !islocked(PYDECREF_LOCK) &&
-        trylock(() -> (pydecref_unsafe_(po); true), PYDECREF_LOCK) &&
+    !islocked(PYDECREF_PYOBJECT_LOCK) &&
+        trylock(() -> (pydecref_unsafe_(po); true), PYDECREF_PYOBJECT_LOCK) &&
         return nothing
 
     # Add back to queue to be decref'd later
