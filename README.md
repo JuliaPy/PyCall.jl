@@ -633,7 +633,7 @@ $ source PATH/TO/bin/activate  # activate virtual environment in system shell
 $ julia  # start Julia
 ...
 
-julia> ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python")
+julia> ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python3")
 "PATH/TO/bin/python3"
 
 julia> using PyCall
