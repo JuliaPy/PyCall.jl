@@ -60,9 +60,11 @@ const PyDate_HEAD = sizeof(Int)+sizeof(PyPtr)+sizeof(Py_hash_t)+1
 const DateType = Ref{PyPtr}(0)
 const DateTimeType = Ref{PyPtr}(0)
 const DeltaType = Ref{PyPtr}(0)
+const TimeType = Ref{PyPtr}(0)
 const Date_FromDate = Ref{Ptr{Cvoid}}(0)
 const DateTime_FromDateAndTime = Ref{Ptr{Cvoid}}(0)
 const Delta_FromDelta = Ref{Ptr{Cvoid}}(0)
+const Time_FromTime = Ref{Ptr{Cvoid}}(0)
 function init_datetime()
     # emulate PyDateTime_IMPORT:
     PyDateTimeAPI = unsafe_load(@pycheckn ccall((@pysym :PyCapsule_Import),
@@ -71,9 +73,11 @@ function init_datetime()
     DateType[] = PyDateTimeAPI.DateType
     DateTimeType[] = PyDateTimeAPI.DateTimeType
     DeltaType[] = PyDateTimeAPI.DeltaType
+    TimeType[] = PyDateTimeAPI.TimeType
     Date_FromDate[] = PyDateTimeAPI.Date_FromDate
     DateTime_FromDateAndTime[] = PyDateTimeAPI.DateTime_FromDateAndTime
     Delta_FromDelta[] = PyDateTimeAPI.Delta_FromDelta
+    Time_FromTime[] = PyDateTimeAPI.Time_FromTime
 end
 
 PyObject(d::Dates.Date) =
@@ -99,6 +103,13 @@ PyDelta_FromDSU(days, seconds, useconds) =
 
 PyObject(p::Dates.Day) = PyDelta_FromDSU(Dates.value(p), 0, 0)
 
+PyObject(t::Dates.Time) =
+    PyObject(@pycheckn ccall(Time_FromTime[], PyPtr,
+                             (Cint, Cint, Cint, Cint, PyPtr, PyPtr),
+                             Dates.hour(t), Dates.minute(t), Dates.second(t),
+                             Dates.millisecond(t) * 1000,
+                             pynothing[], TimeType[]))
+
 function PyObject(p::Dates.Second)
     # normalize to make Cint overflow less likely
     s = Dates.value(p)
@@ -120,12 +131,15 @@ end
 PyDate_Check(o::PyObject) = pyisinstance(o, DateType[])
 PyDateTime_Check(o::PyObject) = pyisinstance(o, DateTimeType[])
 PyDelta_Check(o::PyObject) = pyisinstance(o, DeltaType[])
+PyTime_Check(o::PyObject) = pyisinstance(o, TimeType[])
 
 function pydate_query(o::PyObject)
     if PyDate_Check(o)
         return PyDateTime_Check(o) ? Dates.DateTime : Dates.Date
     elseif PyDelta_Check(o)
         return Dates.Millisecond
+    elseif PyTime_Check(o)
+        return Dates.Time
     else
         return Union{}
     end
@@ -160,6 +174,20 @@ function convert(::Type{Dates.Date}, o::PyObject)
         end
     else
         throw(ArgumentError("unknown Date type $o"))
+    end
+end
+
+function convert(::Type{Dates.Time}, o::PyObject)
+    if PyTime_Check(o)
+        GC.@preserve o let dt = convert(Ptr{UInt8}, PyPtr(o)) + PyDate_HEAD
+            Dates.Time(unsafe_load(dt,1), unsafe_load(dt,2), # hour, minute
+                    unsafe_load(dt,3), # second
+                    div((UInt(unsafe_load(dt,4)) << 16) |
+                        (UInt(unsafe_load(dt,5)) << 8) |
+                        unsafe_load(dt,6), 1000)) # μs ÷ 1000
+        end
+    else
+        throw(ArgumentError("unknown Time type $o"))
     end
 end
 
