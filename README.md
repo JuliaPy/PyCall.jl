@@ -78,7 +78,7 @@ directly to the `libpython` library.  But it finds the location of
 Subsequent builds of PyCall (e.g. when you update the package via
 `Pkg.update`) will use the same Python executable name by default,
 unless you set the `PYTHON` environment variable or delete the file
-`Pkg.dir("PyCall","deps","PYTHON")`.
+`Pkg.dir("PyCall","deps","deps.jl")`.
 
 **Note:** If you use Python
 [virtualenvs](https://docs.python-guide.org/en/latest/dev/virtualenvs/),
