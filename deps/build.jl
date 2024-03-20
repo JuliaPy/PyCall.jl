@@ -99,7 +99,9 @@ try # make sure deps.jl file is removed on error
         error("Python 2.7 or later is required for PyCall")
     end
 
-    writeifchanged("deps.jl", """
+    dep_path = get(ENV, "PYCALL_DEPOT", "")
+
+    writeifchanged(joinpath(dep_path, "deps.jl"), """
     const python = "$(escape_string(python))"
     const libpython = "$(escape_string(libpy_name))"
     const pyprogramname = "$(escape_string(programname))"
