@@ -61,7 +61,8 @@ convert(::Type{T}, po::PyObject) where {T<:Real} =
 convert(::Type{T}, po::PyObject) where T<:Complex =
     T(@pycheck ccall(@pysym(:PyComplex_AsCComplex), Complex{Cdouble}, (PyPtr,), po))
 
-convert(::Type{Nothing}, po::PyObject) = nothing
+# TODO: This method defination causes method invalidations and latency in Julia 1.9.3, https://github.com/JuliaLang/julia/issues/51389
+# convert(::Type{Nothing}, po::PyObject) = nothing
 
 function Base.float(o::PyObject)
     a = PyAny(o)
@@ -771,7 +772,7 @@ end
 macro return_not_None(ex)
     quote
         T = $(esc(ex))
-        if T != Union{}
+        if T !== Union{}
             return T
         end
     end
@@ -829,9 +830,13 @@ function convert(::Type{PyAny}, o::PyObject)
     end
     try
         T = pytype_query(o)
-        if T == PyObject && is_pyjlwrap(o)
+        if T === PyObject && is_pyjlwrap(o)
             return unsafe_pyjlwrap_to_objref(o)
         end
+        if T === Nothing
+            return nothing
+        end
+
         convert(T, o)
     catch
         pyerr_clear() # just in case
