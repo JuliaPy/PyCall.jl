@@ -29,9 +29,9 @@ jobs:
       Python ${{ matrix.python-version }}
       ${{ matrix.os }} ${{ matrix.architecture }}
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v6
       - name: Setup python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
@@ -41,13 +41,15 @@ jobs:
         run: sudo apt-get install python2.7-dev
         if: ${{ matrix.python-version != '2.7' && matrix.os == 'ubuntu-latest' }}
       - name: Setup julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
 
-      - run: julia -e 'using Pkg; pkg"add PackageCompiler@v1"'
+      - name: Install PackageCompiler.jl
+        run: using Pkg; Pkg.add("PackageCompiler", version="1")
+        shell: julia --color=yes {0}
 
       - run: aot/compile.jl
       - run: aot/assert_has_pycall.jl
