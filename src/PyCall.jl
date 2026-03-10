@@ -36,6 +36,7 @@ import Base.Iterators: filter
 
 include(joinpath(dirname(@__FILE__), "..", "deps","depsutils.jl"))
 include("startup.jl")
+include("gil.jl")
 
 """
 Python executable used by PyCall in the current process.
@@ -114,23 +115,25 @@ it is equivalent to a `PyNULL()` object.
 """
 ispynull(o::PyObject) = o ≛ PyPtr_NULL
 
-function pydecref_(o::Union{PyPtr,PyObject})
-    _finalized[] || ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+function pydecref_(o::PyPtr)
+    if o !== PyPtr_NULL && !_finalized[]
+        @with_GIL ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
+    end
     return o
 end
 
 function pydecref(o::PyObject)
-    pydecref_(o)
+    pydecref_(getfield(o, :o))
     setfield!(o, :o, PyPtr_NULL)
     return o
 end
 
-function pyincref_(o::Union{PyPtr,PyObject})
-    ccall((@pysym :Py_IncRef), Cvoid, (PyPtr,), o)
+function pyincref_(o::PyPtr)
+    @with_GIL ccall((@pysym :Py_IncRef), Cvoid, (PyPtr,), o)
     return o
 end
 
-pyincref(o::PyObject) = pyincref_(o)
+pyincref(o::PyObject) = (pyincref_(getfield(o, :o)); o)
 
 # doing an incref *before* creating a PyObject may safer in the
 # case of borrowed references, to ensure that no exception or interrupt
@@ -165,13 +168,13 @@ function Base.copy!(dest::PyObject, src::PyObject)
 end
 
 pyisinstance(o::PyObject, t::PyObject) =
-  !ispynull(t) && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+  !ispynull(t) && @with_GIL(ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t)) == 1
 
 pyisinstance(o::PyObject, t::Union{Ptr{Cvoid},PyPtr}) =
-  t != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t) == 1
+  t != C_NULL && @with_GIL(ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr,PyPtr), o, t)) == 1
 
 pyquery(q::Ptr{Cvoid}, o::PyObject) =
-  ccall(q, Cint, (PyPtr,), o) == 1
+  @with_GIL(ccall(q, Cint, (PyPtr,), o)) == 1
 
 # conversion to pass PyObject as ccall arguments:
 unsafe_convert(::Type{PyPtr}, po::PyObject) = PyPtr(po)
@@ -240,10 +243,10 @@ function pystring(o::PyObject)
     if ispynull(o)
         return "NULL"
     else
-        s = ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
+        s = @with_GIL ccall((@pysym :PyObject_Repr), PyPtr, (PyPtr,), o)
         if (s == C_NULL)
             pyerr_clear()
-            s = ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
+            s = @with_GIL ccall((@pysym :PyObject_Str), PyPtr, (PyPtr,), o)
             if (s == C_NULL)
                 pyerr_clear()
                 return string(PyPtr(o))
@@ -281,7 +284,7 @@ function hash(o::PyObject, salt::UInt)
         # since on 64-bit Windows the Python 2.x hash is only 32 bits
         hash(unsafe_pyjlwrap_to_objref(o), salt)
     else
-        h = ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
+        h = @with_GIL ccall((@pysym :PyObject_Hash), Py_hash_t, (PyPtr,), o)
         if h == -1 # error
             pyerr_clear()
             return hash(PyPtr(o), salt)
@@ -297,7 +300,7 @@ end
 
 function _getproperty(o::PyObject, s::Union{AbstractString,Symbol})
     ispynull(o) && throw(ArgumentError("ref of NULL PyObject"))
-    p = ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
+    p = @with_GIL ccall((@pysym :PyObject_GetAttrString), PyPtr, (PyPtr, Cstring), o, s)
     if p == C_NULL && pyerr_occurred()
         e = PyError("PyObject_GetAttrString")
         if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
@@ -334,7 +337,7 @@ setproperty!(o::PyObject, s::AbstractString, v) = _setproperty!(o,s,v)
 
 function _setproperty!(o::PyObject, s::Union{Symbol,AbstractString}, v)
     ispynull(o) && throw(ArgumentError("assign of NULL PyObject"))
-    p = ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
+    p = @with_GIL ccall((@pysym :PyObject_SetAttrString), Cint, (PyPtr, Cstring, PyPtr), o, s, PyObject(v))
     if p == -1 && pyerr_occurred()
         e = PyError("PyObject_SetAttrString")
         if PyPtr(e.T) != @pyglobalobjptr(:PyExc_AttributeError)
@@ -370,8 +373,8 @@ function pyhasproperty(o::PyObject, s::Union{Symbol,AbstractString})
     if ispynull(o)
         throw(ArgumentError("hasproperty of NULL PyObject"))
     end
-    return 1 == ccall((@pysym :PyObject_HasAttrString), Cint,
-                      (PyPtr, Cstring), o, s)
+    return 1 == @with_GIL(ccall((@pysym :PyObject_HasAttrString), Cint,
+                                (PyPtr, Cstring), o, s))
 end
 hasproperty(o::PyObject, s::Symbol) = pyhasproperty(o, s)
 hasproperty(o::PyObject, s::AbstractString) = pyhasproperty(o, s)
@@ -480,7 +483,7 @@ end
 function _pyimport(name::AbstractString)
     cookie = ActivatePyActCtx()
     try
-        return PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
+        return @with_GIL PyObject(ccall((@pysym :PyImport_ImportModule), PyPtr, (Cstring,), name))
     finally
         DeactivatePyActCtx(cookie)
     end
@@ -685,7 +688,7 @@ string otherwise.
 """
 function anaconda_conda()
     # Anaconda Python seems to always include "Anaconda" in the version string.
-    if conda || !occursin("conda", unsafe_string(ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())))
+    if conda || !occursin("conda", unsafe_string(@with_GIL ccall(@pysym(:Py_GetVersion), Ptr{UInt8}, ())))
         return ""
     end
     aconda = joinpath(dirname(pyprogramname), "conda")
@@ -770,7 +773,7 @@ include("pyfncall.jl")
 # for now we can define "get".
 
 function get(o::PyObject, returntype::TypeTuple, k, default)
-    r = ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
+    r = @with_GIL ccall((@pysym :PyObject_GetItem), PyPtr, (PyPtr,PyPtr), o,PyObject(k))
     if r == C_NULL
         pyerr_clear()
         default
@@ -781,13 +784,13 @@ end
 
 get(o::PyObject, returntype::TypeTuple, k) =
     convert(returntype, PyObject(@pycheckn ccall((@pysym :PyObject_GetItem),
-                                 PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
+                                                PyPtr, (PyPtr,PyPtr), o, PyObject(k))))
 
 get(o::PyObject, k, default) = get(o, PyAny, k, default)
 get(o::PyObject, k) = get(o, PyAny, k)
 
 function delete!(o::PyObject, k)
-    e = ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))
+    e = @with_GIL ccall((@pysym :PyObject_DelItem), Cint, (PyPtr, PyPtr), o, PyObject(k))
     if e == -1
         pyerr_clear() # delete! ignores errors in Julia
     end
@@ -959,7 +962,7 @@ function get_real_method(obj, name)
         return nothing
     end
 
-    ccall((@pysym :PyCallable_Check), Cint, (PyPtr,), m) == 1 && return m
+    @with_GIL(ccall((@pysym :PyCallable_Check), Cint, (PyPtr,), m)) == 1 && return m
 
     return nothing
 end

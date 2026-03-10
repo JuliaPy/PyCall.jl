@@ -51,11 +51,12 @@ end
 
 # like pyerror(msg) but type-stable: always returns PyError
 function PyError(msg::AbstractString)
-    ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
-    # equivalent of passing C pointers &exc[1], &exc[2], &exc[3]:
-    ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-    ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
-    return PyError(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
+    return @with_GIL begin
+        ptype, pvalue, ptraceback = Ref{PyPtr}(), Ref{PyPtr}(), Ref{PyPtr}()
+        ccall((@pysym :PyErr_Fetch), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+        ccall((@pysym :PyErr_NormalizeException), Cvoid, (Ref{PyPtr},Ref{PyPtr},Ref{PyPtr}), ptype, pvalue, ptraceback)
+        PyError(msg, PyObject(ptype[]), PyObject(pvalue[]), PyObject(ptraceback[]))
+    end
 end
 
 # replace the message from another error
@@ -66,10 +67,10 @@ PyError(msg::AbstractString, e::PyError) =
 # Conversion of Python exceptions into Julia exceptions
 
 # whether a Python exception has occurred
-pyerr_occurred() = ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
+pyerr_occurred() = @with_GIL ccall((@pysym :PyErr_Occurred), PyPtr, ()) != C_NULL
 
 # call to discard Python exceptions
-pyerr_clear() = ccall((@pysym :PyErr_Clear), Cvoid, ())
+pyerr_clear() = @with_GIL ccall((@pysym :PyErr_Clear), Cvoid, ())
 
 function pyerr_check(msg::AbstractString, val::Any)
     pyerr_occurred() && throw(pyerror(msg))
@@ -99,13 +100,13 @@ end
 
 # Macros for common pyerr_check("Foo", ccall((@pysym :Foo), ...)) pattern.
 macro pycheck(ex)
-    :(pyerr_check($(string(callsym(ex))), $(esc(ex))))
+    :(pyerr_check($(string(callsym(ex))), @with_GIL($(esc(ex)))))
 end
 
 # Macros to check that ccall((@pysym :Foo), ...) returns value != bad
 macro pycheckv(ex, bad)
     quote
-        val = $(esc(ex))
+        val = @with_GIL($(esc(ex)))
         if val == $(esc(bad))
             _handle_error($(string(callsym(ex))))
         end
@@ -223,14 +224,14 @@ function pyraise(e, bt = nothing)
     eT = typeof(e)
     pyeT = haskey(pyexc, eT) ? pyexc[eT] : pyexc[Exception]
     err = PyJlError(e, bt)
-    ccall((@pysym :PyErr_SetObject), Cvoid, (PyPtr, PyPtr),
-          pyeT, PyObject(err))
+    @with_GIL ccall((@pysym :PyErr_SetObject), Cvoid, (PyPtr, PyPtr),
+                    pyeT, PyObject(err))
 end
 
 # Second argument allows for backtraces passed to `pyraise` to be ignored.
 function pyraise(e::PyError, ::Vector = [])
-    ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
-          e.T, e.val, e.traceback)
+    @with_GIL ccall((@pysym :PyErr_Restore), Cvoid, (PyPtr, PyPtr, PyPtr),
+                    e.T, e.val, e.traceback)
     # refs were stolen
     setfield!(e.T, :o, PyPtr_NULL)
     setfield!(e.val, :o, PyPtr_NULL)

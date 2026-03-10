@@ -862,6 +862,7 @@ end
 
 include("test_pyfncall.jl")
 include("testpybuffer.jl")
+include("gil.jl")
 if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
     include("test_venv.jl")
     include("test_build.jl")

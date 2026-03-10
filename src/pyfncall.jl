@@ -41,8 +41,8 @@ function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
   kw::Union{Ptr{Cvoid}, PyObject})
     disable_sigint() do
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
-                        pyargsptr, kw)
-        pydecref_(ret)
+                                 pyargsptr, kw)
+        pydecref_(getfield(ret, :o))
         setfield!(ret, :o, retptr)
     end
     return ret #::PyObject
