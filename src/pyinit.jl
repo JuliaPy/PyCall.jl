@@ -109,7 +109,7 @@ end
 
 #########################################################################
 
-const _finalized = Ref(false)
+const _finalized = Threads.Atomic{Bool}(false)
 # This flag is set via `Py_AtExit` to avoid calling `pydecref_` after
 # Python is finalized.
 
@@ -117,10 +117,12 @@ function _set_finalized()
     # This function MUST NOT invoke any Python APIs.
     # https://docs.python.org/3/c-api/sys.html#c.Py_AtExit
     _finalized[] = true
+    _GIL_owner[] = UInt(0)
     return nothing
 end
 
 function Py_Finalize()
+    GIL_lock()
     pygui_stop_all()
     ccall(@pysym(:Py_Finalize), Cvoid, ())
 end
@@ -129,6 +131,7 @@ function __init__()
     # Clear out global states.  This is required only for PyCall
     # AOT-compiled into system image.
     _finalized[] = false
+    _GIL_owner[] = UInt(0)
     empty!(_namespaces)
     empty!(eventloops)
     global npy_initialized = false
@@ -264,6 +267,11 @@ function __init__()
             sys."stderr"."flush"()
         end
     end
+
+    # Release the GIL so that any Julia thread can acquire it.
+    # After this point, all Python C API calls must go through
+    # @with_GIL or @pycheck, @pycheckn, etc.
+    ccall((@pysym :PyEval_SaveThread), Ptr{Cvoid}, ())
 
     # Configure finalization steps.
     #
