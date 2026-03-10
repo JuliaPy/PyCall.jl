@@ -204,8 +204,8 @@ function convert(tt::Type{T}, o::PyObject) where T<:Tuple
     end
     ntuple((i ->
             convert(tuptype(T, isva, i),
-                    PyObject(ccall((@pysym :PySequence_GetItem), PyPtr,
-                                   (PyPtr, Int), o, i-1)))),
+                    PyObject(@with_GIL ccall((@pysym :PySequence_GetItem), PyPtr,
+                                             (PyPtr, Int), o, i-1)))),
            len)
 end
 
@@ -327,7 +327,7 @@ function py2array(T, A::Array{TA,N}, o::PyObject,
             error("dimension mismatch in py2array")
         end
         s = stride(A, dim)
-        for j = 0:len-1
+        @with_GIL for j = 0:len-1
             A[i+j*s] = convert(T, PyObject(ccall((@pysym :PySequence_GetItem),
                                                  PyPtr, (PyPtr, Int), o, j)))
         end
@@ -338,7 +338,7 @@ function py2array(T, A::Array{TA,N}, o::PyObject,
             error("dimension mismatch in py2array")
         end
         s = stride(A, dim)
-        for j = 0:len-1
+        @with_GIL for j = 0:len-1
             py2array(T, A, PyObject(ccall((@pysym :PySequence_GetItem),
                                        PyPtr, (PyPtr, Int), o, j)),
                      dim+1, i+j*s)
@@ -357,13 +357,13 @@ function pyarray_dims(o::PyObject, forcelist=true)
     if len == 0
         return (0,)
     end
-    dims0 = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
-                                        PyPtr, (PyPtr, Int), o, 0)),
+    dims0 = pyarray_dims(PyObject(@with_GIL(ccall((@pysym :PySequence_GetItem),
+                                                  PyPtr, (PyPtr, Int), o, 0))),
                          false)
     if isempty(dims0) # not a nested sequence
         return (len,)
     end
-    for j = 1:len-1
+    @with_GIL for j = 1:len-1
         dims = pyarray_dims(PyObject(ccall((@pysym :PySequence_GetItem),
                                            PyPtr, (PyPtr, Int), o, j)),
                             false)
@@ -389,7 +389,7 @@ function py2array(T, o::PyObject)
 end
 
 function py2vector(T, o::PyObject)
-    len = ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
+    len = @with_GIL ccall((@pysym :PySequence_Size), Int, (PyPtr,), o)
     if len < 0 || # not a sequence
        len+1 < 0  # object pretending to be a sequence of infinite length
         pyerr_clear()
@@ -416,7 +416,7 @@ include("numpy.jl")
 function is_mapping_object(o::PyObject)
     pyisinstance(o, @pyglobalobj :PyDict_Type) ||
     (pyquery((@pyglobal :PyMapping_Check), o) &&
-      ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items") == 1)
+      @with_GIL(ccall((@pysym :PyObject_HasAttrString), Cint, (PyPtr,Ptr{UInt8}), o, "items")) == 1)
 end
 
 """
@@ -453,13 +453,13 @@ convert(::Type{PyDict}, o::PyObject) = PyDict(o)
 convert(::Type{PyDict{K,V}}, o::PyObject) where {K,V} = PyDict{K,V}(o)
 unsafe_convert(::Type{PyPtr}, d::PyDict) = PyPtr(d.o)
 
-haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key))
+haskey(d::PyDict{K,V,true}, key) where {K,V} = 1 == @with_GIL(ccall(@pysym(:PyDict_Contains), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 keys(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Keys), PyPtr, (PyPtr,), d)))
 values(::Type{T}, d::PyDict{K,V,true}) where {T,K,V} = convert(Vector{T}, PyObject(@pycheckn ccall((@pysym :PyDict_Values), PyPtr, (PyPtr,), d)))
 
 keys(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["keys"], PyObject))
 values(::Type{T}, d::PyDict{K,V,false}) where {T,K,V} = convert(Vector{T}, pycall(d.o["values"], PyObject))
-haskey(d::PyDict{K,V,false}, key) where {K,V} = 1 == ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key))
+haskey(d::PyDict{K,V,false}, key) where {K,V} = 1 == @with_GIL(ccall(@pysym(:PyMapping_HasKey), Cint, (PyPtr, PyPtr), d, PyObject(key)))
 
 similar(d::PyDict{K,V}) where {K,V} = Dict{pyany_toany(K),pyany_toany(V)}()
 eltype(::Type{PyDict{K,V}}) where {K,V} = Pair{pyany_toany(K),pyany_toany(V)}
@@ -496,12 +496,12 @@ function pop!(d::PyDict, k, default)
 end
 
 function delete!(d::PyDict{K,V,true}, k) where {K,V}
-    e = ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+    e = @with_GIL ccall(@pysym(:PyDict_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     e == -1 && pyerr_clear() # delete! ignores errors in Julia
     return d
 end
 function delete!(d::PyDict{K,V,false}, k) where {K,V}
-    e = ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
+    e = @with_GIL ccall(@pysym(:PyObject_DelItem), Cint, (PyPtr, PyPtr), d, PyObject(k))
     e == -1 && pyerr_clear() # delete! ignores errors in Julia
     return d
 end
@@ -534,9 +534,9 @@ end
 
 function Base.iterate(d::PyDict{K,V,true}, itr=PyDict_Iterator(Ref{PyPtr}(), Ref{PyPtr}(), Ref(0), 0, length(d))) where {K,V}
     itr.i >= itr.len && return nothing
-    if 0 == ccall((@pysym :PyDict_Next), Cint,
-                    (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
-                    d, itr.pa, itr.ka, itr.va)
+    if 0 == @with_GIL(ccall((@pysym :PyDict_Next), Cint,
+                            (PyPtr, Ref{Int}, Ref{PyPtr}, Ref{PyPtr}),
+                            d, itr.pa, itr.ka, itr.va))
         error("unexpected end of PyDict_Next")
     end
     ko = pyincref(itr.ka[]) # PyDict_Next returns
@@ -725,7 +725,7 @@ function pysequence_query(o::PyObject)
     # problems
     if pyisinstance(o, @pyglobalobj :PyTuple_Type)
         len = length(o)
-        return typetuple(pytype_query(PyObject(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1)), PyAny) for i = 1:len)
+        return typetuple(pytype_query(PyObject(@with_GIL(ccall((@pysym :PySequence_GetItem), PyPtr, (PyPtr,Int), o,i-1))), PyAny) for i = 1:len)
     elseif pyisinstance(o, pyxrange[])
         return AbstractRange
     elseif ispybytearray(o)

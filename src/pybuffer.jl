@@ -47,7 +47,9 @@ the python c-api function `PyObject_GetBuffer()`, unless o.obj is a PyPtr(C_NULL
 function pydecref(o::PyBuffer)
     # note that PyBuffer_Release sets o.obj to NULL, and
     # is a no-op if o.obj is already NULL
-    _finalized[] || ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
+    if !_finalized[]
+        @with_GIL ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
+    end
     o
 end
 
@@ -96,8 +98,8 @@ end
 Base.strides(b::PyBuffer) = ((stride(b,i) for i in 1:b.buf.ndim)...,)
 
 iscontiguous(b::PyBuffer) =
-    1 == ccall((@pysym :PyBuffer_IsContiguous), Cint,
-               (Ref{PyBuffer}, Cchar), b, 'A')
+    1 == @with_GIL(ccall((@pysym :PyBuffer_IsContiguous), Cint,
+                         (Ref{PyBuffer}, Cchar), b, 'A'))
 
 #############################################################################
 # pybuffer constant values from Include/object.h
@@ -131,8 +133,8 @@ function isbuftype!(o::Union{PyObject,PyPtr}, b::PyBuffer)
     # PyObject_CheckBuffer is defined in a header file here: https://github.com/python/cpython/blob/ef5ce884a41c8553a7eff66ebace908c1dcc1f89/Include/abstract.h#L510
     # so we can't access it easily. It basically just checks if PyObject_GetBuffer exists
     # So we'll just try call PyObject_GetBuffer and check for success/failure
-    ret = ccall((@pysym :PyObject_GetBuffer), Cint,
-                     (PyPtr, Any, Cint), o, b, PyBUF_ND_STRIDED)
+    ret = @with_GIL ccall((@pysym :PyObject_GetBuffer), Cint,
+                          (PyPtr, Any, Cint), o, b, PyBUF_ND_STRIDED)
     if ret != 0
         pyerr_clear()
     end
