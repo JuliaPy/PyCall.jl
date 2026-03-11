@@ -2,6 +2,10 @@
 
 const _GIL_owner = Threads.Atomic{UInt}(0)
 
+# Forward declare deferred destructors
+function _defer_Py_DecRef end
+function _defer_PyBuffer_Release end
+
 # Acquires the GIL.
 # This lock can be re-acquired if already held by the OS thread (it is re-entrant).
 function GIL_lock()
@@ -52,7 +56,11 @@ macro with_GIL(expr)
         else
             local _state = GIL_lock()
             try
-                $(esc(expr))
+                local val = $(esc(expr))
+                if _deferred_count[] != 0
+                    _drain_release_queues()
+                end
+                val
             finally
                 GIL_unlock(_state)
             end

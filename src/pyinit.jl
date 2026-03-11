@@ -109,14 +109,9 @@ end
 
 #########################################################################
 
-const _finalized = Threads.Atomic{Bool}(false)
-# This flag is set via `Py_AtExit` to avoid calling `pydecref_` after
-# Python is finalized.
-
 function _set_finalized()
     # This function MUST NOT invoke any Python APIs.
     # https://docs.python.org/3/c-api/sys.html#c.Py_AtExit
-    _finalized[] = true
     _GIL_owner[] = UInt(0)
     return nothing
 end
@@ -130,7 +125,6 @@ end
 function __init__()
     # Clear out global states.  This is required only for PyCall
     # AOT-compiled into system image.
-    _finalized[] = false
     _GIL_owner[] = UInt(0)
     empty!(_namespaces)
     empty!(eventloops)

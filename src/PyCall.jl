@@ -77,7 +77,7 @@ mutable struct PyObject
     o::PyPtr # the actual PyObject*
     function PyObject(o::PyPtr)
         po = new(o)
-        finalizer(pydecref, po)
+        finalizer(_defer_Py_DecRef, po)
         return po
     end
 end
@@ -116,9 +116,7 @@ it is equivalent to a `PyNULL()` object.
 ispynull(o::PyObject) = o ≛ PyPtr_NULL
 
 function pydecref_(o::PyPtr)
-    if o !== PyPtr_NULL && !_finalized[]
-        @with_GIL ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
-    end
+    @with_GIL ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
     return o
 end
 

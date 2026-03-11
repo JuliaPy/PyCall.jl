@@ -32,7 +32,7 @@ mutable struct PyBuffer
         b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
-        finalizer(pydecref, b)
+        finalizer(_defer_PyBuffer_Release, b)
         return b
     end
 end
@@ -45,11 +45,7 @@ It is an error to call this function on a PyBuffer that was not obtained via
 the python c-api function `PyObject_GetBuffer()`, unless o.obj is a PyPtr(C_NULL)
 """
 function pydecref(o::PyBuffer)
-    # note that PyBuffer_Release sets o.obj to NULL, and
-    # is a no-op if o.obj is already NULL
-    if !_finalized[]
-        @with_GIL ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
-    end
+    @with_GIL ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
     o
 end
 
