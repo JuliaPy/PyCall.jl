@@ -44,7 +44,7 @@ jobs:
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
 
-      - run: julia -e 'using Pkg; pkg"add PackageCompiler@v1"'
+      - run: julia -e 'using Pkg; pkg"add PackageCompiler"'
 
       - run: aot/compile.jl
       - run: aot/assert_has_pycall.jl
