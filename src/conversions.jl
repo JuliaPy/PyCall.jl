@@ -5,17 +5,10 @@
 
 # conversions from Julia types to PyObject:
 
-@static if pyversion < v"3"
-    PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(:PyInt_FromSize_t),
-                                                    PyPtr, (UInt,), i))
-    PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(:PyInt_FromSsize_t),
-                                                    PyPtr, (Int,), i))
-else
-    PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromUnsignedLongLong),
-                                                    PyPtr, (Culonglong,), i))
-    PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromLongLong),
-                                                    PyPtr, (Clonglong,), i))
-end
+PyObject(i::Unsigned) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromUnsignedLongLong),
+                                                PyPtr, (Culonglong,), i))
+PyObject(i::Integer) = PyObject(@pycheckn ccall(@pysym(:PyLong_FromLongLong),
+                                                PyPtr, (Clonglong,), i))
 
 PyObject(b::Bool) = PyObject(@pycheckn ccall((@pysym :PyBool_FromLong),
                                              PyPtr, (Clong,), b))
@@ -31,25 +24,17 @@ PyObject(n::Nothing) = pyerr_check("PyObject(nothing)", pyincref(pynothing[]))
 
 # conversions to Julia types from PyObject
 
-@static if pyversion < v"3"
-    convert(::Type{T}, po::PyObject) where {T<:Integer} =
-        T(@pycheck ccall(@pysym(:PyInt_AsSsize_t), Int, (PyPtr,), po))
-elseif pyversion < v"3.2"
-    convert(::Type{T}, po::PyObject) where {T<:Integer} =
-        T(@pycheck ccall(@pysym(:PyLong_AsLongLong), Clonglong, (PyPtr,), po))
-else
-    function convert(::Type{T}, po::PyObject) where {T<:Integer}
-        overflow = Ref{Cint}()
-        val = T(@pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow))
-        iszero(overflow[]) || throw(InexactError(:convert, T, po))
-        return val
-    end
-    function convert(::Type{Integer}, po::PyObject)
-        overflow = Ref{Cint}()
-        val = @pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow)
-        iszero(overflow[]) || return convert(BigInt, po)
-        return val
-    end
+function convert(::Type{T}, po::PyObject) where {T<:Integer}
+    overflow = Ref{Cint}()
+    val = T(@pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow))
+    iszero(overflow[]) || throw(InexactError(:convert, T, po))
+    return val
+end
+function convert(::Type{Integer}, po::PyObject)
+    overflow = Ref{Cint}()
+    val = @pycheck ccall(@pysym(:PyLong_AsLongLongAndOverflow), Clonglong, (PyPtr, Ref{Cint}), po, overflow)
+    iszero(overflow[]) || return convert(BigInt, po)
+    return val
 end
 
 convert(::Type{Bool}, po::PyObject) =
@@ -78,13 +63,9 @@ end
 
 function PyObject(s::AbstractString)
     sb = String(s)
-    if pyunicode_literals || !isascii(sb)
-        PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
-                                 PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
-                                 sb, sizeof(sb), C_NULL))
-    else
-        pybytes(sb)
-    end
+    PyObject(@pycheckn ccall(@pysym(PyUnicode_DecodeUTF8),
+                             PyPtr, (Ptr{UInt8}, Int, Ptr{UInt8}),
+                             sb, sizeof(sb), C_NULL))
 end
 
 const _ps_ptr= Ptr{UInt8}[C_NULL]
@@ -713,16 +694,9 @@ include("pydates.jl")
 # A type-query function f(o::PyObject) returns the Julia type
 # for use with the convert function, or Union{} if there isn't one.
 
-@static if pyversion < v"3"
-    pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyInt_Type) ?
-        (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Int) :
-        pyisinstance(o, @pyglobalobj :PyLong_Type) ? BigInt :
-        pyisinstance(o, npy_integer) ? Int : Union{}
-else
-    pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyLong_Type) ?
-        (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Integer) :
-        pyisinstance(o, npy_integer) ? Integer : Union{}
-end
+pyint_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyLong_Type) ?
+    (pyisinstance(o, @pyglobalobj :PyBool_Type) ? Bool : Integer) :
+    pyisinstance(o, npy_integer) ? Integer : Union{}
 
 pyfloat_query(o::PyObject) = pyisinstance(o, @pyglobalobj :PyFloat_Type) ||  pyisinstance(o, npy_floating) ? Float64 : Union{}
 

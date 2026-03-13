@@ -46,11 +46,11 @@ try # make sure deps.jl file is removed on error
                      (Sys.isunix() && !Sys.isapple()) ?
                      whichfirst("python3", "python") : "Conda"),
             vers = isempty(py) || py == "Conda" ? v"0.0" : vparse(pyconfigvar(py,"VERSION","0.0"))
-            if vers < v"2.7"
+            if vers < v"3.3"
                 if isempty(py) || py == "Conda"
                     throw(UseCondaPython())
                 else
-                    error("Python version $vers < 2.7 is not supported")
+                    error("Python version $vers < 3.3 is not supported")
                 end
             end
 
@@ -95,8 +95,8 @@ try # make sure deps.jl file is removed on error
 
     @info "PyCall is using $python (Python $pyversion) at $programname, libpython = $libpy_name"
 
-    if pyversion < v"2.7"
-        error("Python 2.7 or later is required for PyCall")
+    if pyversion < v"3.3"
+        error("Python 3.3 or later is required for PyCall")
     end
 
     writeifchanged("deps.jl", """

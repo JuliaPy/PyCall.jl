@@ -867,23 +867,9 @@ append!(a::PyObject, items::PyObject) =
     PyObject(@pycheckn ccall((@pysym :PySequence_InPlaceConcat),
                              PyPtr, (PyPtr, PyPtr), a, items))
 
-if pyversion >= v"3.3"
-    function empty!(o::PyObject)
-        pydecref(pycall(o."clear", PyObject)) # list.clear() was added in 3.3
-        return o
-    end
-else
-    function empty!(o::PyObject)
-        p = _getproperty(o, "clear")
-        if p != C_NULL # for dict, set, etc.
-            pydecref(pycall(PyObject(o)."clear", PyObject))
-        else
-            for i = length(o)-1:-1:0
-                delete!(o, i)
-            end
-        end
-        return o
-    end
+function empty!(o::PyObject)
+    pydecref(pycall(o."clear", PyObject)) # list.clear() was added in 3.3
+    return o
 end
 
 #########################################################################
@@ -932,9 +918,6 @@ https://github.com/ipython/ipython/blob/5.9.0/IPython/utils/dir2.py
 """
 function get_real_method(obj, name)
     ispynull(obj) && return nothing
-    @static if pyversion < v"3"
-        pyisinstance(obj, @pyglobalobj :PyType_Type) && return nothing
-    end
 
     canary = try
         trygetproperty(obj, "_ipython_canary_method_should_not_exist_", nothing)

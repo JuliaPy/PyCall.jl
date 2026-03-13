@@ -117,10 +117,7 @@ else
 end
 
 # hashes changed from long to intptr_t in Python 3.2
-const Py_hash_t = pyversion < v"3.2" ? Clong : Int
-
-# whether to use unicode for strings by default, ala Python 3
-const pyunicode_literals = pyversion >= v"3.0"
+const Py_hash_t = Int
 
 if libpython == nothing
     macro pysym(func)

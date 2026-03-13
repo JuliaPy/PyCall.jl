@@ -31,7 +31,7 @@ end
 pymodule_exists(s::AbstractString) = !ispynull(pyimport_e(s))
 
 # default integer type for PyAny conversions
-const PyInt = pyversion < v"3" ? Int : Clonglong
+const PyInt = Clonglong
 
 @testset "conversions" begin
     # conversion of NumPy scalars before npy_initialized by array conversions (#481)
@@ -193,11 +193,7 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
         @test showable("text/html", py"Issue816()")
         @test !showable("text/html", py"Issue816")
         @test showable("text/html", py"CallableAsSpecialRepr()")
-        if PyCall.pyversion_build < v"3"
-            @test_broken showable("text/html", py"CallableAsSpecialRepr")
-        else
-            @test showable("text/html", py"CallableAsSpecialRepr")
-        end
+        @test showable("text/html", py"CallableAsSpecialRepr")
     end
 
     # in Python 3, we need a specific encoding to write strings or bufferize them
@@ -279,10 +275,8 @@ const PyInt = pyversion < v"3" ? Int : Clonglong
     let i = BigInt(12345678901234567890), o = PyObject(i) # BigInt
         @test o - i == 0
         @test convert(BigInt, o) == i
-        if pyversion >= v"3.2"
-            @test PyAny(o) == i == convert(Integer, o)
-            @test_throws InexactError convert(Int64, o)
-        end
+        @test PyAny(o) == i == convert(Integer, o)
+        @test_throws InexactError convert(Int64, o)
     end
 
     # bigfloat conversion
