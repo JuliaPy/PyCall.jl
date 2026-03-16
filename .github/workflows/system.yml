@@ -30,12 +30,12 @@ jobs:
             architecture: arm64
             python-version: '3.x'
             julia-version: 'nightly'
-          - os: macos-latest
-            architecture: x64 # agent is arm64 (runs under Rosetta)
+          - os: macos-15-intel
+            architecture: x64
             python-version: '3.x'
             julia-version: '1'
-          - os: macos-latest
-            architecture: x64 # agent is arm64 (runs under Rosetta)
+          - os: macos-15-intel
+            architecture: x64
             python-version: '3.x'
             julia-version: 'nightly'
           # 32 bit Windows:
@@ -70,16 +70,8 @@ jobs:
           architecture: ${{ matrix.architecture }}
       - name: Install numpy
         run: python -m pip install --user numpy
-        if: ${{ !(matrix.os == 'macos-latest' && matrix.architecture == 'x64') }}
-      - name: Install numpy (Rosetta)
-        run: arch -x86_64 python -m pip install --user numpy
-        if: ${{ matrix.os == 'macos-latest' && matrix.architecture == 'x64' }}
       - name: Install virtualenv
         run: python -m pip install virtualenv
-        if: ${{ !(matrix.os == 'macos-latest' && matrix.architecture == 'x64') }}
-      - name: Install virtualenv (Rosetta)
-        run: arch -x86_64 python -m pip install virtualenv
-        if: ${{ matrix.os == 'macos-latest' && matrix.architecture == 'x64' }}
       - run: virtualenv --version
       - name: Setup julia
         uses: julia-actions/setup-julia@v1
