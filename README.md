@@ -52,11 +52,12 @@ can change the Python version by setting the `PYTHON` environment variable
 to the path of the `python` (or `python3` etc.) executable and then re-running `Pkg.build("PyCall")`.
 In Julia:
 
-    ENV["PYTHON"] = "... path of the python executable ..."
-    # ENV["PYTHON"] = raw"C:\Python310-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python310-x64\\python.exe"
-
-    # ENV["PYTHON"] = "/usr/bin/python3.10"           # example for *nix
-    Pkg.build("PyCall")
+```julia
+ENV["PYTHON"] = "... path of the python executable ..."
+# ENV["PYTHON"] = raw"C:\Python310-x64\python.exe" # example for Windows, "raw" to not have to escape: "C:\\Python310-x64\\python.exe"
+# ENV["PYTHON"] = "/usr/bin/python3.10"           # example for *nix
+Pkg.build("PyCall")
+```
 
 Note also that you will need to re-run `Pkg.build("PyCall")` if your
 `python` program changes significantly (e.g. you switch to a new
@@ -102,9 +103,11 @@ Windows, or using the Julia Conda package, in order to minimize headaches.
 
 Here is a simple example to call Python's `math.sin` function:
 
-    using PyCall
-    math = pyimport("math")
-    math.sin(math.pi / 4) # returns ≈ 1/√2 = 0.70710678...
+```julia
+using PyCall
+math = pyimport("math")
+math.sin(math.pi / 4) # returns ≈ 1/√2 = 0.70710678...
+```
 
 Type conversions are automatically performed for numeric, boolean,
 string, IO stream, date/period, and function types, along with tuples,
@@ -122,10 +125,13 @@ Keyword arguments can also be passed. For example, matplotlib's
 [pyplot](https://matplotlib.org/) uses keyword arguments to specify plot
 options, and this functionality is accessed from Julia by:
 
-    plt = pyimport("matplotlib.pyplot")
-    x = range(0;stop=2*pi,length=1000); y = sin.(3*x + 4*cos.(2*x));
-    plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
-    plt.show()
+```julia
+plt = pyimport("matplotlib.pyplot")
+x = range(0;stop=2*pi,length=1000)
+y = sin.(3*x + 4*cos.(2*x))
+plt.plot(x, y, color="red", linewidth=2.0, linestyle="--")
+plt.show()
+```
 
 However, for better integration with Julia graphics backends and to
 avoid the need for the `show` function, we recommend using matplotlib
@@ -135,14 +141,18 @@ Arbitrary Julia functions can be passed to Python routines taking
 function arguments.  For example, to find the root of cos(x) - x,
 we could call the Newton solver in scipy.optimize via:
 
-    so = pyimport("scipy.optimize")
-    so.newton(x -> cos(x) - x, 1)
+```julia
+so = pyimport("scipy.optimize")
+so.newton(x -> cos(x) - x, 1)
+```
 
 A macro exists for mimicking Python's "with statement". For example:
 
-    @pywith pybuiltin("open")("file.txt","w") as f begin
-        f.write("hello")
-    end
+```julia
+@pywith pybuiltin("open")("file.txt","w") as f begin
+    f.write("hello")
+end
+```
 
 The type of `f` can be specified with `f::T` (for example, to override automatic
 conversion, use `f::PyObject`). Similarly, if the context manager returns a type
@@ -430,66 +440,76 @@ documentation `?pyfunction` and `?pyfunctionret` for more information.
 `@pydef` creates a Python class whose methods are implemented in Julia.
 For instance,
 
-    P = pyimport("numpy.polynomial")
-    @pydef mutable struct Doubler <: P.Polynomial
-        function __init__(self, x=10)
-            self.x = x
-        end
-        my_method(self, arg1::Number) = arg1 + 20
-        x2.get(self) = self.x * 2
-        function x2.set!(self, new_val)
-            self.x = new_val / 2
-        end
+```julia
+P = pyimport("numpy.polynomial")
+@pydef mutable struct Doubler <: P.Polynomial
+    function __init__(self, x=10)
+        self.x = x
     end
-    Doubler().x2
+    my_method(self, arg1::Number) = arg1 + 20
+    x2.get(self) = self.x * 2
+    function x2.set!(self, new_val)
+        self.x = new_val / 2
+    end
+end
+Doubler().x2
+```
 
 is essentially equivalent to the following Python code:
 
-    import numpy.polynomial
-    class Doubler(numpy.polynomial.Polynomial):
-        def __init__(self, x=10):
-            self.x = x
-        def my_method(self, arg1): return arg1 + 20
-        @property
-        def x2(self): return self.x * 2
-        @x2.setter
-        def x2(self, new_val):
-            self.x = new_val / 2
-    Doubler().x2
+```python
+import numpy.polynomial
+class Doubler(numpy.polynomial.Polynomial):
+    def __init__(self, x=10):
+        self.x = x
+    def my_method(self, arg1): return arg1 + 20
+    @property
+    def x2(self): return self.x * 2
+    @x2.setter
+    def x2(self, new_val):
+        self.x = new_val / 2
+Doubler().x2
+```
 
 The method arguments and return values are automatically converted between Julia and Python. All Python special methods are supported (`__len__`, `__add__`, etc.).
 
 `@pydef` allows for multiple inheritance of Python classes:
 
-    @pydef mutable struct SomeType <: (BaseClass1, BaseClass2)
-        ...
-    end
+```julia
+@pydef mutable struct SomeType <: (BaseClass1, BaseClass2)
+    ...
+end
+```
 
 Here's another example using [Tkinter](https://wiki.python.org/moin/TkInter):
 
-    using PyCall
-    tk = pyimport("Tkinter")
+```julia
+using PyCall
+tk = pyimport("Tkinter")
 
-    @pydef mutable struct SampleApp <: tk.Tk
-        __init__(self, args...; kwargs...) = begin
-            tk.Tk.__init__(self, args...; kwargs...)
-            self.label = tk.Label(text="Hello, world!")
-            self.label.pack(padx=10, pady=10)
-        end
+@pydef mutable struct SampleApp <: tk.Tk
+    __init__(self, args...; kwargs...) = begin
+        tk.Tk.__init__(self, args...; kwargs...)
+        self.label = tk.Label(text="Hello, world!")
+        self.label.pack(padx=10, pady=10)
     end
+end
 
-    app = SampleApp()
-    app.mainloop()
+app = SampleApp()
+app.mainloop()
+```
 
 Class variables are also supported:
 
-    using PyCall
-    @pydef mutable struct ObjectCounter
-        obj_count = 0 # Class variable
-        function __init__(::PyObject)
-            ObjectCounter.obj_count += 1
-        end
+```julia
+using PyCall
+@pydef mutable struct ObjectCounter
+    obj_count = 0 # Class variable
+    function __init__(::PyObject)
+        ObjectCounter.obj_count += 1
     end
+end
+```
 
 ### GUI Event Loops
 
@@ -499,8 +519,7 @@ convenient to start the GUI event loop (which processes things like
 mouse clicks) as an asynchronous task within Julia, so that the GUI is
 responsive without blocking Julia's input prompt.  PyCall includes
 functions to implement these event loops for some of the most common
-cross-platform [GUI
-toolkits](https://en.wikipedia.org/wiki/Widget_toolkit):
+cross-platform [GUI toolkits](https://en.wikipedia.org/wiki/Widget_toolkit):
 [wxWidgets](http://www.wxwidgets.org/), [GTK+](http://www.gtk.org/)
 version 2 (via [PyGTK](http://www.pygtk.org/)) or version 3 (via
 [PyGObject](https://pygobject.readthedocs.io/en/latest/)), and
@@ -627,7 +646,7 @@ To use `PyCall` with a certain virtual environment, set the environment
 variable `PYCALL_JL_RUNTIME_PYTHON` *before* importing `PyCall` to
 path to the Python executable.  For example:
 
-```julia
+```julia-repl
 $ source PATH/TO/bin/activate  # activate virtual environment in system shell
 
 $ julia  # start Julia
