@@ -29,7 +29,7 @@ jobs:
       Python ${{ matrix.python-version }}
       ${{ matrix.os }} ${{ matrix.architecture }}
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v6
       - name: Setup python
         uses: actions/setup-python@v6
         with:
@@ -38,13 +38,15 @@ jobs:
       - run: python --version
       - run: python -m pip install --user numpy
       - name: Setup julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
 
-      - run: julia -e 'using Pkg; pkg"add PackageCompiler"'
+      - name: Install PackageCompiler.jl
+        run: using Pkg; Pkg.add("PackageCompiler", version="1")
+        shell: julia --color=yes {0}
 
       - run: aot/compile.jl
       - run: aot/assert_has_pycall.jl

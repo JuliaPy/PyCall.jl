@@ -62,7 +62,7 @@ jobs:
       Python ${{ matrix.python-version }}
       ${{ matrix.os }} ${{ matrix.architecture }}
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v6
       - name: Setup python
         uses: actions/setup-python@v6
         with:
@@ -74,7 +74,7 @@ jobs:
         run: python -m pip install virtualenv
       - run: virtualenv --version
       - name: Setup julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.architecture }}
@@ -91,8 +91,8 @@ jobs:
           #  https://docs.github.com/en/actions/learn-github-actions/contexts#runner-context
           _TMP_DIR: ${{ runner.temp }}
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v6
         with:
-          file: ./lcov.info
+          files: ./lcov.info
           flags: unittests
           name: codecov-umbrella
