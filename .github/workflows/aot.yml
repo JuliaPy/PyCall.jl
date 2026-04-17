@@ -37,9 +37,6 @@ jobs:
           architecture: ${{ matrix.architecture }}
       - run: python --version
       - run: python -m pip install --user numpy
-      - name: Install libpython2.7 for `find_libpython` test
-        run: sudo apt-get install python2.7-dev
-        if: ${{ matrix.python-version != '2.7' && matrix.os == 'ubuntu-latest' }}
       - name: Setup julia
         uses: julia-actions/setup-julia@v2
         with:
@@ -47,9 +44,7 @@ jobs:
           arch: ${{ matrix.architecture }}
           show-versioninfo: true
 
-      - name: Install PackageCompiler.jl
-        run: using Pkg; Pkg.add("PackageCompiler", version="1")
-        shell: julia --color=yes {0}
+      - run: julia -e 'using Pkg; pkg"add PackageCompiler"'
 
       - run: aot/compile.jl
       - run: aot/assert_has_pycall.jl

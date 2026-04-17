@@ -147,7 +147,7 @@ function copy(a::PyArray{T,N}) where {T,N}
     # `Array`) otherwise we do a regular `copyto!`, such that A[I...] == a[I...]
     A = Array{T}(undef, a.dims)
     if a.f_contig
-        ccall(:memcpy, Cvoid, (Ptr{T}, Ptr{T}, Int), A, a, sizeof(T)*length(a))
+        ccall(:memcpy, Cvoid, (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t), A, a, sizeof(T)*length(a))
     else
         copyto!(A, a)
     end
