@@ -32,9 +32,22 @@ mutable struct PyBuffer
         b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
                           C_NULL, C_NULL, C_NULL))
-        finalizer(pydecref, b)
+        finalizer(pydecref_safe_, b)
         return b
     end
+end
+
+const PYDECREF_PYBUFFER_LOCK = ReentrantLock()
+
+function pydecref_safe_(b::PyBuffer)
+    # If available, we lock and decref
+    !islocked(PYDECREF_PYBUFFER_LOCK) &&
+        trylock(() -> (pydecref(b); true), PYDECREF_PYBUFFER_LOCK) &&
+        return nothing
+
+    # Add back to queue to be decref'd later
+    finalizer(pydecref_safe_, b)
+    return nothing
 end
 
 """

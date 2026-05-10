@@ -110,7 +110,7 @@ end
 #########################################################################
 
 const _finalized = Ref(false)
-# This flag is set via `Py_AtExit` to avoid calling `pydecref_` after
+# This flag is set via `Py_AtExit` to avoid calling `pydecref_unsafe_` after
 # Python is finalized.
 
 function _set_finalized()
