@@ -76,7 +76,13 @@ try # make sure deps.jl file is removed on error
 
     use_conda = dirname(python) == abspath(Conda.PYTHONDIR)
     if use_conda
-        Conda.add("numpy"; satisfied_skip_solve=true)
+        if Sys.iswindows() && Sys.WORD_SIZE == 32
+            # Conda is no longer distributed for 32-bit Windows
+            # and does not have satisified_skip_solve
+            Conda.add("numpy")
+        else
+            Conda.add("numpy"; satisfied_skip_solve=true)
+        end
     end
 
     (libpython, libpy_name) = find_libpython(python)
