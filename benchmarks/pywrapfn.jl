@@ -81,7 +81,7 @@ See check_pyargsptr(nargs::Int) above
 """
 function check_pyargsptr(pf::PyWrapFn{N, RT}) where {N, RT}
     if unsafe_load(pf.pyargsptr).ob_refcnt > 1
-        pydecref_(pf.pyargsptr)
+        pydecref_unsafe_(pf.pyargsptr)
         pf.pyargsptr =
             @pycheckn ccall((@pysym :PyTuple_New), PyPtr, (Int,), nargs)
     end

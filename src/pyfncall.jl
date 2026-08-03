@@ -28,7 +28,7 @@ function _pycall!(ret::PyObject, o::Union{PyObject,PyPtr}, args, nargs::Int=leng
         end
         return __pycall!(ret, pyargsptr, o, kw) #::PyObject
     finally
-        pydecref_(pyargsptr)
+        pydecref_unsafe_(pyargsptr)
     end
 end
 
@@ -42,7 +42,7 @@ function __pycall!(ret::PyObject, pyargsptr::PyPtr, o::Union{PyObject,PyPtr},
     disable_sigint() do
         retptr = @pycheckn ccall((@pysym :PyObject_Call), PyPtr, (PyPtr,PyPtr,PyPtr), o,
                         pyargsptr, kw)
-        pydecref_(ret)
+        pydecref_unsafe_(ret)
         setfield!(ret, :o, retptr)
     end
     return ret #::PyObject
