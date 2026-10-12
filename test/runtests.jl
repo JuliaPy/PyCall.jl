@@ -856,7 +856,17 @@ end
 
 include("test_pyfncall.jl")
 include("testpybuffer.jl")
-include("gil.jl")
+
+if Threads.nthreads() >= 3
+    include("gil.jl")
+else
+    # addenv requires v1.6+
+    env = copy(ENV)
+    # -t command line argument requires v1.5+
+    env["JULIA_NUM_THREADS"] = "3"
+    gil_file = joinpath(@__DIR__, "gil.jl")
+    run(Cmd(`$(Base.julia_cmd()) --startup-file=no $gil_file`, env=env))
+end
 if lowercase(get(ENV, "JULIA_PKGEVAL", "false")) != "true"
     include("test_venv.jl")
     include("test_build.jl")

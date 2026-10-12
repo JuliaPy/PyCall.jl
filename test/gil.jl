@@ -39,40 +39,47 @@ using Base.Threads
         @test isempty(PyCall._deferred_Py_DecRef)
     end
 
-    @testset "GIL + GC safepoint deadlock" begin
-        done = Threads.Atomic{Bool}(false)
+    if Threads.nthreads() >= 3
+        # Without enough worker threads, the test will either hang
+        # (since no progress will be made on task2) or not testing anything
+        # (single thread task switching without actual contension/dead lock)
+        @testset "GIL + GC safepoint deadlock" begin
+            done = Threads.Atomic{Bool}(false)
 
-        # If not protected by a (GC-aware) Julia-level lock, it is possible
-        # to deadlock with the GC + GIL:
-        #   1. Task A holds the GIL
-        #   2. Task B waits to access the GIL
-        #   3. Task A triggers GC
-        #   4. Task B never reaches a safepoint, due to waiting for the GIL.
-        task1 = Threads.@spawn begin
-            while !done[]
-                PyCall.@with_GIL begin
-                    for _ in 1:10_000
-                        PyObject(0)
+            # If not protected by a (GC-aware) Julia-level lock, it is possible
+            # to deadlock with the GC + GIL:
+            #   1. Task A holds the GIL
+            #   2. Task B waits to access the GIL
+            #   3. Task A triggers GC
+            #   4. Task B never reaches a safepoint, due to waiting for the GIL.
+            task1 = Threads.@spawn begin
+                while !done[]
+                    PyCall.@with_GIL begin
+                        for _ in 1:10_000
+                            PyObject(0)
+                        end
                     end
                 end
             end
-        end
 
-        task2 = Threads.@spawn begin
-            while !done[]
-                PyCall.@with_GIL begin
-                    for _ in 1:10_000
-                        PyObject(0)
+            task2 = Threads.@spawn begin
+                while !done[]
+                    PyCall.@with_GIL begin
+                        for _ in 1:10_000
+                            PyObject(0)
+                        end
                     end
+                    GC.gc(true)
                 end
-                GC.gc(true)
             end
-        end
 
-        result = timedwait(() -> istaskdone(task1) || istaskdone(task2), 3.0)
-        done[] = true
-        timedwait(() -> istaskdone(task1) && istaskdone(task2), 5.0)
-        @test result === :timed_out
+            result = timedwait(() -> istaskdone(task1) || istaskdone(task2), 3.0)
+            done[] = true
+            timedwait(() -> istaskdone(task1) && istaskdone(task2), 5.0)
+            @test result === :timed_out
+        end
+    else
+        @warn "GIL test requires at least 3 threads to run"
     end
 
 end
