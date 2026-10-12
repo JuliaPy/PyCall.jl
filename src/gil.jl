@@ -3,18 +3,9 @@
 const _GIL_owner = Threads.Atomic{UInt}(0)
 
 # It is not legal for Julia code to spin directly on "foreign" locks such as
-# the GIL, since this can mean never making progress toward:
-#
-#   * GC safepoints, which causes deadlocks when other threads initiate a GC
-#     and wait forever for all threads to "stop".
-#
-#   * yield() points, which can starve the scheduler and also lead to deadlocks
-#     since Tasks waiting for the GIL can block other Tasks ready to make
-#     progress from being scheduled.
-#
-# Instead we are required to hold a Julia-side lock that is GC-aware + scheduler-
-# aware whenever we hold the foreign GIL, preventing these deadlocks.
-const _jl_gil = ReentrantLock()
+# the GIL, since this can mean never making progress toward.
+# Instead we need to tell the julia runtime about it so that GC operations
+# can be scheduled.
 
 # Forward declare deferred destructors
 function _defer_Py_DecRef end
@@ -23,8 +14,16 @@ function _defer_PyBuffer_Release end
 # Acquires the GIL.
 # This lock can be re-acquired if already held by the OS thread (it is re-entrant).
 function GIL_lock()
-    lock(_jl_gil)
-    state = ccall((@pysym :PyGILState_Ensure), Cint, ())
+    @static if VERSION < v"1.12"
+        gc_state = ccall(:jl_gc_safe_enter, Int8, ())
+        state = ccall((@pysym :PyGILState_Ensure), Cint, ())
+        ccall(:jl_gc_safe_leave, Cvoid, (Int8,), gc_state)
+        ccall(:jl_gc_safepoint, Cvoid, ())
+    elseif libpython == nothing
+        state = @ccall gc_safe=true PyGILState_Ensure()::Cint
+    else
+        state = @ccall gc_safe=true libpython.PyGILState_Ensure()::Cint
+    end
     _GIL_owner[] = objectid(current_task())
     return state
 end
@@ -34,7 +33,6 @@ end
 function GIL_unlock(state::Cint)
     _GIL_owner[] = UInt(0)
     ccall((@pysym :PyGILState_Release), Cvoid, (Cint,), state)
-    unlock(_jl_gil)
 end
 
 # Quickly check whether this task holds the GIL.
