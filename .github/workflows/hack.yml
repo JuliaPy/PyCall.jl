@@ -1,0 +1,29 @@
+name: Hack to satisfy repo requirement
+
+on:
+  push:
+    branches:
+      - master
+    tags: '*'
+  pull_request:
+
+jobs:
+  test-hack:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        name:
+          - Test Julia 1 Conda macos-latest x64
+          - Test Julia 1 Python 2.7 ubuntu-latest x64
+          - Test Julia 1 Python 2.7 windows-2019 x64
+          - Test Julia 1 Python 2.7 windows-2019 x64
+          - Test Julia 1 Python 3.9 ubuntu-latest x64
+          - Test Julia 1 Python 3.x macos-latest x64
+          - Test Julia 1.0 Python 3.x macos-latest x64
+          - Test Julia 1.0 Python 3.x ubuntu-latest x64
+          - Test Julia 1.0 Python 3.x windows-latest x64
+          - Test Julia nightly Python 3.x macos-latest x64
+      fail-fast: false
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
