@@ -30,11 +30,11 @@ jobs:
             architecture: arm64
             python-version: '3.x'
             julia-version: 'nightly'
-          - os: macos-15-intel
+          - os: macos-26-intel
             architecture: x64
             python-version: '3.x'
             julia-version: '1'
-          - os: macos-15-intel
+          - os: macos-26-intel
             architecture: x64
             python-version: '3.x'
             julia-version: 'nightly'
