@@ -11,8 +11,6 @@
 #      when po is deallocated, and this callback function removes
 #      jo from pycall_gc so that Julia can garbage-collect it.
 
-using Base.Threads: atomic_add!, atomic_sub!, Atomic, SpinLock
-
 const pycall_gc = Dict{PyPtr,Any}()
 
 function weakref_callback(callback::PyPtr, wo::PyPtr)
@@ -58,75 +56,117 @@ end
 #   * To work around this, we defer any GIL-requiring operations to run
 #     at the end of next `@with_GIL` block.
 
-const _deferred_count = Atomic{Int}(0)
-const _deferred_Py_DecRef = Vector{PyPtr}()
-const _deferred_PyBuffer_Release = Vector{PyBuffer}()
+mutable struct DeferredNode
+    obj::Union{PyPtr,PyBuffer}
+    next::Union{DeferredNode,Nothing}
+    DeferredNode(x) = new(x, nothing)
+end
 
-# Since it is illegal for finalizers to `yield()` to the Julia scheduler, this
-# lock MUST be a `SpinLock` or similar. Most other locks in `Base` implicitly
-# yield.
-const _deferred_queue_lock = SpinLock()
+@static if VERSION >= v"1.12"
+    using Base.Threads: @atomic, @atomicswap, @atomicreplace
+    mutable struct DeferredList
+        @atomic head::Union{DeferredNode,Nothing}
+    end
+    const _deferred_list = DeferredList(nothing)
+
+    function _add_deferred(node::DeferredNode)
+        # The read of the list head doesn't need any ordering
+        # since we are only using it to write to the `node`.
+        # Note that the guarantee that `_take_deferred` can see the correct content
+        # originates from the fact that every write to the head is an RMW,
+        # so each pusher's release CAS forms a release sequence
+        # that extends through all later CAS's and so the acquire read
+        # (swap in `_take_deferred`) synchronizes with every pusher, not just the last one.
+        # Since these release store to the head covers the entire linked list
+        # (guaranteed by the atomic CAS, no matter ordering)
+        # an acquired read should observe all of the nodes in the linked list in a valid state.
+        head = @atomic :monotonic _deferred_list.head
+        while true
+            node.next = head
+            res = @atomicreplace :release :monotonic _deferred_list.head head => node
+            if res.success
+                break
+            end
+            head = res.old
+        end
+    end
+    function _take_deferred()
+        return @atomicswap :acquire _deferred_list.head = nothing
+    end
+else
+    using Base.Threads: SpinLock
+    # Since it is illegal for finalizers to `yield()` to the Julia scheduler, this
+    # lock MUST be a `SpinLock` or similar. Most other locks in `Base` implicitly
+    # yield.
+    # Also note that the spinlock is not reentrant and since this can be called from
+    # the finallizer (i.e. GC) we must not allocate or do anything that can trigger GC
+    # in with the lock held. This isn't going to be super reliable
+    # but should be good enough to support older julia versions.
+    const _deferred_queue_lock = SpinLock()
+    mutable struct DeferredList
+        head::Union{DeferredNode,Nothing}
+    end
+    const _deferred_list = DeferredList(nothing)
+
+    function _add_deferred(node::DeferredNode)
+        lock(_deferred_queue_lock) do
+            head = _deferred_list.head
+            node.next = head
+            _deferred_list.head = node
+            return
+        end
+    end
+    function _take_deferred()
+        # If the head is nothing, we don't need the load to have any acquire semantics
+        # so we could read it out of the locking region as long as the read itself is atomic
+        # (i.e. doesn't return torn pointer)
+        if _deferred_list.head === nothing
+            return
+        end
+        lock(_deferred_queue_lock) do
+            # The head has changed so we need to read again.
+            head = _deferred_list.head
+            _deferred_list.head = nothing
+            return head
+        end
+    end
+end
 
 # Defers a `Py_DecRef(o)` call to be performed later, when the GIL is available
 function _defer_Py_DecRef(o::PyObject)
-    lock(_deferred_queue_lock)
-    try
-        ptr = getfield(o, :o)
-        if ptr !== PyPtr_NULL
-            push!(_deferred_Py_DecRef, ptr)
-            atomic_add!(_deferred_count, 1)
-            setfield!(o, :o, PyPtr_NULL)
-        end
-    finally
-        unlock(_deferred_queue_lock)
+    ptr = getfield(o, :o)
+    if ptr !== PyPtr_NULL
+        _add_deferred(DeferredNode(ptr))
+        setfield!(o, :o, PyPtr_NULL)
     end
     return
 end
 
 # Defers a `PyBuffer_Release(o)` call to be performed later, when the GIL is available
 function _defer_PyBuffer_Release(o::PyBuffer)
-    lock(_deferred_queue_lock)
-    try
-        push!(_deferred_PyBuffer_Release, o)
-        atomic_add!(_deferred_count, 1)
-    finally
-        unlock(_deferred_queue_lock)
-    end
+    _add_deferred(DeferredNode(o))
     return
 end
 
 # Called at the end of every `@with_GIL` block, this performs any deferred destruction
 # operations from finalizers that could not be done immediately due to not holding the GIL
-@noinline function _drain_release_queues()
-    lock(_deferred_queue_lock)
-
-    nobj = length(_deferred_Py_DecRef)
-    nbuf = length(_deferred_PyBuffer_Release)
-    atomic_sub!(_deferred_count, nobj + nbuf)
-
-    if nobj != 0
-        Py_DecRefs = copy(_deferred_Py_DecRef)
-        empty!(_deferred_Py_DecRef)
+@inline function _check_release_queues()
+    list = _take_deferred()
+    if list === nothing
+        return
     end
+    _drain_release_queues(list)
+end
 
-    if nbuf != 0
-        PyBuffer_Releases = copy(_deferred_PyBuffer_Release)
-        empty!(_deferred_PyBuffer_Release)
-    end
-
-    unlock(_deferred_queue_lock)
-
-    if nobj != 0
-        for o in Py_DecRefs
+@noinline function _drain_release_queues(node)
+    while node !== nothing
+        o = node.obj
+        if isa(o, PyBuffer)
+            ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
+        else
             ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), o)
         end
+        node = node.next
     end
-
-    if nbuf != 0
-        for o in PyBuffer_Releases
-            ccall(@pysym(:PyBuffer_Release), Cvoid, (Ref{PyBuffer},), o)
-        end
-    end
-
     return nothing
 end

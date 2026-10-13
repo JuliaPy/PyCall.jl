@@ -34,9 +34,9 @@ using Base.Threads
             result = timedwait(() -> istaskdone(t), 5.0)
             @test result === :ok
             @test fetch(t) === true
-            @test !isempty(PyCall._deferred_Py_DecRef)
+            @test PyCall._deferred_list.head !== nothing
         end
-        @test isempty(PyCall._deferred_Py_DecRef)
+        @test PyCall._deferred_list.head === nothing
     end
 
     if Threads.nthreads() >= 3
