@@ -71,9 +71,7 @@ macro with_GIL(expr)
             local _state = GIL_lock()
             try
                 local val = $(esc(expr))
-                if _deferred_count[] != 0
-                    _drain_release_queues()
-                end
+                _check_release_queues()
                 val
             finally
                 GIL_unlock(_state)
