@@ -6,6 +6,7 @@
 #############################################################################
 # mirror of Py_buffer struct in Python Include/object.h
 
+# Stable ABI since 3.11
 struct Py_buffer
     buf::Ptr{Cvoid}
     obj::PyPtr
@@ -18,12 +19,7 @@ struct Py_buffer
     shape::Ptr{Cssize_t}
     strides::Ptr{Cssize_t}
     suboffsets::Ptr{Cssize_t}
-
-    # some opaque padding fields to account for differences between
-    # Python versions (the structure changed in Python 2.7 and 3.3)
-    internal0::Ptr{Cvoid}
-    internal1::Ptr{Cvoid}
-    internal2::Ptr{Cvoid}
+    internal::Ptr{Cvoid}
 end
 
 mutable struct PyBuffer
@@ -31,7 +27,7 @@ mutable struct PyBuffer
     PyBuffer() = begin
         b = new(Py_buffer(C_NULL, PyPtr_NULL, 0, 0,
                           0, 0, C_NULL, C_NULL, C_NULL, C_NULL,
-                          C_NULL, C_NULL, C_NULL))
+                          C_NULL))
         finalizer(pydecref, b)
         return b
     end
