@@ -313,7 +313,7 @@ function PyTypeObject!(init::Function, t::PyTypeObject, name::AbstractString, ba
         t.tp_new = @pyglobal :PyType_GenericNew
     end
     @pycheckz ccall((@pysym :PyType_Ready), Cint, (Ref{PyTypeObject},), t)
-    ccall((@pysym :Py_IncRef), Cvoid, (Any,), t)
+    @with_GIL ccall((@pysym :Py_IncRef), Cvoid, (Any,), t)
     return t
 end
 
@@ -416,7 +416,7 @@ function pyjlwrap_type!(init::Function, to::PyTypeObject, name::AbstractString)
         # We want tp_base to be a pointer to the C-like PyTypeObject struct.
         # This is equivalent to the jl_value_t* in Julia (see JuliaLang/julia#31473).
         t.tp_base = pointer_from_objref(jlWrapType)
-        ccall((@pysym :Py_IncRef), Cvoid, (Ref{PyTypeObject},), jlWrapType)
+        @with_GIL ccall((@pysym :Py_IncRef), Cvoid, (Ref{PyTypeObject},), jlWrapType)
         init(t)
     end
 end
@@ -451,7 +451,7 @@ function pyjlwrap_new(x::Any)
     pyjlwrap_new(jlWrapType, x)
 end
 
-is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Ref{PyTypeObject}), o, jlWrapType) == 1
+is_pyjlwrap(o::PyObject) = jlWrapType.tp_new != C_NULL && @with_GIL(ccall((@pysym :PyObject_IsInstance), Cint, (PyPtr, Ref{PyTypeObject}), o, jlWrapType)) == 1
 
 ################################################################
 # Fallback conversion: if we don't have a better conversion function,

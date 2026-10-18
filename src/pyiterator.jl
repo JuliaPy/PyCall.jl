@@ -149,12 +149,12 @@ end
 # Broadcasting: if the object is iterable, return collect(o), and otherwise
 #               return o.
 function Base.Broadcast.broadcastable(o::PyObject)
-    iter = ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), o)
+    iter = @with_GIL ccall((@pysym :PyObject_GetIter), PyPtr, (PyPtr,), o)
     if iter == C_NULL
         pyerr_clear()
         return Ref(o)
     else
-        ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), iter)
+        @with_GIL ccall(@pysym(:Py_DecRef), Cvoid, (PyPtr,), iter)
         return collect(o)
     end
 end
