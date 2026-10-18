@@ -15,7 +15,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-26-intel
           - windows-latest
         architecture: [x64]
         julia-version: ['1']
