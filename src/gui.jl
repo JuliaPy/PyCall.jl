@@ -143,7 +143,11 @@ end
 function qt_eventloop(QtCore::PyObject, sec::Real=50e-3)
     fixqtpath()
     instance = QtCore."QCoreApplication"."instance"
-    AllEvents = QtCore."QEventLoop"."AllEvents"
+    AllEvents = try
+        QtCore."QEventLoop"."AllEvents"
+    catch
+        QtCore."QEventLoop"."ProcessEventsFlag"."AllEvents"
+    end
     processEvents = QtCore."QCoreApplication"."processEvents"
     pop!(ENV, "QT_PLUGIN_PATH", "") # clean up environment
     maxtime = PyObject(50)
